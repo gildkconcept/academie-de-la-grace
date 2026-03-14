@@ -17,9 +17,10 @@
     "@tailwindcss/postcss": "^4",
     "@yudiel/react-qr-scanner": "^2.5.1",
     "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "jsonwebtoken": "^9.0.2",
-    "next": "15.2.4",
+    "next": "^15.5.12",
     "qrcode": "^1.5.4",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -27,6 +28,7 @@
     "react-qr-code": "^2.0.18",
     "recharts": "^2.15.2",
     "sonner": "^2.0.3",
+    "tailwind-merge": "^2.6.0",
     "tailwindcss": "^4",
     "typescript": "^5.8.2",
     "zod": "^3.24.2"
@@ -39,6 +41,6 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.2.4"
+    "eslint-config-next": "15.5.12"
   }
 }
