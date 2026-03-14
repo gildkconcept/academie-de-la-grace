@@ -9,6 +9,7 @@ interface QRScannerProps {
   onError?: (error: string) => void
 }
 
+// Export nommé (c'est ce qui est important)
 export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
   const [isActive, setIsActive] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
@@ -30,10 +31,8 @@ export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
     }
   }
 
-  // CORRECTION ICI : le paramètre est un tableau de IDetectedBarcode
   const handleScan = (detectedCodes: IDetectedBarcode[]) => {
     if (detectedCodes && detectedCodes.length > 0) {
-      // Prendre le premier code détecté
       const result = detectedCodes[0].rawValue
       onScan(result)
       setIsActive(false)
@@ -143,3 +142,6 @@ export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
     </div>
   )
 }
+
+// Pour être sûr, on ajoute aussi un export par défaut
+export default QRScanner
