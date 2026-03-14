@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { BrowserMultiFormatReader } from '@yudiel/react-qr-scanner'
+import { useState, useEffect } from 'react'
+import QrScanner from '@yudiel/react-qr-scanner'
 import { toast } from 'sonner'
 
 interface QRScannerProps {
@@ -9,10 +9,9 @@ interface QRScannerProps {
   onError?: (error: string) => void
 }
 
-export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
+export const QRScannerComponent = ({ onScan, onError }: QRScannerProps) => {
   const [isActive, setIsActive] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Vérifier la permission caméra au démarrage
   useEffect(() => {
@@ -46,6 +45,7 @@ export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
   const handleError = (error: any) => {
     console.error('Erreur scan:', error)
     if (onError) onError('Erreur lors du scan')
+    toast.error('Erreur de scan. Réessayez.')
   }
 
   const startScan = () => {
@@ -57,11 +57,10 @@ export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
     setHasPermission(null)
   }
 
-  // Bouton flottant pour démarrer le scan (style mobile)
+  // Bouton flottant pour démarrer le scan
   if (!isActive) {
     return (
       <>
-        {/* Bouton fixe en bas de l'écran */}
         <button
           onClick={startScan}
           className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white py-4 px-8 rounded-full shadow-lg hover:bg-indigo-700 active:bg-indigo-800 transition-all duration-200 text-lg font-semibold flex items-center space-x-3 z-50"
@@ -77,8 +76,6 @@ export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
           </svg>
           <span>Scanner un QR Code</span>
         </button>
-
-        {/* Indice visuel */}
         <p className="fixed bottom-28 left-0 right-0 text-center text-sm text-gray-500">
           Pointez votre téléphone vers le QR code du responsable
         </p>
@@ -86,7 +83,7 @@ export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
     )
   }
 
-  // Écran de scan plein écran (style mobile)
+  // Écran de scan plein écran
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
       {/* En-tête */}
@@ -100,7 +97,7 @@ export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
           </svg>
         </button>
         <h3 className="text-white font-semibold">Scanner un QR Code</h3>
-        <div className="w-10"></div> {/* Spacer pour centrer le titre */}
+        <div className="w-10"></div>
       </div>
 
       {/* Zone de scan */}
@@ -123,32 +120,28 @@ export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
           </div>
         ) : (
           <>
-            {/* Lecteur QR code */}
-            <BrowserMultiFormatReader
-              onResult={handleScan}
+            <QrScanner
+              onDecode={handleScan}
               onError={handleError}
+              containerStyle={{ width: '100%', height: '100%' }}
+              videoStyle={{ objectFit: 'cover' }}
             />
 
             {/* Overlay de scan */}
             <div className="absolute inset-0 pointer-events-none">
-              {/* Zones sombres */}
               <div className="absolute inset-0 bg-black/50"></div>
               
-              {/* Zone de scan claire */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-transparent">
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64">
                 <div className="absolute inset-0 border-4 border-indigo-500 rounded-2xl"></div>
                 
-                {/* Coins animés */}
                 <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-indigo-500 rounded-tl-2xl"></div>
                 <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-indigo-500 rounded-tr-2xl"></div>
                 <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-indigo-500 rounded-bl-2xl"></div>
                 <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-indigo-500 rounded-br-2xl"></div>
                 
-                {/* Ligne de scan animée */}
                 <div className="absolute left-0 right-0 h-0.5 bg-indigo-500 animate-scan"></div>
               </div>
 
-              {/* Texte d'instruction */}
               <div className="absolute bottom-12 left-0 right-0 text-center">
                 <p className="text-white text-sm bg-black/30 backdrop-blur inline-block px-4 py-2 rounded-full">
                   Placez le QR code dans le cadre
@@ -159,7 +152,7 @@ export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
         )}
       </div>
 
-      {/* Pied de page avec bouton torche (optionnel) */}
+      {/* Pied de page */}
       <div className="absolute bottom-0 left-0 right-0 p-4 flex justify-center">
         <button
           onClick={stopScan}
