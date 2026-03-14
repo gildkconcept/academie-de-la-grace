@@ -15,7 +15,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
     }
 
-    return NextResponse.json({ user: decoded })
+    return NextResponse.json({ 
+      user: {
+        id: decoded.id,
+        name: decoded.name,
+        username: decoded.username,
+        role: decoded.role,
+        serviceId: decoded.serviceId
+      }
+    })
   } catch (error) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }

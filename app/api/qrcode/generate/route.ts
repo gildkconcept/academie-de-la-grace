@@ -14,16 +14,28 @@ export async function POST(request: Request) {
     const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
-    if (!user || (user.role !== 'service_manager' && user.role !== 'superadmin')) {
+    if (!user) {
+      return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
+    }
+
+    // Vérifier le rôle
+    if (user.role !== 'service_manager' && user.role !== 'superadmin') {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
     const { serviceId } = await request.json()
     
+    // Utiliser le serviceId de l'utilisateur si non fourni
+    const targetServiceId = serviceId || user.serviceId
+    
+    if (!targetServiceId) {
+      return NextResponse.json({ error: 'Service ID requis' }, { status: 400 })
+    }
+
     // Générer un token unique pour le QR code
     const qrToken = randomBytes(32).toString('hex')
     const expiresAt = new Date()
-    expiresAt.setHours(expiresAt.getHours() + 2) // QR code valide 2 heures
+    expiresAt.setHours(expiresAt.getHours() + 2)
     
     const today = new Date().toISOString().split('T')[0]
 
@@ -32,7 +44,7 @@ export async function POST(request: Request) {
       .from('sessions')
       .insert([
         {
-          service_id: serviceId,
+          service_id: targetServiceId,
           qr_token: qrToken,
           expires_at: expiresAt.toISOString(),
           date: today

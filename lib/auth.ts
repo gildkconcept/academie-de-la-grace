@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken'
+import jwt, { JwtPayload } from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { supabase } from './supabase'
 
@@ -10,10 +10,7 @@ export async function hashPassword(password: string) {
 
 export async function comparePassword(password: string, hash: string) {
   try {
-    console.log('Comparaison mot de passe...')
-    const result = await bcrypt.compare(password, hash)
-    console.log('Résultat comparaison:', result)
-    return result
+    return await bcrypt.compare(password, hash)
   } catch (error) {
     console.error('Erreur comparaison:', error)
     return false
@@ -36,7 +33,18 @@ export function generateToken(user: any) {
 
 export function verifyToken(token: string) {
   try {
-    return jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, JWT_SECRET)
+    // Vérifier que c'est bien un objet avec les propriétés attendues
+    if (typeof decoded === 'object' && decoded !== null) {
+      return decoded as JwtPayload & {
+        id: string
+        username: string
+        name: string
+        role: string
+        serviceId?: string
+      }
+    }
+    return null
   } catch (error) {
     return null
   }

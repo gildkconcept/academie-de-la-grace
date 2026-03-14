@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-export default function ScanPage() {
+// Composant qui utilise useSearchParams (doit être dans un Suspense)
+function ScanContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [processing, setProcessing] = useState(false)
@@ -16,10 +18,8 @@ export default function ScanPage() {
   const sessionId = searchParams.get('session')
 
   useEffect(() => {
-    // Vérifier si l'utilisateur est connecté
     const userToken = localStorage.getItem('token')
     if (!userToken) {
-      // Rediriger vers login avec un return URL
       router.push(`/login?redirect=/scan?token=${token}&session=${sessionId}`)
     }
   }, [router, token, sessionId])
@@ -33,10 +33,7 @@ export default function ScanPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          sessionId,
-          token
-        })
+        body: JSON.stringify({ sessionId, token })
       })
 
       const data = await res.json()
@@ -58,38 +55,53 @@ export default function ScanPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center">Confirmation de présence</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {message ? (
-            <div className="text-center">
-              <p className="text-lg mb-4">{message}</p>
-              {!message.includes('succès') && (
-                <Button onClick={() => router.push('/dashboard/student')}>
-                  Retour au tableau de bord
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="text-center">
-              <p className="mb-6">
-                Voulez-vous confirmer votre présence pour cette session ?
-              </p>
-              <Button
-                onClick={handleConfirmPresence}
-                disabled={processing}
-                size="lg"
-                className="w-full"
-              >
-                {processing ? 'Traitement...' : 'Confirmer ma présence'}
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle className="text-center">Confirmation de présence</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {message ? (
+          <div className="text-center">
+            <p className="text-lg mb-4">{message}</p>
+            {!message.includes('succès') && (
+              <Button onClick={() => router.push('/dashboard/student')}>
+                Retour au tableau de bord
               </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </div>
+        ) : (
+          <div className="text-center">
+            <p className="mb-6">
+              Voulez-vous confirmer votre présence pour cette session ?
+            </p>
+            <Button
+              onClick={handleConfirmPresence}
+              disabled={processing}
+              size="lg"
+              className="w-full"
+            >
+              {processing ? 'Traitement...' : 'Confirmer ma présence'}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// Page principale avec Suspense
+export default function ScanPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <Suspense fallback={
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <p>Chargement...</p>
+          </CardContent>
+        </Card>
+      }>
+        <ScanContent />
+      </Suspense>
     </div>
   )
 }
