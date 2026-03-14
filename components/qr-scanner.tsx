@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Scanner } from '@yudiel/react-qr-scanner'
+import { Scanner, IDetectedBarcode } from '@yudiel/react-qr-scanner'
 import { toast } from 'sonner'
 
 interface QRScannerProps {
@@ -9,7 +9,7 @@ interface QRScannerProps {
   onError?: (error: string) => void
 }
 
-export const QRScannerComponent = ({ onScan, onError }: QRScannerProps) => {
+export const QRScanner = ({ onScan, onError }: QRScannerProps) => {
   const [isActive, setIsActive] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
 
@@ -30,8 +30,11 @@ export const QRScannerComponent = ({ onScan, onError }: QRScannerProps) => {
     }
   }
 
-  const handleScan = (result: string) => {
-    if (result) {
+  // CORRECTION ICI : le paramètre est un tableau de IDetectedBarcode
+  const handleScan = (detectedCodes: IDetectedBarcode[]) => {
+    if (detectedCodes && detectedCodes.length > 0) {
+      // Prendre le premier code détecté
+      const result = detectedCodes[0].rawValue
       onScan(result)
       setIsActive(false)
       toast.success('✅ Présence enregistrée !')
