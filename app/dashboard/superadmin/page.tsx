@@ -21,13 +21,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Service, Student } from '@/types'
 import { generateAttendancePDF } from '@/lib/pdf-generator'
-import { UserCircleIcon } from '@heroicons/react/24/outline'
+import { 
+  UserCircleIcon, 
+  Bars3Icon, 
+  XMarkIcon,
+  ArrowLeftOnRectangleIcon,
+  DocumentArrowDownIcon,
+  FunnelIcon
+} from '@heroicons/react/24/outline'
 import { ProfileSection } from '@/components/ProfileSection'
 
 export default function SuperAdminDashboard() {
   const { user, loading, logout } = useAuth()
   const router = useRouter()
   const [showProfile, setShowProfile] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [services, setServices] = useState<Service[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([])
@@ -58,6 +67,7 @@ export default function SuperAdminDashboard() {
 
   const toggleProfile = () => {
     setShowProfile(!showProfile)
+    setMobileMenuOpen(false)
   }
 
   useEffect(() => {
@@ -83,7 +93,6 @@ export default function SuperAdminDashboard() {
   const fetchData = async () => {
     setLoadingData(true)
     try {
-      // Récupérer les services
       const { data: servicesData } = await supabase
         .from('services')
         .select('*')
@@ -93,7 +102,6 @@ export default function SuperAdminDashboard() {
         setServices(servicesData)
       }
 
-      // Récupérer tous les étudiants
       const { data: studentsData } = await supabase
         .from('students')
         .select('*')
@@ -103,12 +111,10 @@ export default function SuperAdminDashboard() {
         setStudents(studentsData)
         setFilteredStudents(studentsData)
         
-        // Extraire toutes les branches uniques
         const uniqueBranches = [...new Set(studentsData.map(s => s.branch))].sort()
         setBranches(uniqueBranches)
       }
 
-      // Statistiques du jour
       const today = new Date().toISOString().split('T')[0]
       const { data: attendanceData } = await supabase
         .from('attendance')
@@ -131,7 +137,6 @@ export default function SuperAdminDashboard() {
         averageProgress: Math.round(avgProgress)
       })
 
-      // Générer les statistiques pour les graphiques
       generateChartData(studentsData || [], servicesData || [])
       
     } catch (error) {
@@ -143,7 +148,6 @@ export default function SuperAdminDashboard() {
   }
 
   const generateChartData = (studentsData: Student[], servicesData: Service[]) => {
-    // Présence par service
     const servicePresence = servicesData.map(service => {
       const serviceStudents = studentsData.filter(s => s.service_id === service.id)
       const presentCount = Math.floor(Math.random() * serviceStudents.length)
@@ -156,7 +160,6 @@ export default function SuperAdminDashboard() {
     })
     setPresenceByService(servicePresence)
 
-    // Présence par niveau
     const niveau1 = studentsData.filter(s => s.level === 1)
     const niveau2 = studentsData.filter(s => s.level === 2)
     setPresenceByLevel([
@@ -164,7 +167,6 @@ export default function SuperAdminDashboard() {
       { name: 'Niveau 2', présents: Math.floor(Math.random() * niveau2.length), total: niveau2.length }
     ])
 
-    // Présence par branche (top 5)
     const branchMap = new Map()
     studentsData.forEach(s => {
       const count = branchMap.get(s.branch) || 0
@@ -180,7 +182,6 @@ export default function SuperAdminDashboard() {
       }))
     setPresenceByBranch(topBranches)
 
-    // Statistiques baptême
     const baptises = studentsData.filter(s => s.baptized).length
     const nonBaptises = studentsData.length - baptises
     setBaptismStats([
@@ -290,7 +291,6 @@ export default function SuperAdminDashboard() {
               .eq('service_id', session.service_id)
             serviceStudents = studentsData || []
           } else {
-            // Session universelle - tous les étudiants
             serviceStudents = students
           }
           
@@ -364,7 +364,7 @@ export default function SuperAdminDashboard() {
           </div>
           <div class="bg-blue-50 p-4 rounded-xl mb-4">
             <p class="text-sm text-blue-800">
-              📱 Montrez ce code aux étudiants. Ils ont 5 minutes pour l'entrer dans l'application.
+              📱 Montrez ce code aux étudiants. Ils ont 5 minutes pour l'entrer.
             </p>
           </div>
           <button onclick="this.closest('.fixed').remove()" 
@@ -529,7 +529,7 @@ export default function SuperAdminDashboard() {
             <div class="universal-badge">🌍 CODE UNIVERSEL</div>
             <div class="duration">⏳ Valable 5 minutes</div>
             <div class="warning">
-              ⚠️ Passé ce délai, les étudiants n'ayant pas scanné seront automatiquement marqués ABSENTS
+              ⚠️ Passé ce délai, les absents seront marqués automatiquement
             </div>
             <div class="instruction">🔑 Code de présence</div>
             <div class="code">${code}</div>
@@ -552,15 +552,9 @@ export default function SuperAdminDashboard() {
             <p style="font-size: 1.2rem; color: #374151;">
               <strong>Code valable pour TOUS les étudiants</strong>
             </p>
-            <p style="color: #6b7280;">
-              Tous services • Tous niveaux • Toutes branches
-            </p>
             
             <div class="current-time">
               Les étudiants ont 5 minutes pour entrer ce code
-            </div>
-            <div class="note">
-              Les absents seront marqués automatiquement après expiration
             </div>
           </div>
         </body>
@@ -610,7 +604,7 @@ export default function SuperAdminDashboard() {
               body: JSON.stringify({ sessionId: data.sessionId })
             });
             fetchAllSessions();
-            toast.info('Les absents ont été automatiquement marqués');
+            toast.info('Les absents ont été marqués automatiquement');
           } catch (error) {
             console.error('Erreur marquage absents:', error)
           }
@@ -706,22 +700,42 @@ export default function SuperAdminDashboard() {
   }
 
   if (loading || loadingData) {
-    return <div className="flex justify-center items-center h-screen">Chargement...</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
+        <div className="text-center px-4">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 text-base sm:text-lg">Chargement de votre espace...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!user) return null
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm">
+      {/* Navigation */}
+      <nav className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold">
-                {showProfile ? 'Mon profil' : `Dashboard Super Admin - ${user.name}`}
+            <div className="flex items-center flex-1 lg:flex-none">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+              >
+                {mobileMenuOpen ? (
+                  <XMarkIcon className="h-6 w-6" />
+                ) : (
+                  <Bars3Icon className="h-6 w-6" />
+                )}
+              </button>
+              <h1 className="text-lg sm:text-xl font-semibold ml-2 lg:ml-0 truncate">
+                {showProfile ? 'Mon profil' : 'Super Admin'}
               </h1>
             </div>
-            <div className="flex items-center space-x-4">
+
+            {/* Boutons desktop */}
+            <div className="hidden lg:flex items-center space-x-4">
               <Button
                 onClick={toggleProfile}
                 variant="outline"
@@ -731,115 +745,133 @@ export default function SuperAdminDashboard() {
                 <UserCircleIcon className="w-4 h-4" />
                 {showProfile ? 'Tableau de bord' : 'Mon profil'}
               </Button>
-              <Button onClick={logout} variant="destructive">
+              <Button onClick={logout} variant="destructive" size="sm">
                 Déconnexion
               </Button>
             </div>
+
+            {/* Bouton déconnexion mobile */}
+            <div className="flex items-center lg:hidden">
+              <button
+                onClick={logout}
+                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                title="Déconnexion"
+              >
+                <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Menu mobile */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-gray-200 bg-white">
+            <div className="px-4 py-3 space-y-2">
+              <button
+                onClick={toggleProfile}
+                className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
+              >
+                <UserCircleIcon className="w-5 h-5 mr-3" />
+                {showProfile ? 'Tableau de bord' : 'Mon profil'}
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
+      {/* Contenu principal */}
       {showProfile ? (
         <ProfileSection user={user} onClose={() => setShowProfile(false)} />
       ) : (
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
           {/* Statistiques globales */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-8">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-sm font-medium text-gray-500">Total Étudiants</div>
-                <div className="mt-2 text-3xl font-semibold text-gray-900">{stats.totalStudents}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-5 mb-4 sm:mb-8">
+            <Card className="card-hover">
+              <CardContent className="p-4 sm:pt-6">
+                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Total Étudiants</div>
+                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-gray-900">{stats.totalStudents}</div>
               </CardContent>
             </Card>
             
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-sm font-medium text-gray-500">Total Services</div>
-                <div className="mt-2 text-3xl font-semibold text-gray-900">{stats.totalServices}</div>
+            <Card className="card-hover">
+              <CardContent className="p-4 sm:pt-6">
+                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Services</div>
+                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-gray-900">{stats.totalServices}</div>
               </CardContent>
             </Card>
             
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-sm font-medium text-gray-500">Présents aujourd'hui</div>
-                <div className="mt-2 text-3xl font-semibold text-green-600">{stats.presentToday}</div>
+            <Card className="card-hover">
+              <CardContent className="p-4 sm:pt-6">
+                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Présents</div>
+                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-green-600">{stats.presentToday}</div>
               </CardContent>
             </Card>
             
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-sm font-medium text-gray-500">Baptisés</div>
-                <div className="mt-2 text-3xl font-semibold text-blue-600">{stats.baptized}</div>
+            <Card className="card-hover">
+              <CardContent className="p-4 sm:pt-6">
+                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Baptisés</div>
+                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-blue-600">{stats.baptized}</div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-sm font-medium text-gray-500">Progression moyenne</div>
-                <div className="mt-2 text-3xl font-semibold text-purple-600">{stats.averageProgress}%</div>
+            <Card className="card-hover col-span-2 sm:col-span-2 lg:col-span-1">
+              <CardContent className="p-4 sm:pt-6">
+                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Progression</div>
+                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-purple-600">{stats.averageProgress}%</div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Génération de code universel (5 min) */}
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>🎯 Génération du code de présence</CardTitle>
-              <p className="text-sm text-gray-500">
-                Code valable 5 minutes pour tous les services. Les absents seront marqués automatiquement.
-              </p>
+          {/* Génération de code */}
+          <Card className="mb-4 sm:mb-8">
+            <CardHeader className="px-4 sm:px-6 py-4">
+              <CardTitle className="text-base sm:text-lg">🎯 Génération du code de présence</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center py-4 sm:py-6">
+            <CardContent className="px-4 sm:px-6 pb-6">
+              <div className="flex flex-col items-center justify-center py-4">
                 <Button
                   onClick={generateCode}
-                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-auto py-6 sm:py-8 px-6 sm:px-12 text-xl sm:text-2xl font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center space-x-3"
+                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-auto py-4 sm:py-6 px-4 sm:px-8 text-base sm:text-lg font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 sm:gap-3"
                 >
-                  <span className="text-3xl sm:text-4xl">⏱️</span>
-                  <span className="flex flex-col items-start">
-                    <span>GÉNÉRER LE CODE</span>
-                    <span className="text-xs sm:text-sm opacity-90 font-normal">(5 minutes)</span>
-                  </span>
+                  <span className="text-xl sm:text-2xl">⏱️</span>
+                  <span>GÉNÉRER LE CODE (5 MIN)</span>
                 </Button>
-                
-                {/* Message d'information */}
-                <div className="mt-6 w-full max-w-md">
-                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
-                    <div className="flex items-start">
-                      <span className="text-blue-500 text-xl mr-3">📱</span>
-                      <div>
-                        <p className="text-sm text-blue-800 font-medium">
-                          Génération depuis mobile
-                        </p>
-                        <p className="text-xs text-blue-600 mt-1">
-                          Le code sera affiché dans une nouvelle fenêtre. 
-                          Si rien ne s'affiche, vérifie que ton navigateur autorise les pop-ups.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-xs sm:text-sm text-gray-500 mt-3 text-center">
+                  Les étudiants ont 5 minutes pour entrer ce code
+                </p>
               </div>
             </CardContent>
           </Card>
 
+          {/* Filtres - Version mobile avec bouton */}
+          <div className="lg:hidden mb-4">
+            <Button
+              onClick={() => setShowFilters(!showFilters)}
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+            >
+              <FunnelIcon className="w-4 h-4" />
+              {showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
+            </Button>
+          </div>
+
           {/* Filtres avancés */}
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Filtres avancés</CardTitle>
+          <Card className={`mb-4 sm:mb-8 ${!showFilters && 'hidden lg:block'}`}>
+            <CardHeader className="px-4 sm:px-6 py-4">
+              <CardTitle className="text-base sm:text-lg">Filtres avancés</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <CardContent className="px-4 sm:px-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Service
                   </label>
                   <select
                     value={selectedService}
                     onChange={(e) => setSelectedService(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md"
+                    className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="all">Tous les services</option>
+                    <option value="all">Tous</option>
                     {services.map(service => (
                       <option key={service.id} value={service.id}>{service.name}</option>
                     ))}
@@ -847,15 +879,15 @@ export default function SuperAdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Branche
                   </label>
                   <select
                     value={selectedBranch}
                     onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md"
+                    className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="all">Toutes les branches</option>
+                    <option value="all">Toutes</option>
                     {branches.map(branch => (
                       <option key={branch} value={branch}>{branch}</option>
                     ))}
@@ -863,28 +895,28 @@ export default function SuperAdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Niveau
                   </label>
                   <select
                     value={selectedLevel}
                     onChange={(e) => setSelectedLevel(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md"
+                    className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="all">Tous les niveaux</option>
+                    <option value="all">Tous</option>
                     <option value="1">Niveau 1</option>
                     <option value="2">Niveau 2</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Baptême
                   </label>
                   <select
                     value={selectedBaptism}
                     onChange={(e) => setSelectedBaptism(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md"
+                    className="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="all">Tous</option>
                     <option value="yes">Baptisés</option>
@@ -894,88 +926,77 @@ export default function SuperAdminDashboard() {
               </div>
 
               <div className="flex justify-between items-center">
-                <div>
-                  <span className="text-sm text-gray-600">
-                    {filteredStudents.length} étudiants trouvés
-                  </span>
-                </div>
-                <div className="space-x-2">
-                  <Button onClick={resetFilters} variant="outline">
-                    Réinitialiser les filtres
-                  </Button>
-                </div>
+                <span className="text-xs sm:text-sm text-gray-600">
+                  {filteredStudents.length} étudiants
+                </span>
+                <Button onClick={resetFilters} variant="outline" size="sm">
+                  Réinitialiser
+                </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Sélection de séance avec visualisation des présences */}
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Présences par séance</CardTitle>
+          {/* Sélection de séance */}
+          <Card className="mb-4 sm:mb-8">
+            <CardHeader className="px-4 sm:px-6 py-4">
+              <CardTitle className="text-base sm:text-lg">Présences par séance</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 sm:px-6">
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Sélectionner une séance
-                    </label>
-                    <select
-                      value={selectedSession}
-                      onChange={(e) => {
-                        setSelectedSession(e.target.value)
-                        fetchAttendanceBySession(e.target.value)
-                      }}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="all">Choisir une séance...</option>
-                      {sessions.map((session) => (
-                        <option key={session.id} value={session.id}>
-                          {new Date(session.date).toLocaleDateString('fr-FR')} - {session.services?.name || 'Universel'} (Code: {session.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                <select
+                  value={selectedSession}
+                  onChange={(e) => {
+                    setSelectedSession(e.target.value)
+                    fetchAttendanceBySession(e.target.value)
+                  }}
+                  className="w-full p-2 sm:p-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">Choisir une séance...</option>
+                  {sessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {new Date(session.date).toLocaleDateString('fr-FR')} - {session.services?.name || 'Universel'}
+                    </option>
+                  ))}
+                </select>
 
                 {selectedSession !== 'all' && (
                   <>
-                    {/* Statistiques de la séance */}
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                      <div className="bg-green-50 p-4 rounded-lg text-center">
-                        <div className="text-2xl font-bold text-green-600">
+                    {/* Statistiques */}
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                      <div className="bg-green-50 p-2 sm:p-4 rounded-lg text-center">
+                        <div className="text-lg sm:text-2xl font-bold text-green-600">
                           {attendanceBySession.filter(a => a.status === 'present').length}
                         </div>
-                        <div className="text-sm text-gray-600">Présents</div>
+                        <div className="text-xs sm:text-sm text-gray-600">Présents</div>
                       </div>
-                      <div className="bg-red-50 p-4 rounded-lg text-center">
-                        <div className="text-2xl font-bold text-red-600">
+                      <div className="bg-red-50 p-2 sm:p-4 rounded-lg text-center">
+                        <div className="text-lg sm:text-2xl font-bold text-red-600">
                           {attendanceBySession.filter(a => a.status === 'absent').length}
                         </div>
-                        <div className="text-sm text-gray-600">Absents</div>
+                        <div className="text-xs sm:text-sm text-gray-600">Absents</div>
                       </div>
-                      <div className="bg-yellow-50 p-4 rounded-lg text-center">
-                        <div className="text-2xl font-bold text-yellow-600">
+                      <div className="bg-yellow-50 p-2 sm:p-4 rounded-lg text-center">
+                        <div className="text-lg sm:text-2xl font-bold text-yellow-600">
                           {attendanceBySession.filter(a => a.status === 'late').length}
                         </div>
-                        <div className="text-sm text-gray-600">Retards</div>
+                        <div className="text-xs sm:text-sm text-gray-600">Retards</div>
                       </div>
                     </div>
 
-                    {/* Liste détaillée des présences */}
+                    {/* Liste des présences - Version mobile en cartes */}
                     <div className="mt-4">
-                      <h4 className="font-medium mb-2">Détail des présences :</h4>
+                      <h4 className="text-sm sm:text-base font-medium mb-2">Détail :</h4>
                       <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
                         {sessionStudents.map(student => {
                           const attendance = attendanceBySession.find(a => a.student_id === student.id)
                           const studentService = services.find(s => s.id === student.service_id)
                           return (
-                            <div key={student.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                              <div className="flex-1">
-                                <span className="font-medium">{student.full_name}</span>
-                                <span className="text-sm text-gray-500 ml-2">({studentService?.name})</span>
+                            <div key={student.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-2 bg-gray-50 rounded gap-1 sm:gap-0">
+                              <div>
+                                <span className="text-sm font-medium">{student.full_name}</span>
+                                <span className="text-xs text-gray-500 ml-2">({studentService?.name})</span>
                               </div>
-                              <span className={`px-2 py-1 rounded text-sm ${
+                              <span className={`px-2 py-1 rounded text-xs font-semibold self-start sm:self-auto ${
                                 attendance ? 
                                   attendance.status === 'present' ? 'bg-green-100 text-green-800' :
                                   attendance.status === 'late' ? 'bg-yellow-100 text-yellow-800' :
@@ -996,57 +1017,34 @@ export default function SuperAdminDashboard() {
                     {/* Statistiques par branche */}
                     {branchStats.length > 0 && (
                       <div className="mt-6">
-                        <h4 className="font-medium mb-4">📊 Statistiques par branche d'église</h4>
+                        <h4 className="text-sm sm:text-base font-medium mb-4">📊 Stats par branche</h4>
                         
-                        {/* Graphique */}
-                        <div className="mb-6">
-                          <BranchStatsChart data={branchStats} />
+                        {/* Version mobile : cartes */}
+                        <div className="block lg:hidden space-y-2">
+                          {branchStats.map((branch) => (
+                            <div key={branch.name} className="bg-white border border-gray-200 rounded-lg p-3">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="font-medium text-sm">{branch.name}</span>
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  branch.percentage >= 75 ? 'bg-green-100 text-green-800' :
+                                  branch.percentage >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {branch.percentage}%
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
+                                <div>Total: {branch.total}</div>
+                                <div className="text-green-600">P: {branch.present}</div>
+                                <div className="text-red-600">A: {branch.absent}</div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
 
-                        {/* Tableau récapitulatif */}
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Branche</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Présents</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Absents</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Retards</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taux</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {branchStats.map((branch) => (
-                                <tr key={branch.name}>
-                                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {branch.name}
-                                  </td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                    {branch.total}
-                                  </td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600 font-medium">
-                                    {branch.present}
-                                  </td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-red-600 font-medium">
-                                    {branch.absent}
-                                  </td>
-                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-yellow-600 font-medium">
-                                    {branch.late}
-                                  </td>
-                                  <td className="px-4 py-3 whitespace-nowrap">
-                                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                      branch.percentage >= 75 ? 'bg-green-100 text-green-800' :
-                                      branch.percentage >= 50 ? 'bg-yellow-100 text-yellow-800' :
-                                      'bg-red-100 text-red-800'
-                                    }`}>
-                                      {branch.percentage}%
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                        {/* Version desktop : graphique */}
+                        <div className="hidden lg:block">
+                          <BranchStatsChart data={branchStats} />
                         </div>
                       </div>
                     )}
@@ -1055,8 +1053,7 @@ export default function SuperAdminDashboard() {
                     <div className="flex flex-col space-y-2 mt-4">
                       <Button
                         onClick={() => generatePDF('all')}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white w-full"
-                        size="lg"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white w-full text-sm sm:text-base py-3"
                       >
                         📄 Rapport complet
                       </Button>
@@ -1064,18 +1061,16 @@ export default function SuperAdminDashboard() {
                       <div className="grid grid-cols-2 gap-2">
                         <Button
                           onClick={() => generatePDF('present')}
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                          size="lg"
+                          className="bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base py-3"
                         >
-                          ✅ Présents uniquement
+                          ✅ Présents
                         </Button>
                         
                         <Button
                           onClick={() => generatePDF('absent')}
-                          className="bg-red-600 hover:bg-red-700 text-white"
-                          size="lg"
+                          className="bg-red-600 hover:bg-red-700 text-white text-sm sm:text-base py-3"
                         >
-                          ❌ Absents uniquement
+                          ❌ Absents
                         </Button>
                       </div>
                     </div>
@@ -1086,16 +1081,16 @@ export default function SuperAdminDashboard() {
           </Card>
 
           {/* Graphiques */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 mb-4 sm:mb-8">
             <Card>
-              <CardHeader>
-                <CardTitle>Présences par service</CardTitle>
+              <CardHeader className="px-4 sm:px-6 py-4">
+                <CardTitle className="text-base sm:text-lg">Présences par service</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+              <CardContent className="px-2 sm:px-6">
+                <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={presenceByService}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} interval={0} />
                     <YAxis />
                     <Tooltip />
                     <Legend />
@@ -1107,11 +1102,11 @@ export default function SuperAdminDashboard() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Présences par niveau</CardTitle>
+              <CardHeader className="px-4 sm:px-6 py-4">
+                <CardTitle className="text-base sm:text-lg">Présences par niveau</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+              <CardContent className="px-2 sm:px-6">
+                <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={presenceByLevel}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
@@ -1124,58 +1119,47 @@ export default function SuperAdminDashboard() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Top 5 des branches</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={presenceByBranch}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="présents" fill="#f59e0b" name="Présents" />
-                    <Bar dataKey="total" fill="#9ca3af" name="Total" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Répartition Baptême</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CustomPieChart data={baptismStats} />
-              </CardContent>
-            </Card>
           </div>
 
-          {/* Liste des étudiants */}
+          {/* Liste des étudiants - Version mobile en cartes */}
           <Card>
-            <CardHeader>
-              <CardTitle>
-                Liste des étudiants
-                {selectedService !== 'all' && ` - Service: ${services.find(s => s.id === selectedService)?.name}`}
-                {selectedBranch !== 'all' && ` - Branche: ${selectedBranch}`}
-                {selectedLevel !== 'all' && ` - Niveau ${selectedLevel}`}
-                {selectedBaptism !== 'all' && ` - ${selectedBaptism === 'yes' ? 'Baptisés' : 'Non baptisés'}`}
+            <CardHeader className="px-4 sm:px-6 py-4">
+              <CardTitle className="text-base sm:text-lg">
+                Étudiants
+                {selectedService !== 'all' && ` - ${services.find(s => s.id === selectedService)?.name}`}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
+            <CardContent className="px-2 sm:px-6">
+              {/* Version mobile : cartes */}
+              <div className="block lg:hidden space-y-3">
+                {filteredStudents.map((student) => {
+                  const studentService = services.find(s => s.id === student.service_id)
+                  return (
+                    <div key={student.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                      <h3 className="font-medium text-gray-900 mb-2">{student.full_name}</h3>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
+                        <div>Service: {studentService?.name || '-'}</div>
+                        <div>Niveau {student.level}</div>
+                        <div>Branche: {student.branch}</div>
+                        <div>Baptême: {student.baptized ? 'Oui' : 'Non'}</div>
+                        <div className="col-span-2">Tél: {student.phone || '-'}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Version desktop : tableau */}
+              <div className="hidden lg:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Niveau</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branche</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Baptême</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Niveau</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Branche</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Baptême</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -1183,28 +1167,18 @@ export default function SuperAdminDashboard() {
                       const studentService = services.find(s => s.id === student.service_id)
                       return (
                         <tr key={student.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {student.full_name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {studentService?.name || 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            Niveau {student.level}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {student.branch}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{student.full_name}</td>
+                          <td className="px-6 py-4 text-sm text-gray-500">{studentService?.name || '-'}</td>
+                          <td className="px-6 py-4 text-sm text-gray-500">Niveau {student.level}</td>
+                          <td className="px-6 py-4 text-sm text-gray-500">{student.branch}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                               student.baptized ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                             }`}>
                               {student.baptized ? 'Oui' : 'Non'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {student.phone}
-                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">{student.phone || '-'}</td>
                         </tr>
                       )
                     })}
