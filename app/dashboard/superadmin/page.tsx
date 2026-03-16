@@ -21,10 +21,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Service, Student } from '@/types'
 import { generateAttendancePDF } from '@/lib/pdf-generator'
+import { UserCircleIcon } from '@heroicons/react/24/outline'
+import { ProfileSection } from '@/components/ProfileSection'
 
 export default function SuperAdminDashboard() {
   const { user, loading, logout } = useAuth()
   const router = useRouter()
+  const [showProfile, setShowProfile] = useState(false)
   const [services, setServices] = useState<Service[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([])
@@ -52,6 +55,10 @@ export default function SuperAdminDashboard() {
   const [presenceByLevel, setPresenceByLevel] = useState<any[]>([])
   const [presenceByBranch, setPresenceByBranch] = useState<any[]>([])
   const [baptismStats, setBaptismStats] = useState<any[]>([])
+
+  const toggleProfile = () => {
+    setShowProfile(!showProfile)
+  }
 
   useEffect(() => {
     if (!loading && !user) {
@@ -710,9 +717,20 @@ export default function SuperAdminDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-semibold">Dashboard Super Admin - {user?.name}</h1>
+              <h1 className="text-xl font-semibold">
+                {showProfile ? 'Mon profil' : `Dashboard Super Admin - ${user.name}`}
+              </h1>
             </div>
             <div className="flex items-center space-x-4">
+              <Button
+                onClick={toggleProfile}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <UserCircleIcon className="w-4 h-4" />
+                {showProfile ? 'Tableau de bord' : 'Mon profil'}
+              </Button>
               <Button onClick={logout} variant="destructive">
                 Déconnexion
               </Button>
@@ -721,478 +739,482 @@ export default function SuperAdminDashboard() {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Statistiques globales */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-sm font-medium text-gray-500">Total Étudiants</div>
-              <div className="mt-2 text-3xl font-semibold text-gray-900">{stats.totalStudents}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-sm font-medium text-gray-500">Total Services</div>
-              <div className="mt-2 text-3xl font-semibold text-gray-900">{stats.totalServices}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-sm font-medium text-gray-500">Présents aujourd'hui</div>
-              <div className="mt-2 text-3xl font-semibold text-green-600">{stats.presentToday}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-sm font-medium text-gray-500">Baptisés</div>
-              <div className="mt-2 text-3xl font-semibold text-blue-600">{stats.baptized}</div>
-            </CardContent>
-          </Card>
+      {showProfile ? (
+        <ProfileSection user={user} onClose={() => setShowProfile(false)} />
+      ) : (
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          {/* Statistiques globales */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-8">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm font-medium text-gray-500">Total Étudiants</div>
+                <div className="mt-2 text-3xl font-semibold text-gray-900">{stats.totalStudents}</div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm font-medium text-gray-500">Total Services</div>
+                <div className="mt-2 text-3xl font-semibold text-gray-900">{stats.totalServices}</div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm font-medium text-gray-500">Présents aujourd'hui</div>
+                <div className="mt-2 text-3xl font-semibold text-green-600">{stats.presentToday}</div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm font-medium text-gray-500">Baptisés</div>
+                <div className="mt-2 text-3xl font-semibold text-blue-600">{stats.baptized}</div>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-sm font-medium text-gray-500">Progression moyenne</div>
-              <div className="mt-2 text-3xl font-semibold text-purple-600">{stats.averageProgress}%</div>
-            </CardContent>
-          </Card>
-        </div>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm font-medium text-gray-500">Progression moyenne</div>
+                <div className="mt-2 text-3xl font-semibold text-purple-600">{stats.averageProgress}%</div>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Génération de code universel (5 min) - Version Mobile */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>🎯 Génération du code de présence</CardTitle>
-            <p className="text-sm text-gray-500">
-              Code valable 5 minutes pour tous les services.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-4 sm:py-6">
-              <Button
-                onClick={generateCode}
-                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-auto py-6 sm:py-8 px-6 sm:px-12 text-xl sm:text-2xl font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center space-x-3"
-              >
-                <span className="text-3xl sm:text-4xl">⏱️</span>
-                <span className="flex flex-col items-start">
-                  <span>GÉNÉRER LE CODE</span>
-                  <span className="text-xs sm:text-sm opacity-90 font-normal">(5 minutes)</span>
-                </span>
-              </Button>
-              
-              {/* Message d'information */}
-              <div className="mt-6 w-full max-w-md">
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
-                  <div className="flex items-start">
-                    <span className="text-blue-500 text-xl mr-3">📱</span>
-                    <div>
-                      <p className="text-sm text-blue-800 font-medium">
-                        Génération depuis mobile
-                      </p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        Le code sera affiché dans une nouvelle fenêtre. 
-                        Si rien ne s'affiche, vérifie que ton navigateur autorise les pop-ups.
-                      </p>
+          {/* Génération de code universel (5 min) */}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>🎯 Génération du code de présence</CardTitle>
+              <p className="text-sm text-gray-500">
+                Code valable 5 minutes pour tous les services. Les absents seront marqués automatiquement.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col items-center justify-center py-4 sm:py-6">
+                <Button
+                  onClick={generateCode}
+                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-auto py-6 sm:py-8 px-6 sm:px-12 text-xl sm:text-2xl font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center space-x-3"
+                >
+                  <span className="text-3xl sm:text-4xl">⏱️</span>
+                  <span className="flex flex-col items-start">
+                    <span>GÉNÉRER LE CODE</span>
+                    <span className="text-xs sm:text-sm opacity-90 font-normal">(5 minutes)</span>
+                  </span>
+                </Button>
+                
+                {/* Message d'information */}
+                <div className="mt-6 w-full max-w-md">
+                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                    <div className="flex items-start">
+                      <span className="text-blue-500 text-xl mr-3">📱</span>
+                      <div>
+                        <p className="text-sm text-blue-800 font-medium">
+                          Génération depuis mobile
+                        </p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          Le code sera affiché dans une nouvelle fenêtre. 
+                          Si rien ne s'affiche, vérifie que ton navigateur autorise les pop-ups.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Filtres avancés */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Filtres avancés</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Service
-                </label>
-                <select
-                  value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="all">Tous les services</option>
-                  {services.map(service => (
-                    <option key={service.id} value={service.id}>{service.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Branche
-                </label>
-                <select
-                  value={selectedBranch}
-                  onChange={(e) => setSelectedBranch(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="all">Toutes les branches</option>
-                  {branches.map(branch => (
-                    <option key={branch} value={branch}>{branch}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Niveau
-                </label>
-                <select
-                  value={selectedLevel}
-                  onChange={(e) => setSelectedLevel(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="all">Tous les niveaux</option>
-                  <option value="1">Niveau 1</option>
-                  <option value="2">Niveau 2</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Baptême
-                </label>
-                <select
-                  value={selectedBaptism}
-                  onChange={(e) => setSelectedBaptism(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="all">Tous</option>
-                  <option value="yes">Baptisés</option>
-                  <option value="no">Non baptisés</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="text-sm text-gray-600">
-                  {filteredStudents.length} étudiants trouvés
-                </span>
-              </div>
-              <div className="space-x-2">
-                <Button onClick={resetFilters} variant="outline">
-                  Réinitialiser les filtres
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Sélection de séance avec visualisation des présences */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Présences par séance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Filtres avancés */}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Filtres avancés</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Sélectionner une séance
+                    Service
                   </label>
                   <select
-                    value={selectedSession}
-                    onChange={(e) => {
-                      setSelectedSession(e.target.value)
-                      fetchAttendanceBySession(e.target.value)
-                    }}
+                    value={selectedService}
+                    onChange={(e) => setSelectedService(e.target.value)}
                     className="w-full p-2 border border-gray-300 rounded-md"
                   >
-                    <option value="all">Choisir une séance...</option>
-                    {sessions.map((session) => (
-                      <option key={session.id} value={session.id}>
-                        {new Date(session.date).toLocaleDateString('fr-FR')} - {session.services?.name || 'Universel'} (Code: {session.code})
-                      </option>
+                    <option value="all">Tous les services</option>
+                    {services.map(service => (
+                      <option key={service.id} value={service.id}>{service.name}</option>
                     ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Branche
+                  </label>
+                  <select
+                    value={selectedBranch}
+                    onChange={(e) => setSelectedBranch(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="all">Toutes les branches</option>
+                    {branches.map(branch => (
+                      <option key={branch} value={branch}>{branch}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Niveau
+                  </label>
+                  <select
+                    value={selectedLevel}
+                    onChange={(e) => setSelectedLevel(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="all">Tous les niveaux</option>
+                    <option value="1">Niveau 1</option>
+                    <option value="2">Niveau 2</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Baptême
+                  </label>
+                  <select
+                    value={selectedBaptism}
+                    onChange={(e) => setSelectedBaptism(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="all">Tous</option>
+                    <option value="yes">Baptisés</option>
+                    <option value="no">Non baptisés</option>
                   </select>
                 </div>
               </div>
 
-              {selectedSession !== 'all' && (
-                <>
-                  {/* Statistiques de la séance */}
-                  <div className="grid grid-cols-3 gap-4 mt-4">
-                    <div className="bg-green-50 p-4 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {attendanceBySession.filter(a => a.status === 'present').length}
-                      </div>
-                      <div className="text-sm text-gray-600">Présents</div>
-                    </div>
-                    <div className="bg-red-50 p-4 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-red-600">
-                        {attendanceBySession.filter(a => a.status === 'absent').length}
-                      </div>
-                      <div className="text-sm text-gray-600">Absents</div>
-                    </div>
-                    <div className="bg-yellow-50 p-4 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-yellow-600">
-                        {attendanceBySession.filter(a => a.status === 'late').length}
-                      </div>
-                      <div className="text-sm text-gray-600">Retards</div>
-                    </div>
-                  </div>
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-sm text-gray-600">
+                    {filteredStudents.length} étudiants trouvés
+                  </span>
+                </div>
+                <div className="space-x-2">
+                  <Button onClick={resetFilters} variant="outline">
+                    Réinitialiser les filtres
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                  {/* Liste détaillée des présences */}
-                  <div className="mt-4">
-                    <h4 className="font-medium mb-2">Détail des présences :</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
-                      {sessionStudents.map(student => {
-                        const attendance = attendanceBySession.find(a => a.student_id === student.id)
-                        const studentService = services.find(s => s.id === student.service_id)
-                        return (
-                          <div key={student.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                            <div className="flex-1">
-                              <span className="font-medium">{student.full_name}</span>
-                              <span className="text-sm text-gray-500 ml-2">({studentService?.name})</span>
-                            </div>
-                            <span className={`px-2 py-1 rounded text-sm ${
-                              attendance ? 
-                                attendance.status === 'present' ? 'bg-green-100 text-green-800' :
-                                attendance.status === 'late' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
-                              : 'bg-red-100 text-red-800'
-                            }`}>
-                              {attendance ? 
-                                attendance.status === 'present' ? '✓ Présent' :
-                                attendance.status === 'late' ? '⚠ Retard' : '✗ Absent'
-                              : '✗ Absent'}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Statistiques par branche */}
-                  {branchStats.length > 0 && (
-                    <div className="mt-6">
-                      <h4 className="font-medium mb-4">📊 Statistiques par branche d'église</h4>
-                      
-                      {/* Graphique */}
-                      <div className="mb-6">
-                        <BranchStatsChart data={branchStats} />
-                      </div>
-
-                      {/* Tableau récapitulatif */}
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Branche</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Présents</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Absents</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Retards</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taux</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {branchStats.map((branch) => (
-                              <tr key={branch.name}>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                  {branch.name}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                  {branch.total}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600 font-medium">
-                                  {branch.present}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-red-600 font-medium">
-                                  {branch.absent}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-yellow-600 font-medium">
-                                  {branch.late}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                    branch.percentage >= 75 ? 'bg-green-100 text-green-800' :
-                                    branch.percentage >= 50 ? 'bg-yellow-100 text-yellow-800' :
-                                    'bg-red-100 text-red-800'
-                                  }`}>
-                                    {branch.percentage}%
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Options PDF */}
-                  <div className="flex flex-col space-y-2 mt-4">
-                    <Button
-                      onClick={() => generatePDF('all')}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white w-full"
-                      size="lg"
+          {/* Sélection de séance avec visualisation des présences */}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Présences par séance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sélectionner une séance
+                    </label>
+                    <select
+                      value={selectedSession}
+                      onChange={(e) => {
+                        setSelectedSession(e.target.value)
+                        fetchAttendanceBySession(e.target.value)
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-md"
                     >
-                      📄 Rapport complet
-                    </Button>
-                    
-                    <div className="grid grid-cols-2 gap-2">
+                      <option value="all">Choisir une séance...</option>
+                      {sessions.map((session) => (
+                        <option key={session.id} value={session.id}>
+                          {new Date(session.date).toLocaleDateString('fr-FR')} - {session.services?.name || 'Universel'} (Code: {session.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {selectedSession !== 'all' && (
+                  <>
+                    {/* Statistiques de la séance */}
+                    <div className="grid grid-cols-3 gap-4 mt-4">
+                      <div className="bg-green-50 p-4 rounded-lg text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {attendanceBySession.filter(a => a.status === 'present').length}
+                        </div>
+                        <div className="text-sm text-gray-600">Présents</div>
+                      </div>
+                      <div className="bg-red-50 p-4 rounded-lg text-center">
+                        <div className="text-2xl font-bold text-red-600">
+                          {attendanceBySession.filter(a => a.status === 'absent').length}
+                        </div>
+                        <div className="text-sm text-gray-600">Absents</div>
+                      </div>
+                      <div className="bg-yellow-50 p-4 rounded-lg text-center">
+                        <div className="text-2xl font-bold text-yellow-600">
+                          {attendanceBySession.filter(a => a.status === 'late').length}
+                        </div>
+                        <div className="text-sm text-gray-600">Retards</div>
+                      </div>
+                    </div>
+
+                    {/* Liste détaillée des présences */}
+                    <div className="mt-4">
+                      <h4 className="font-medium mb-2">Détail des présences :</h4>
+                      <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
+                        {sessionStudents.map(student => {
+                          const attendance = attendanceBySession.find(a => a.student_id === student.id)
+                          const studentService = services.find(s => s.id === student.service_id)
+                          return (
+                            <div key={student.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                              <div className="flex-1">
+                                <span className="font-medium">{student.full_name}</span>
+                                <span className="text-sm text-gray-500 ml-2">({studentService?.name})</span>
+                              </div>
+                              <span className={`px-2 py-1 rounded text-sm ${
+                                attendance ? 
+                                  attendance.status === 'present' ? 'bg-green-100 text-green-800' :
+                                  attendance.status === 'late' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                                : 'bg-red-100 text-red-800'
+                              }`}>
+                                {attendance ? 
+                                  attendance.status === 'present' ? '✓ Présent' :
+                                  attendance.status === 'late' ? '⚠ Retard' : '✗ Absent'
+                                : '✗ Absent'}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Statistiques par branche */}
+                    {branchStats.length > 0 && (
+                      <div className="mt-6">
+                        <h4 className="font-medium mb-4">📊 Statistiques par branche d'église</h4>
+                        
+                        {/* Graphique */}
+                        <div className="mb-6">
+                          <BranchStatsChart data={branchStats} />
+                        </div>
+
+                        {/* Tableau récapitulatif */}
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Branche</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Présents</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Absents</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Retards</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taux</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {branchStats.map((branch) => (
+                                <tr key={branch.name}>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {branch.name}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                    {branch.total}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600 font-medium">
+                                    {branch.present}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-red-600 font-medium">
+                                    {branch.absent}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-yellow-600 font-medium">
+                                    {branch.late}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                      branch.percentage >= 75 ? 'bg-green-100 text-green-800' :
+                                      branch.percentage >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-red-100 text-red-800'
+                                    }`}>
+                                      {branch.percentage}%
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Options PDF */}
+                    <div className="flex flex-col space-y-2 mt-4">
                       <Button
-                        onClick={() => generatePDF('present')}
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => generatePDF('all')}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white w-full"
                         size="lg"
                       >
-                        ✅ Présents uniquement
+                        📄 Rapport complet
                       </Button>
                       
-                      <Button
-                        onClick={() => generatePDF('absent')}
-                        className="bg-red-600 hover:bg-red-700 text-white"
-                        size="lg"
-                      >
-                        ❌ Absents uniquement
-                      </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          onClick={() => generatePDF('present')}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          size="lg"
+                        >
+                          ✅ Présents uniquement
+                        </Button>
+                        
+                        <Button
+                          onClick={() => generatePDF('absent')}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                          size="lg"
+                        >
+                          ❌ Absents uniquement
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Graphiques */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Présences par service</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={presenceByService}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="présents" fill="#10b981" name="Présents" />
-                  <Bar dataKey="absents" fill="#ef4444" name="Absents" />
-                </BarChart>
-              </ResponsiveContainer>
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Présences par niveau</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={presenceByLevel}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="présents" fill="#8b5cf6" name="Présents" />
-                  <Bar dataKey="total" fill="#9ca3af" name="Total" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          {/* Graphiques */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Présences par service</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={presenceByService}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="présents" fill="#10b981" name="Présents" />
+                    <Bar dataKey="absents" fill="#ef4444" name="Absents" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Top 5 des branches</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={presenceByBranch}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="présents" fill="#f59e0b" name="Présents" />
-                  <Bar dataKey="total" fill="#9ca3af" name="Total" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Présences par niveau</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={presenceByLevel}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="présents" fill="#8b5cf6" name="Présents" />
+                    <Bar dataKey="total" fill="#9ca3af" name="Total" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
+            <Card>
+              <CardHeader>
+                <CardTitle>Top 5 des branches</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={presenceByBranch}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="présents" fill="#f59e0b" name="Présents" />
+                    <Bar dataKey="total" fill="#9ca3af" name="Total" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Répartition Baptême</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CustomPieChart data={baptismStats} />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Liste des étudiants */}
           <Card>
             <CardHeader>
-              <CardTitle>Répartition Baptême</CardTitle>
+              <CardTitle>
+                Liste des étudiants
+                {selectedService !== 'all' && ` - Service: ${services.find(s => s.id === selectedService)?.name}`}
+                {selectedBranch !== 'all' && ` - Branche: ${selectedBranch}`}
+                {selectedLevel !== 'all' && ` - Niveau ${selectedLevel}`}
+                {selectedBaptism !== 'all' && ` - ${selectedBaptism === 'yes' ? 'Baptisés' : 'Non baptisés'}`}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <CustomPieChart data={baptismStats} />
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Niveau</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branche</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Baptême</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredStudents.map((student) => {
+                      const studentService = services.find(s => s.id === student.service_id)
+                      return (
+                        <tr key={student.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {student.full_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {studentService?.name || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            Niveau {student.level}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {student.branch}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              student.baptized ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {student.baptized ? 'Oui' : 'Non'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {student.phone}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* Liste des étudiants */}
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Liste des étudiants
-              {selectedService !== 'all' && ` - Service: ${services.find(s => s.id === selectedService)?.name}`}
-              {selectedBranch !== 'all' && ` - Branche: ${selectedBranch}`}
-              {selectedLevel !== 'all' && ` - Niveau ${selectedLevel}`}
-              {selectedBaptism !== 'all' && ` - ${selectedBaptism === 'yes' ? 'Baptisés' : 'Non baptisés'}`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Niveau</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branche</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Baptême</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredStudents.map((student) => {
-                    const studentService = services.find(s => s.id === student.service_id)
-                    return (
-                      <tr key={student.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {student.full_name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {studentService?.name || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          Niveau {student.level}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {student.branch}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            student.baptized ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {student.baptized ? 'Oui' : 'Non'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {student.phone}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
     </div>
   )
 }
