@@ -327,8 +327,245 @@ export default function SuperAdminDashboard() {
     setSelectedBaptism('all')
   }
 
+  const showCodeModal = (code: string, expiresAt: string) => {
+    const expiresAtDate = new Date(expiresAt);
+    const expirationLocale = expiresAtDate.toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-2xl p-6 max-w-md w-full">
+        <div class="text-center">
+          <div class="bg-green-100 text-green-800 px-4 py-2 rounded-full inline-block mb-4">
+            🌍 CODE UNIVERSEL
+          </div>
+          <div class="text-6xl sm:text-8xl font-bold tracking-wider text-indigo-600 mb-6 font-mono">
+            ${code}
+          </div>
+          <div class="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full inline-block mb-4">
+            ⏳ Valable 5 minutes
+          </div>
+          <div class="bg-gray-100 p-4 rounded-xl mb-6">
+            <div class="flex justify-between items-center py-2 border-b border-gray-200">
+              <span class="text-gray-600">⏰ Expire à :</span>
+              <span class="font-bold text-red-600 text-lg">${expirationLocale}</span>
+            </div>
+          </div>
+          <div class="bg-blue-50 p-4 rounded-xl mb-4">
+            <p class="text-sm text-blue-800">
+              📱 Montrez ce code aux étudiants. Ils ont 5 minutes pour l'entrer dans l'application.
+            </p>
+          </div>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-xl transition-colors">
+            Fermer
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+  };
+
+  const displayCodeInWindow = (codeWindow: Window, code: string, expiresAt: string) => {
+    const maintenant = new Date();
+    const expiresAtDate = new Date(expiresAt);
+    
+    const heureLocale = maintenant.toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    
+    const expirationLocale = expiresAtDate.toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    codeWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Code de présence - 5 minutes</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              display: flex; 
+              justify-content: center; 
+              align-items: center; 
+              min-height: 100vh; 
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+              padding: 1rem;
+            }
+            .container { 
+              text-align: center; 
+              background: white; 
+              padding: 2rem; 
+              border-radius: 2rem; 
+              box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+              max-width: 700px;
+              width: 100%;
+            }
+            .universal-badge {
+              background: #10b981;
+              color: white;
+              padding: 0.75rem 1.5rem;
+              border-radius: 3rem;
+              display: inline-block;
+              margin-bottom: 1.5rem;
+              font-weight: 600;
+              font-size: 1.1rem;
+            }
+            .duration {
+              background: #f59e0b;
+              color: white;
+              padding: 0.75rem 1.5rem;
+              border-radius: 3rem;
+              display: inline-block;
+              margin: 1rem 0 1.5rem 0;
+              font-weight: 600;
+              font-size: 1.1rem;
+            }
+            .warning {
+              background: #fee2e2;
+              color: #b91c1c;
+              padding: 1rem;
+              border-radius: 1rem;
+              margin: 1rem 0;
+              font-size: 1rem;
+              border-left: 4px solid #b91c1c;
+            }
+            .instruction {
+              font-size: 1.5rem;
+              color: #374151;
+              margin-bottom: 1rem;
+              font-weight: 500;
+            }
+            .code { 
+              font-size: min(10rem, 20vw); 
+              font-weight: 800; 
+              letter-spacing: 1.5rem;
+              color: #4f46e5;
+              margin: 1.5rem 0;
+              text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+              font-family: 'Courier New', monospace;
+              line-height: 1.2;
+              word-break: break-all;
+            }
+            .time-info {
+              background: #f3f4f6;
+              padding: 1.5rem;
+              border-radius: 1rem;
+              margin: 2rem 0;
+            }
+            .time-row {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 0.75rem 0;
+              border-bottom: 1px solid #e5e7eb;
+              font-size: 1.1rem;
+            }
+            .time-row:last-child { border-bottom: none; }
+            .time-label { color: #4b5563; font-weight: 500; }
+            .time-value {
+              font-weight: 700;
+              color: #1f2937;
+              background: white;
+              padding: 0.25rem 0.75rem;
+              border-radius: 2rem;
+              font-size: 1.2rem;
+            }
+            .expires-value {
+              color: #ef4444;
+              font-size: 1.3rem;
+              font-weight: 800;
+            }
+            .admin-info {
+              background: #e0f2fe;
+              color: #0369a1;
+              padding: 0.75rem;
+              border-radius: 0.5rem;
+              margin: 1rem 0;
+              font-size: 0.9rem;
+            }
+            .current-time {
+              color: #6b7280;
+              font-size: 0.9rem;
+              margin-top: 1rem;
+            }
+            .note {
+              font-size: 0.9rem;
+              color: #9ca3af;
+              margin-top: 0.5rem;
+            }
+            @media (max-width: 640px) {
+              .container { padding: 1.5rem; }
+              .code { letter-spacing: 0.5rem; }
+              .time-row { flex-direction: column; gap: 0.5rem; }
+              .time-value { width: 100%; text-align: center; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="universal-badge">🌍 CODE UNIVERSEL</div>
+            <div class="duration">⏳ Valable 5 minutes</div>
+            <div class="warning">
+              ⚠️ Passé ce délai, les étudiants n'ayant pas scanné seront automatiquement marqués ABSENTS
+            </div>
+            <div class="instruction">🔑 Code de présence</div>
+            <div class="code">${code}</div>
+            
+            <div class="time-info">
+              <div class="time-row">
+                <span class="time-label">⏰ Expire à :</span>
+                <span class="time-value expires-value">${expirationLocale}</span>
+              </div>
+              <div class="time-row">
+                <span class="time-label">🕒 Heure actuelle :</span>
+                <span class="time-value">${heureLocale}</span>
+              </div>
+            </div>
+            
+            <div class="admin-info">
+              👤 Généré par ${user?.name} (Administrateur)
+            </div>
+            
+            <p style="font-size: 1.2rem; color: #374151;">
+              <strong>Code valable pour TOUS les étudiants</strong>
+            </p>
+            <p style="color: #6b7280;">
+              Tous services • Tous niveaux • Toutes branches
+            </p>
+            
+            <div class="current-time">
+              Les étudiants ont 5 minutes pour entrer ce code
+            </div>
+            <div class="note">
+              Les absents seront marqués automatiquement après expiration
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    codeWindow.document.close();
+  };
+
   const generateCode = async () => {
     try {
+      toast.loading('Génération du code en cours...', { id: 'generate' });
+
       const res = await fetch('/api/code/generate', {
         method: 'POST',
         headers: {
@@ -336,230 +573,53 @@ export default function SuperAdminDashboard() {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({})
-      })
+      });
 
-      const data = await res.json()
+      const data = await res.json();
+      
+      toast.dismiss('generate');
       
       if (res.ok) {
-        const codeWindow = window.open('', '_blank')
-        if (codeWindow) {
-          const maintenant = new Date()
-          const expiresAt = new Date(data.expiresAt)
-          
-          const heureLocale = maintenant.toLocaleTimeString('fr-FR', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          })
-          
-          const expirationLocale = expiresAt.toLocaleTimeString('fr-FR', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          })
-
-          codeWindow.document.write(`
-            <html>
-              <head>
-                <title>Code de présence - 5 minutes</title>
-                <style>
-                  body { 
-                    display: flex; 
-                    justify-content: center; 
-                    align-items: center; 
-                    min-height: 100vh; 
-                    margin: 0; 
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-                    padding: 1rem;
-                  }
-                  .container { 
-                    text-align: center; 
-                    background: white; 
-                    padding: 3rem; 
-                    border-radius: 2rem; 
-                    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-                    max-width: 700px;
-                    width: 100%;
-                  }
-                  .universal-badge {
-                    background: #10b981;
-                    color: white;
-                    padding: 0.75rem 1.5rem;
-                    border-radius: 3rem;
-                    display: inline-block;
-                    margin-bottom: 1.5rem;
-                    font-weight: 600;
-                    font-size: 1.1rem;
-                  }
-                  .duration {
-                    background: #f59e0b;
-                    color: white;
-                    padding: 0.75rem 1.5rem;
-                    border-radius: 3rem;
-                    display: inline-block;
-                    margin: 1rem 0 1.5rem 0;
-                    font-weight: 600;
-                    font-size: 1.1rem;
-                  }
-                  .warning {
-                    background: #fee2e2;
-                    color: #b91c1c;
-                    padding: 1rem;
-                    border-radius: 1rem;
-                    margin: 1rem 0;
-                    font-size: 1rem;
-                    border-left: 4px solid #b91c1c;
-                  }
-                  .instruction {
-                    font-size: 1.5rem;
-                    color: #374151;
-                    margin-bottom: 1rem;
-                    font-weight: 500;
-                  }
-                  .code { 
-                    font-size: 10rem; 
-                    font-weight: 800; 
-                    letter-spacing: 1.5rem;
-                    color: #4f46e5;
-                    margin: 1.5rem 0;
-                    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-                    font-family: 'Courier New', monospace;
-                    line-height: 1.2;
-                    word-break: break-all;
-                  }
-                  .time-info {
-                    background: #f3f4f6;
-                    padding: 1.5rem;
-                    border-radius: 1rem;
-                    margin: 2rem 0;
-                  }
-                  .time-row {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 0.75rem 0;
-                    border-bottom: 1px solid #e5e7eb;
-                    font-size: 1.1rem;
-                  }
-                  .time-row:last-child {
-                    border-bottom: none;
-                  }
-                  .time-label {
-                    color: #4b5563;
-                    font-weight: 500;
-                  }
-                  .time-value {
-                    font-weight: 700;
-                    color: #1f2937;
-                    background: white;
-                    padding: 0.25rem 0.75rem;
-                    border-radius: 2rem;
-                    font-size: 1.2rem;
-                  }
-                  .expires-value {
-                    color: #ef4444;
-                    font-size: 1.3rem;
-                    font-weight: 800;
-                  }
-                  .admin-info {
-                    background: #e0f2fe;
-                    color: #0369a1;
-                    padding: 0.75rem;
-                    border-radius: 0.5rem;
-                    margin: 1rem 0;
-                    font-size: 0.9rem;
-                  }
-                  .current-time {
-                    color: #6b7280;
-                    font-size: 0.9rem;
-                    margin-top: 1rem;
-                  }
-                  .note {
-                    font-size: 0.9rem;
-                    color: #9ca3af;
-                    margin-top: 0.5rem;
-                  }
-                  @media (max-width: 768px) {
-                    .container { padding: 1.5rem; }
-                    .code { font-size: 5rem; letter-spacing: 0.5rem; }
-                    .time-row { flex-direction: column; gap: 0.5rem; }
-                    .time-value { width: 100%; text-align: center; }
-                  }
-                </style>
-              </head>
-              <body>
-                <div class="container">
-                  <div class="universal-badge">🌍 CODE UNIVERSEL</div>
-                  <div class="duration">⏳ Valable 5 minutes</div>
-                  <div class="warning">
-                    ⚠️ Passé ce délai, les étudiants n'ayant pas scanné seront automatiquement marqués ABSENTS
-                  </div>
-                  <div class="instruction">🔑 Code de présence</div>
-                  <div class="code">${data.code}</div>
-                  
-                  <div class="time-info">
-                    <div class="time-row">
-                      <span class="time-label">⏰ Expire à :</span>
-                      <span class="time-value expires-value">${expirationLocale}</span>
-                    </div>
-                    <div class="time-row">
-                      <span class="time-label">🕒 Heure actuelle :</span>
-                      <span class="time-value">${heureLocale}</span>
-                    </div>
-                  </div>
-                  
-                  <div class="admin-info">
-                    👤 Généré par ${user?.name} (Administrateur)
-                  </div>
-                  
-                  <p style="font-size: 1.2rem; color: #374151;">
-                    <strong>Code valable pour TOUS les étudiants</strong>
-                  </p>
-                  <p style="color: #6b7280;">
-                    Tous services • Tous niveaux • Toutes branches
-                  </p>
-                  
-                  <div class="current-time">
-                    Les étudiants ont 5 minutes pour entrer ce code
-                  </div>
-                  <div class="note">
-                    Les absents seront marqués automatiquement après expiration
-                  </div>
-                </div>
-              </body>
-            </html>
-          `)
-          codeWindow.document.close()
-
-          // Planifier le marquage des absents après 5 minutes
-          setTimeout(async () => {
-            try {
-              await fetch('/api/code/mark-absent', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ sessionId: data.sessionId })
-              })
-              console.log('✅ Marquage des absents effectué pour la session', data.sessionId)
-              fetchAllSessions()
-              toast.info('Les absents ont été automatiquement marqués')
-            } catch (error) {
-              console.error('Erreur marquage absents:', error)
-            }
-          }, 5 * 60 * 1000)
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isMobile) {
+          showCodeModal(data.code, data.expiresAt);
+        } else {
+          const codeWindow = window.open('', '_blank');
+          if (codeWindow) {
+            displayCodeInWindow(codeWindow, data.code, data.expiresAt);
+          } else {
+            showCodeModal(data.code, data.expiresAt);
+          }
         }
-        toast.success('Code généré (valable 5 minutes)')
-        fetchAllSessions()
+
+        setTimeout(async () => {
+          try {
+            await fetch('/api/code/mark-absent', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ sessionId: data.sessionId })
+            });
+            fetchAllSessions();
+            toast.info('Les absents ont été automatiquement marqués');
+          } catch (error) {
+            console.error('Erreur marquage absents:', error)
+          }
+        }, 5 * 60 * 1000);
+        
+        toast.success('Code généré (valable 5 minutes)');
+        fetchAllSessions();
       } else {
-        toast.error(data.error || 'Erreur lors de la génération')
+        toast.error(data.error || 'Erreur lors de la génération');
       }
     } catch (error) {
-      console.error('Erreur:', error)
-      toast.error('Erreur lors de la génération du code')
+      console.error('Erreur:', error);
+      toast.dismiss('generate');
+      toast.error('Erreur lors de la génération du code');
     }
-  }
+  };
 
   const generatePDF = async (type: 'all' | 'present' | 'absent') => {
     if (selectedSession === 'all') {
@@ -700,26 +760,44 @@ export default function SuperAdminDashboard() {
           </Card>
         </div>
 
-        {/* Génération de code universel (5 min) */}
+        {/* Génération de code universel (5 min) - Version Mobile */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>🎯 Génération du code de présence</CardTitle>
             <p className="text-sm text-gray-500">
-              Code valable 5 minutes pour tous les services. Les absents seront marqués automatiquement.
+              Code valable 5 minutes pour tous les services.
             </p>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center py-6">
+            <div className="flex flex-col items-center justify-center py-4 sm:py-6">
               <Button
                 onClick={generateCode}
-                className="bg-green-600 hover:bg-green-700 text-white h-auto py-8 px-12 text-2xl font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200"
+                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-auto py-6 sm:py-8 px-6 sm:px-12 text-xl sm:text-2xl font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200 flex items-center justify-center space-x-3"
               >
-                <span className="text-4xl mr-4">⏱️</span>
-                GÉNÉRER LE CODE (5 MIN)
+                <span className="text-3xl sm:text-4xl">⏱️</span>
+                <span className="flex flex-col items-start">
+                  <span>GÉNÉRER LE CODE</span>
+                  <span className="text-xs sm:text-sm opacity-90 font-normal">(5 minutes)</span>
+                </span>
               </Button>
-              <p className="text-sm text-gray-500 mt-4">
-                Les étudiants ont 5 minutes pour entrer ce code. Passé ce délai, les absents seront automatiquement enregistrés.
-              </p>
+              
+              {/* Message d'information */}
+              <div className="mt-6 w-full max-w-md">
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                  <div className="flex items-start">
+                    <span className="text-blue-500 text-xl mr-3">📱</span>
+                    <div>
+                      <p className="text-sm text-blue-800 font-medium">
+                        Génération depuis mobile
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Le code sera affiché dans une nouvelle fenêtre. 
+                        Si rien ne s'affiche, vérifie que ton navigateur autorise les pop-ups.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
