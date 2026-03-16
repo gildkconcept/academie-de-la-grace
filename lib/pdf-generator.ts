@@ -7,7 +7,7 @@ interface StudentData {
   branch: string;
   level: number;
   baptized: boolean;
-  phone: string;
+  phone?: string;  // Rendre optionnel pour correspondre au type Student
 }
 
 interface AttendanceData {
@@ -22,7 +22,7 @@ export const generateAttendancePDF = (
   allStudents: StudentData[],
   attendanceData: AttendanceData[],
   serviceName: string,
-  type: 'all' | 'present' | 'absent' = 'all' // Nouveau paramètre
+  type: 'all' | 'present' | 'absent' = 'all'
 ) => {
   // Filtrer les étudiants selon le type demandé
   let filteredStudents: StudentData[] = [];
@@ -105,7 +105,7 @@ export const generateAttendancePDF = (
       student.branch,
       `Niveau ${student.level}`,
       student.baptized ? 'Oui' : 'Non',
-      student.phone,
+      student.phone || '-',  // Si pas de téléphone, mettre un tiret
       attendance ? 
         (attendance.status === 'present' ? '✓ Présent' : 
          attendance.status === 'late' ? '⚠ Retard' : '✗ Absent') 
