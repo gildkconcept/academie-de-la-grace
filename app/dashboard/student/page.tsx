@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import QRScanner from '@/components/qr-scanner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ProgressChart } from '@/components/charts'
@@ -16,7 +15,9 @@ export default function StudentDashboard() {
   const router = useRouter()
   const [attendance, setAttendance] = useState<Attendance[]>([])
   const [progress, setProgress] = useState<Progress[]>([])
-  const [showScanner, setShowScanner] = useState(false)
+  const [showCodeInput, setShowCodeInput] = useState(false)
+  const [code, setCode] = useState('')
+  const [verifying, setVerifying] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
 
   useEffect(() => {
@@ -37,7 +38,6 @@ export default function StudentDashboard() {
   const fetchData = async () => {
     setLoadingData(true)
     try {
-      // Récupérer l'historique des présences
       const { data: attendanceData } = await supabase
         .from('attendance')
         .select('*, sessions(*)')
@@ -49,7 +49,6 @@ export default function StudentDashboard() {
         setAttendance(attendanceData)
       }
 
-      // Récupérer la progression académique
       const { data: progressData } = await supabase
         .from('progress')
         .select('*')
@@ -66,43 +65,37 @@ export default function StudentDashboard() {
     }
   }
 
-  const handleScan = async (qrData: string) => {
+  const verifyCode = async () => {
+    if (code.length !== 6) {
+      toast.error('Le code doit faire 6 chiffres')
+      return
+    }
+
+    setVerifying(true)
     try {
-      // Extraire les paramètres de l'URL scannée
-      const url = new URL(qrData)
-      const token = url.searchParams.get('token')
-      const sessionId = url.searchParams.get('session')
-
-      if (!token || !sessionId) {
-        toast.error('QR code invalide')
-        setShowScanner(false)
-        return
-      }
-
-      const res = await fetch('/api/qrcode/scan', {
+      const res = await fetch('/api/code/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          sessionId,
-          token
-        })
+        body: JSON.stringify({ code })
       })
 
       const data = await res.json()
 
       if (res.ok) {
-        toast.success('Présence enregistrée avec succès !')
-        setShowScanner(false)
-        fetchData() // Rafraîchir les données
+        toast.success('✅ Présence enregistrée !')
+        setShowCodeInput(false)
+        setCode('')
+        fetchData()
       } else {
-        toast.error(data.error || 'Erreur lors de l\'enregistrement')
+        toast.error(data.error || 'Code invalide')
       }
     } catch (error) {
-      console.error('Erreur scan:', error)
-      toast.error('Erreur lors du scan')
+      toast.error('Erreur lors de la vérification')
+    } finally {
+      setVerifying(false)
     }
   }
 
@@ -119,7 +112,7 @@ export default function StudentDashboard() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 pb-24">
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -137,27 +130,6 @@ export default function StudentDashboard() {
       </nav>
 
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Scanner QR Code */}
-        <div className="mb-8">
-          {!showScanner ? (
-            <Button onClick={() => setShowScanner(true)} size="lg">
-              Scanner QR Code pour marquer ma présence
-            </Button>
-          ) : (
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-lg font-medium mb-4">Scannez le QR code de la session</h2>
-              <QRScanner onScan={handleScan} onError={(err) => toast.error(err)} />
-              <Button 
-                onClick={() => setShowScanner(false)} 
-                variant="outline" 
-                className="mt-4"
-              >
-                Annuler
-              </Button>
-            </div>
-          )}
-        </div>
-
         {/* Statistiques personnelles */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
           <Card>
@@ -200,7 +172,7 @@ export default function StudentDashboard() {
         </Card>
 
         {/* Historique des présences */}
-        <Card>
+        <Card className="mb-8">
           <CardHeader>
             <CardTitle>Historique des présences</CardTitle>
           </CardHeader>
@@ -242,6 +214,60 @@ export default function StudentDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Scanner Section - Code Input */}
+      {!showCodeInput ? (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-full max-w-md px-4">
+          <button
+            onClick={() => setShowCodeInput(true)}
+            className="w-full bg-indigo-600 text-white py-4 px-8 rounded-full shadow-lg hover:bg-indigo-700 active:bg-indigo-800 transition-all duration-200 text-lg font-semibold flex items-center justify-center space-x-3"
+          >
+            <span className="text-2xl">🔑</span>
+            <span>Entrer le code de présence</span>
+          </button>
+          <p className="text-center text-sm text-gray-500 mt-2">
+            Entrez le code à 6 chiffres affiché par votre responsable
+          </p>
+        </div>
+      ) : (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold mb-4">🔑 Code de présence</h3>
+            
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="123456"
+              className="w-full text-center text-4xl font-bold p-4 border-2 border-indigo-300 rounded-lg mb-4 tracking-widest"
+              autoFocus
+            />
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={verifyCode}
+                disabled={verifying || code.length !== 6}
+                className="flex-1 bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
+              >
+                {verifying ? 'Vérification...' : 'Valider ma présence'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowCodeInput(false)
+                  setCode('')
+                }}
+                className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 font-medium"
+              >
+                Annuler
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-500 text-center mt-4">
+              ⏰ Le code expire après 5 minutes
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

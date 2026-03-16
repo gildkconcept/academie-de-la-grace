@@ -20,25 +20,35 @@ export async function GET(request: Request) {
     const serviceId = searchParams.get('serviceId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const sessionId = searchParams.get('sessionId')
 
     let query = supabase
       .from('attendance')
       .select(`
         *,
         students (
+          id,
           full_name,
-          service_id,
+          branch,
           level,
-          baptized
+          baptized,
+          phone,
+          service_id
         ),
         sessions (
-          service_id,
-          date
+          id,
+          code,
+          date,
+          service_id
         )
       `)
 
+    if (sessionId) {
+      query = query.eq('session_id', sessionId)
+    }
+
     if (serviceId) {
-      query = query.eq('sessions.service_id', serviceId)
+      query = query.eq('students.service_id', serviceId)
     }
 
     if (startDate && endDate) {
@@ -48,13 +58,14 @@ export async function GET(request: Request) {
     const { data, error } = await query
 
     if (error) {
+      console.error('Erreur stats:', error)
       return NextResponse.json(
         { error: 'Erreur lors de la récupération des stats' },
         { status: 500 }
       )
     }
 
-    // Calculer les statistiques
+    // Calculer les statistiques globales
     const stats = {
       total: data.length,
       present: data.filter(a => a.status === 'present').length,
@@ -65,8 +76,32 @@ export async function GET(request: Request) {
         1: data.filter(a => a.students?.level === 1).length,
         2: data.filter(a => a.students?.level === 2).length
       },
+      byBranch: {} as Record<string, { total: number; present: number; absent: number; late: number }>,
       baptized: data.filter(a => a.students?.baptized).length
     }
+
+    // Statistiques par service
+    data.forEach(record => {
+      if (record.students?.service_id) {
+        const serviceId = record.students.service_id
+        stats.byService[serviceId] = (stats.byService[serviceId] || 0) + 1
+      }
+    })
+
+    // Statistiques par branche
+    data.forEach(record => {
+      if (record.students?.branch) {
+        const branch = record.students.branch
+        if (!stats.byBranch[branch]) {
+          stats.byBranch[branch] = { total: 0, present: 0, absent: 0, late: 0 }
+        }
+        stats.byBranch[branch].total++
+        
+        if (record.status === 'present') stats.byBranch[branch].present++
+        else if (record.status === 'absent') stats.byBranch[branch].absent++
+        else if (record.status === 'late') stats.byBranch[branch].late++
+      }
+    })
 
     return NextResponse.json(stats)
   } catch (error) {

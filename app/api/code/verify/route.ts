@@ -1,0 +1,148 @@
+import { NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase'
+import { verifyToken } from '@/lib/auth'
+
+export async function POST(request: Request) {
+  try {
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+
+    const token = authHeader.split(' ')[1]
+    const user = verifyToken(token)
+    
+    if (!user || user.role !== 'student') {
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+    }
+
+    const { code } = await request.json()
+
+    if (!code || code.length !== 6) {
+      return NextResponse.json({ error: 'Code invalide' }, { status: 400 })
+    }
+
+    console.log('🔬 VÉRIFICATION CODE:')
+    console.log('Code reçu:', code)
+
+    // Vérifier si la session existe avec ce code
+    const { data: session, error: sessionError } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('code', code)
+      .maybeSingle()
+
+    if (sessionError || !session) {
+      console.log('❌ Code non trouvé dans la base')
+      return NextResponse.json(
+        { error: 'Code invalide' },
+        { status: 400 }
+      )
+    }
+
+    console.log('✅ Code trouvé dans la base')
+    console.log('Session ID:', session.id)
+    console.log('Expiration stockée:', session.expires_at)
+
+    // Vérifier l'expiration en UTC
+    const maintenant = new Date()
+    const nowUTC = Date.UTC(
+      maintenant.getUTCFullYear(),
+      maintenant.getUTCMonth(),
+      maintenant.getUTCDate(),
+      maintenant.getUTCHours(),
+      maintenant.getUTCMinutes(),
+      maintenant.getUTCSeconds(),
+      maintenant.getUTCMilliseconds()
+    )
+    
+    const expiresAt = new Date(session.expires_at)
+    const expiresAtUTC = expiresAt.getTime()
+    
+    console.log('🕒 Comparaison des temps (UTC):')
+    console.log('   Maintenant UTC:', new Date(nowUTC).toISOString())
+    console.log('   Expiration UTC:', new Date(expiresAtUTC).toISOString())
+    
+    const diffMs = expiresAtUTC - nowUTC
+    const diffMinutes = diffMs / (60 * 1000)
+    
+    if (diffMs <= 0) {
+      console.log('❌ Code expiré depuis', Math.abs(diffMinutes).toFixed(0), 'minutes')
+      return NextResponse.json(
+        { error: 'Code expiré' },
+        { status: 400 }
+      )
+    }
+
+    console.log('✅ Code valide - Reste', diffMinutes.toFixed(0), 'minutes')
+
+    // Récupérer l'étudiant
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, full_name')
+      .eq('id', user.id)
+      .single()
+
+    if (studentError || !student) {
+      console.log('❌ Étudiant non trouvé')
+      return NextResponse.json(
+        { error: 'Étudiant non trouvé' },
+        { status: 404 }
+      )
+    }
+
+    console.log('✅ Étudiant trouvé:', student.full_name)
+
+    // Vérifier si déjà enregistré pour cette session
+    const { data: existingAttendance } = await supabase
+      .from('attendance')
+      .select('id')
+      .eq('student_id', user.id)
+      .eq('session_id', session.id)
+      .maybeSingle()
+
+    if (existingAttendance) {
+      console.log('❌ Présence déjà enregistrée')
+      return NextResponse.json(
+        { error: 'Présence déjà enregistrée' },
+        { status: 400 }
+      )
+    }
+
+    // Enregistrer la présence
+    const today = new Date().toISOString().split('T')[0]
+    const { error: attendanceError } = await supabase
+      .from('attendance')
+      .insert([
+        {
+          student_id: user.id,
+          session_id: session.id,
+          status: 'present',
+          date: today,
+          scanned_at: new Date().toISOString()
+        }
+      ])
+
+    if (attendanceError) {
+      console.error('❌ Erreur enregistrement:', attendanceError)
+      return NextResponse.json(
+        { error: 'Erreur lors de l\'enregistrement' },
+        { status: 500 }
+      )
+    }
+
+    console.log('✅ Présence enregistrée avec succès pour', student.full_name)
+    console.log('=================================')
+
+    return NextResponse.json({
+      success: true,
+      message: 'Présence enregistrée avec succès'
+    })
+  } catch (error) {
+    console.error('❌ Erreur globale:', error)
+    return NextResponse.json(
+      { error: 'Erreur serveur' },
+      { status: 500 }
+    )
+  }
+}
