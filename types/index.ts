@@ -3,9 +3,11 @@ export type UserRole = 'superadmin' | 'service_manager' | 'student'
 export interface User {
   id: string
   name: string
-  username: string  // Au lieu de email
+  username: string
   role: UserRole
   serviceId?: string
+  email?: string
+  phone?: string
 }
 
 export interface Student {
@@ -15,12 +17,12 @@ export interface Student {
   level: 1 | 2
   service_id: string
   baptized: boolean
-  phone: string
-  username: string  // Au lieu de email
+  phone?: string
+  username: string
+  email?: string
   created_at: Date
 }
 
-// Le reste reste identique...
 export interface Service {
   id: string
   name: string
@@ -29,10 +31,11 @@ export interface Service {
 
 export interface Session {
   id: string
-  service_id: string
-  qr_token: string
+  service_id?: string
+  code: string
   expires_at: Date
   date: Date
+  created_at?: Date
 }
 
 export interface Attendance {
@@ -40,7 +43,7 @@ export interface Attendance {
   student_id: string
   session_id: string
   status: 'present' | 'absent' | 'late'
-  scanned_at: Date
+  scanned_at?: Date
   date: Date
 }
 

@@ -65,7 +65,6 @@ export default function ProfilePage() {
       if (res.ok) {
         toast.success('Profil mis à jour avec succès')
         
-        // Mettre à jour le token pour refléter les changements
         setTimeout(() => {
           window.location.reload()
         }, 1500)
@@ -81,7 +80,6 @@ export default function ProfilePage() {
   }
 
   const handlePasswordUpdate = async () => {
-    // Vérifications
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
       toast.error('Tous les champs sont requis')
       return
@@ -120,8 +118,7 @@ export default function ProfilePage() {
           newPassword: '',
           confirmPassword: ''
         })
-
-        // Déconnecter l'utilisateur pour qu'il se reconnecte
+        
         setTimeout(() => {
           logout()
           router.push('/login')

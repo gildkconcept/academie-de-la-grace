@@ -25,7 +25,9 @@ export function useAuth() {
               name: data.user.name,
               username: data.user.username,
               role: data.user.role,
-              serviceId: data.user.serviceId
+              serviceId: data.user.serviceId,
+              email: data.user.email || '',        // Ajout email
+              phone: data.user.phone || ''         // Ajout phone
             })
           } else {
             localStorage.removeItem('token')
