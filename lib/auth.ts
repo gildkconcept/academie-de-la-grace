@@ -1,4 +1,4 @@
-import jwt, { JwtPayload } from 'jsonwebtoken'
+import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { supabase } from './supabase'
 
@@ -18,30 +18,34 @@ export async function comparePassword(password: string, hash: string) {
 }
 
 export function generateToken(user: any) {
-  return jwt.sign(
-    { 
-      id: user.id, 
-      username: user.username,
-      name: user.name,
-      role: user.role,
-      serviceId: user.service_id 
-    }, 
-    JWT_SECRET, 
-    { expiresIn: '7d' }
-  )
+  // Pour les étudiants, on inclut le niveau
+  const payload: any = { 
+    id: user.id, 
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    serviceId: user.service_id
+  }
+  
+  // Si c'est un étudiant, ajouter le niveau
+  if (user.role === 'student' && user.level) {
+    payload.level = user.level
+  }
+  
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
 }
 
 export function verifyToken(token: string) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET)
-    // Vérifier que c'est bien un objet avec les propriétés attendues
     if (typeof decoded === 'object' && decoded !== null) {
-      return decoded as JwtPayload & {
+      return decoded as jwt.JwtPayload & {
         id: string
         username: string
         name: string
         role: string
         serviceId?: string
+        level?: number
       }
     }
     return null

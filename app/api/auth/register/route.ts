@@ -7,6 +7,15 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { fullName, branch, level, serviceId, baptized, phone, username, password } = body
 
+    // Validation du niveau (1, 2 ou 3)
+    const levelNumber = parseInt(level)
+    if (isNaN(levelNumber) || levelNumber < 1 || levelNumber > 3) {
+      return NextResponse.json(
+        { error: 'Le niveau doit être 1, 2 ou 3' },
+        { status: 400 }
+      )
+    }
+
     // Vérifier si le nom d'utilisateur ou le téléphone existe déjà
     const { data: existingStudent } = await supabase
       .from('students')
@@ -31,7 +40,7 @@ export async function POST(request: Request) {
         {
           full_name: fullName,
           branch,
-          level: parseInt(level),
+          level: levelNumber,
           service_id: serviceId,
           baptized: baptized === 'true',
           phone,

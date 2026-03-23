@@ -19,7 +19,7 @@ export default function RegisterPage() {
     serviceId: '',
     baptized: 'false',
     phone: '',
-    username: '',  // Remplacé email par username
+    username: '',
     password: ''
   })
 
@@ -126,6 +126,7 @@ export default function RegisterPage() {
               >
                 <option value="1">Niveau 1</option>
                 <option value="2">Niveau 2</option>
+                <option value="3">Niveau 3</option>
               </select>
             </div>
 

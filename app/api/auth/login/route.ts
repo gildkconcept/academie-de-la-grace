@@ -8,81 +8,62 @@ export async function POST(request: Request) {
     
     console.log('=== TENTATIVE DE CONNEXION ===')
     console.log('Username:', username)
-    console.log('Password reçu:', password ? '✓' : '✗')
 
     // Vérifier d'abord dans users (admins/managers)
-    console.log('Recherche dans users...')
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('username', username)
       .single()
 
-    if (userError) {
-      console.log('Erreur recherche users:', userError.message)
-    }
-
-    if (user) {
-      console.log('Utilisateur trouvé dans users:', user.username)
-      console.log('Hash en BD:', user.password.substring(0, 20) + '...')
-      
-      const passwordValid = await comparePassword(password, user.password)
-      console.log('Mot de passe valide:', passwordValid)
-      
-      if (passwordValid) {
-        const token = generateToken(user)
-        console.log('Connexion réussie pour:', username)
-        return NextResponse.json({
-          token,
-          user: {
-            id: user.id,
-            name: user.name,
-            username: user.username,
-            role: user.role,
-            serviceId: user.service_id
-          }
-        })
-      }
-    } else {
-      console.log('Aucun utilisateur trouvé avec ce username')
+    if (user && await comparePassword(password, user.password)) {
+      const token = generateToken(user)
+      return NextResponse.json({
+        token,
+        user: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          role: user.role,
+          serviceId: user.service_id,
+          level: null
+        }
+      })
     }
 
     // Vérifier dans students
-    console.log('Recherche dans students...')
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('*')
+      .select('id, full_name, username, password, service_id, level, email, phone')
       .eq('username', username)
       .single()
 
-    if (studentError) {
-      console.log('Erreur recherche students:', studentError.message)
+    if (student && await comparePassword(password, student.password)) {
+      console.log('📊 Étudiant trouvé - Niveau:', student.level)
+      
+      const token = generateToken({ 
+        id: student.id,
+        name: student.full_name,
+        username: student.username,
+        role: 'student',
+        service_id: student.service_id,
+        level: student.level
+      })
+      
+      return NextResponse.json({
+        token,
+        user: {
+          id: student.id,
+          name: student.full_name,
+          username: student.username,
+          role: 'student',
+          serviceId: student.service_id,
+          level: student.level  // 1, 2 ou 3
+        }
+      })
     }
 
-    if (student) {
-      console.log('Étudiant trouvé:', student.username)
-      console.log('Hash en BD:', student.password.substring(0, 20) + '...')
-      
-      const passwordValid = await comparePassword(password, student.password)
-      console.log('Mot de passe valide:', passwordValid)
-      
-      if (passwordValid) {
-        const token = generateToken({ ...student, role: 'student' })
-        console.log('Connexion réussie pour étudiant:', username)
-        return NextResponse.json({
-          token,
-          user: {
-            id: student.id,
-            name: student.full_name,
-            username: student.username,
-            role: 'student',
-            serviceId: student.service_id
-          }
-        })
-      }
-    }
-
-    console.log('=== ÉCHEC DE CONNEXION ===')
+    console.log('Échec de connexion pour:', username)
     return NextResponse.json(
       { error: 'Nom d\'utilisateur ou mot de passe incorrect' },
       { status: 401 }

@@ -20,18 +20,24 @@ export function useAuth() {
         .then(res => res.json())
         .then(data => {
           if (data.user) {
+            console.log('📦 Données utilisateur reçues de verify:', data.user)
             setUser({
               id: data.user.id,
               name: data.user.name,
               username: data.user.username,
               role: data.user.role,
               serviceId: data.user.serviceId,
-              email: data.user.email || '',        // Ajout email
-              phone: data.user.phone || ''         // Ajout phone
+              email: data.user.email || '',
+              phone: data.user.phone || '',
+              level: data.user.level || 1
             })
           } else {
             localStorage.removeItem('token')
           }
+        })
+        .catch(error => {
+          console.error('❌ Erreur auth:', error)
+          localStorage.removeItem('token')
         })
         .finally(() => setLoading(false))
     } else {

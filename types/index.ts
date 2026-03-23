@@ -8,13 +8,14 @@ export interface User {
   serviceId?: string
   email?: string
   phone?: string
+  level?: 1 | 2 | 3  // Maintenant 1, 2 ou 3
 }
 
 export interface Student {
   id: string
   full_name: string
   branch: string
-  level: 1 | 2
+  level: 1 | 2 | 3  // Maintenant 1, 2 ou 3
   service_id: string
   baptized: boolean
   phone?: string
@@ -50,7 +51,7 @@ export interface Attendance {
 export interface Progress {
   id: string
   student_id: string
-  level: 1 | 2
+  level: 1 | 2 | 3  
   module: string
   score: number
   completed: boolean

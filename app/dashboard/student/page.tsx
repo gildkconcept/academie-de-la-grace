@@ -14,19 +14,32 @@ import {
   Bars3Icon, 
   XMarkIcon,
   ArrowLeftOnRectangleIcon,
-  QrCodeIcon
+  QrCodeIcon,
+  PencilSquareIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline'
 
 export default function StudentDashboard() {
   const { user, loading, logout } = useAuth()
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const [attendance, setAttendance] = useState<Attendance[]>([])
   const [progress, setProgress] = useState<Progress[]>([])
   const [showCodeInput, setShowCodeInput] = useState(false)
   const [code, setCode] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
+  const [userLevel, setUserLevel] = useState<number>(1) // État local pour le niveau
+  
+  // États pour le profil
+  const [profileData, setProfileData] = useState({
+    name: '',
+    username: '',
+    email: '',
+    phone: ''
+  })
+  const [loadingUpdate, setLoadingUpdate] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -39,9 +52,42 @@ export default function StudentDashboard() {
       router.push('/dashboard/superadmin')
     }
     if (user?.id) {
+      console.log('👤 Utilisateur connecté:', user)
+      console.log('📊 Niveau depuis user:', user.level)
+      
+      // Récupérer le niveau depuis la base de données pour être sûr
+      fetchUserLevel()
       fetchData()
+      if (user) {
+        setProfileData({
+          name: user.name || '',
+          username: user.username || '',
+          email: user.email || '',
+          phone: user.phone || ''
+        })
+      }
     }
   }, [user, loading])
+
+  const fetchUserLevel = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('level')
+        .eq('id', user?.id)
+        .single()
+      
+      if (error) {
+        console.error('Erreur récupération niveau:', error)
+        return
+      }
+      
+      console.log('📊 Niveau depuis base de données:', data?.level)
+      setUserLevel(data?.level || 1)
+    } catch (error) {
+      console.error('Erreur:', error)
+    }
+  }
 
   const fetchData = async () => {
     setLoadingData(true)
@@ -70,6 +116,41 @@ export default function StudentDashboard() {
       toast.error('Erreur lors du chargement des données')
     } finally {
       setLoadingData(false)
+    }
+  }
+
+  const handleProfileUpdate = async () => {
+    if (!profileData.name || !profileData.username) {
+      toast.error('Le nom et le nom d\'utilisateur sont requis')
+      return
+    }
+
+    setLoadingUpdate(true)
+    try {
+      const res = await fetch('/api/profile/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(profileData)
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        toast.success('Profil mis à jour avec succès')
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
+      } else {
+        toast.error(data.error || 'Erreur lors de la mise à jour')
+      }
+    } catch (error) {
+      console.error('Erreur:', error)
+      toast.error('Erreur lors de la mise à jour du profil')
+    } finally {
+      setLoadingUpdate(false)
     }
   }
 
@@ -126,6 +207,9 @@ export default function StudentDashboard() {
 
   if (!user) return null
 
+  const currentLevel = userLevel || user.level || 1
+  console.log('🎨 Affichage du niveau:', currentLevel)
+
   return (
     <div className="min-h-screen bg-gray-100 pb-24">
       {/* Navigation */}
@@ -144,161 +228,253 @@ export default function StudentDashboard() {
                 )}
               </button>
               <h1 className="text-lg sm:text-xl font-semibold ml-2 lg:ml-0 truncate">
-                Mon Espace Étudiant
+                {showProfile ? 'Mon profil' : 'Mon Espace Étudiant'}
               </h1>
             </div>
 
-            {/* Bouton déconnexion mobile */}
-            <div className="flex items-center lg:hidden">
-              <button
-                onClick={logout}
-                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                title="Déconnexion"
-              >
-                <ArrowLeftOnRectangleIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Infos desktop */}
             <div className="hidden lg:flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{user.name}</span>
+              <div className="flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm">
+                <AcademicCapIcon className="w-4 h-4" />
+                Niveau {currentLevel}
+              </div>
+              <Button
+                onClick={() => setShowProfile(!showProfile)}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <UserCircleIcon className="w-4 h-4" />
+                {showProfile ? 'Tableau de bord' : 'Mon profil'}
+              </Button>
               <Button onClick={logout} variant="destructive" size="sm">
                 Déconnexion
               </Button>
             </div>
+
+            <div className="flex items-center lg:hidden">
+              <button
+                onClick={logout}
+                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Menu mobile */}
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-gray-200 bg-white">
-            <div className="px-4 py-3">
-              <p className="text-sm text-gray-600">Connecté en tant que {user.name}</p>
+            <div className="px-4 py-3 space-y-2">
+              <p className="text-sm text-gray-600 pb-2 border-b">Connecté en tant que {user.name}</p>
+              <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-lg">
+                <AcademicCapIcon className="w-4 h-4 text-indigo-600" />
+                <span className="text-sm text-indigo-600">Niveau {currentLevel}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setShowProfile(!showProfile)
+                  setMobileMenuOpen(false)
+                }}
+                className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
+              >
+                <UserCircleIcon className="w-5 h-5 mr-3" />
+                {showProfile ? 'Tableau de bord' : 'Mon profil'}
+              </button>
             </div>
           </div>
         )}
       </nav>
 
-      <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
-        {/* Statistiques personnelles */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-5 mb-4 sm:mb-8">
-          <Card className="card-hover">
-            <CardContent className="p-3 sm:pt-6">
-              <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Présences</div>
-              <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-green-600">
-                {attendance.filter(a => a.status === 'present').length}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="card-hover">
-            <CardContent className="p-3 sm:pt-6">
-              <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Progression</div>
-              <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-blue-600">
-                {calculateProgress()}%
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="card-hover">
-            <CardContent className="p-3 sm:pt-6">
-              <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Modules</div>
-              <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-purple-600">
-                {progress.filter(p => p.completed).length}
+      {showProfile ? (
+        <div className="max-w-3xl mx-auto py-4 sm:py-6 px-4 sm:px-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PencilSquareIcon className="w-5 h-5" />
+                Modifier mon profil
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex items-center justify-center sm:justify-start space-x-4">
+                  <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center">
+                    <span className="text-3xl font-bold text-indigo-600">
+                      {profileData.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{profileData.name}</p>
+                    <p className="text-sm text-gray-500">@{profileData.username}</p>
+                    <p className="text-xs text-gray-400 mt-1">Niveau {currentLevel}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
+                    <input
+                      type="text"
+                      value={profileData.name}
+                      onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nom d'utilisateur</label>
+                    <input
+                      type="text"
+                      value={profileData.username}
+                      onChange={(e) => setProfileData({ ...profileData, username: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input
+                      type="email"
+                      value={profileData.email}
+                      onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
+                    <input
+                      type="tel"
+                      value={profileData.phone}
+                      onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleProfileUpdate}
+                    disabled={loadingUpdate}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    {loadingUpdate ? 'Mise à jour...' : 'Enregistrer'}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
+      ) : (
+        <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
+          {/* Statistiques personnelles */}
+          <div className="grid grid-cols-3 gap-3 sm:gap-5 mb-4 sm:mb-8">
+            <Card className="card-hover">
+              <CardContent className="p-3 sm:pt-6">
+                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Présences</div>
+                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-green-600">
+                  {attendance.filter(a => a.status === 'present').length}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="card-hover">
+              <CardContent className="p-3 sm:pt-6">
+                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Progression</div>
+                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-blue-600">
+                  {calculateProgress()}%
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="card-hover">
+              <CardContent className="p-3 sm:pt-6">
+                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Modules</div>
+                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-purple-600">
+                  {progress.filter(p => p.completed).length}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Graphique de progression */}
-        <Card className="mb-4 sm:mb-8">
-          <CardHeader className="px-4 sm:px-6 py-4">
-            <CardTitle className="text-base sm:text-lg">Ma progression académique</CardTitle>
-          </CardHeader>
-          <CardContent className="px-2 sm:px-6">
-            <ProgressChart data={progress.map(p => ({
-              name: p.module,
-              progress: p.score
-            }))} />
-          </CardContent>
-        </Card>
+          {/* Graphique de progression */}
+          <Card className="mb-4 sm:mb-8">
+            <CardHeader className="px-4 sm:px-6 py-4">
+              <CardTitle className="text-base sm:text-lg">Ma progression académique</CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 sm:px-6">
+              <ProgressChart data={progress.map(p => ({
+                name: p.module,
+                progress: p.score
+              }))} />
+            </CardContent>
+          </Card>
 
-        {/* Historique des présences - Version mobile en cartes */}
-        <Card className="mb-4 sm:mb-8">
-          <CardHeader className="px-4 sm:px-6 py-4">
-            <CardTitle className="text-base sm:text-lg">Historique des présences</CardTitle>
-          </CardHeader>
-          <CardContent className="px-2 sm:px-6">
-            {/* Version mobile : cartes */}
-            <div className="block lg:hidden space-y-2">
-              {attendance.length === 0 ? (
-                <p className="text-gray-500 text-center py-4 text-sm">Aucune présence enregistrée</p>
-              ) : (
-                attendance.map((a) => (
-                  <div key={a.id} className="bg-white border border-gray-200 rounded-lg p-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium text-sm">
-                        {new Date(a.date).toLocaleDateString('fr-FR')}
-                      </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        a.status === 'present' 
-                          ? 'bg-green-100 text-green-800'
-                          : a.status === 'late'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {a.status === 'present' ? 'Présent' : a.status === 'late' ? 'Retard' : 'Absent'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      {a.scanned_at ? new Date(a.scanned_at).toLocaleTimeString('fr-FR') : '-'}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Version desktop : tableau */}
-            <div className="hidden lg:block overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Heure</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {attendance.map((a) => (
-                    <tr key={a.id}>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {new Date(a.date).toLocaleDateString('fr-FR')}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          a.status === 'present' 
-                            ? 'bg-green-100 text-green-800'
-                            : a.status === 'late'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
+          {/* Historique des présences */}
+          <Card className="mb-4 sm:mb-8">
+            <CardHeader className="px-4 sm:px-6 py-4">
+              <CardTitle className="text-base sm:text-lg">Historique des présences</CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 sm:px-6">
+              <div className="block lg:hidden space-y-2">
+                {attendance.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4 text-sm">Aucune présence enregistrée</p>
+                ) : (
+                  attendance.map((a) => (
+                    <div key={a.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium text-sm">
+                          {new Date(a.date).toLocaleDateString('fr-FR')}
+                        </span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          a.status === 'present' ? 'bg-green-100 text-green-800' :
+                          a.status === 'late' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
                         }`}>
                           {a.status === 'present' ? 'Présent' : a.status === 'late' ? 'Retard' : 'Absent'}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
+                      </div>
+                      <p className="text-xs text-gray-500">
                         {a.scanned_at ? new Date(a.scanned_at).toLocaleTimeString('fr-FR') : '-'}
-                      </td>
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Heure</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {attendance.map((a) => (
+                      <tr key={a.id}>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {new Date(a.date).toLocaleDateString('fr-FR')}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            a.status === 'present' ? 'bg-green-100 text-green-800' :
+                            a.status === 'late' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {a.status === 'present' ? 'Présent' : a.status === 'late' ? 'Retard' : 'Absent'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {a.scanned_at ? new Date(a.scanned_at).toLocaleTimeString('fr-FR') : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Bouton flottant pour le code */}
-      {!showCodeInput ? (
+      {!showProfile && !showCodeInput && (
         <div className="fixed bottom-4 sm:bottom-6 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] sm:w-auto max-w-md px-4">
           <button
             onClick={() => setShowCodeInput(true)}
@@ -308,11 +484,13 @@ export default function StudentDashboard() {
             <span>Entrer le code de présence</span>
           </button>
         </div>
-      ) : (
+      )}
+
+      {/* Modal Code */}
+      {showCodeInput && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <h3 className="text-lg sm:text-xl font-bold mb-4">🔑 Code de présence</h3>
-            
             <input
               type="text"
               value={code}
@@ -321,7 +499,6 @@ export default function StudentDashboard() {
               className="w-full text-center text-3xl sm:text-4xl font-bold p-3 sm:p-4 border-2 border-indigo-300 rounded-lg mb-4 tracking-widest"
               autoFocus
             />
-            
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={verifyCode}
@@ -340,7 +517,6 @@ export default function StudentDashboard() {
                 Annuler
               </button>
             </div>
-            
             <p className="text-xs sm:text-sm text-gray-500 text-center mt-4">
               ⏰ Le code expire après 5 minutes
             </p>

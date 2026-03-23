@@ -16,7 +16,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
     }
 
-    // Récupérer les informations complètes de l'utilisateur depuis la base de données
+    console.log('🔍 Token décodé:', decoded)
+
     let userData = null
     
     if (decoded.role === 'superadmin' || decoded.role === 'service_manager') {
@@ -26,13 +27,16 @@ export async function GET(request: Request) {
         .eq('id', decoded.id)
         .single()
       userData = data
+      console.log('👤 Utilisateur admin trouvé:', userData)
     } else {
       const { data } = await supabase
         .from('students')
-        .select('*')
+        .select('id, full_name, username, role, service_id, level, email, phone')
         .eq('id', decoded.id)
         .single()
       userData = data
+      console.log('👤 Étudiant trouvé:', userData)
+      console.log('📊 Niveau dans la base:', userData?.level)
     }
 
     return NextResponse.json({ 
@@ -43,10 +47,12 @@ export async function GET(request: Request) {
         role: decoded.role,
         serviceId: decoded.serviceId,
         email: userData?.email || '',
-        phone: userData?.phone || ''
+        phone: userData?.phone || '',
+        level: userData?.level || (decoded.role === 'student' ? 1 : null)
       }
     })
   } catch (error) {
+    console.error('❌ Erreur verify:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }
