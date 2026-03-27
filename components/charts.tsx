@@ -16,7 +16,7 @@ import {
   Line
 } from 'recharts'
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B', '#33CC99', '#9966CC']
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B']
 
 interface AttendanceChartProps {
   data: Array<{ month: string; presents: number }>
@@ -80,66 +80,6 @@ export const ProgressChart = ({ data }: ProgressChartProps) => {
         <Legend />
         <Line type="monotone" dataKey="progress" stroke="#8884d8" name="Progression %" />
       </LineChart>
-    </ResponsiveContainer>
-  )
-}
-
-interface ServiceAttendanceChartProps {
-  data: Array<{ name: string; présents: number; absents: number; total: number }>
-}
-
-export const ServiceAttendanceChart = ({ data }: ServiceAttendanceChartProps) => {
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="présents" fill="#10b981" name="Présents" />
-        <Bar dataKey="absents" fill="#ef4444" name="Absents" />
-      </BarChart>
-    </ResponsiveContainer>
-  )
-}
-
-interface LevelAttendanceChartProps {
-  data: Array<{ name: string; présents: number; total: number }>
-}
-
-export const LevelAttendanceChart = ({ data }: LevelAttendanceChartProps) => {
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="présents" fill="#8b5cf6" name="Présents" />
-        <Bar dataKey="total" fill="#9ca3af" name="Total" />
-      </BarChart>
-    </ResponsiveContainer>
-  )
-}
-
-interface BranchAttendanceChartProps {
-  data: Array<{ name: string; présents: number; total: number }>
-}
-
-export const BranchAttendanceChart = ({ data }: BranchAttendanceChartProps) => {
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="présents" fill="#f59e0b" name="Présents" />
-        <Bar dataKey="total" fill="#9ca3af" name="Total" />
-      </BarChart>
     </ResponsiveContainer>
   )
 }

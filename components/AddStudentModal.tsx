@@ -1,6 +1,7 @@
+// components/AddStudentModal.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
@@ -24,6 +25,33 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
     phone: '',
     password: ''
   })
+
+  // Empêcher le scroll du body quand le modal est ouvert
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen])
+
+  if (!isOpen) return null
+
+  const handleClose = () => {
+    setFormData({
+      fullName: '',
+      username: '',
+      branch: '',
+      level: '1',
+      baptized: 'false',
+      phone: '',
+      password: ''
+    })
+    onClose()
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
@@ -63,16 +91,7 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
       if (res.ok) {
         toast.success('Étudiant ajouté avec succès')
         onStudentAdded()
-        onClose()
-        setFormData({
-          fullName: '',
-          username: '',
-          branch: '',
-          level: '1',
-          baptized: 'false',
-          phone: '',
-          password: ''
-        })
+        handleClose()
       } else {
         toast.error(data.error || 'Erreur lors de la création')
       }
@@ -84,15 +103,18 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
     }
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose()
+      }}
+    >
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Ajouter un étudiant sans téléphone</CardTitle>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <XMarkIcon className="w-5 h-5" />
@@ -111,7 +133,7 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
                   required
                   value={formData.fullName}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
@@ -125,7 +147,7 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
                   required
                   value={formData.username}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
@@ -139,7 +161,7 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
                   required
                   value={formData.branch}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
@@ -152,10 +174,11 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
                   required
                   value={formData.level}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="1">Niveau 1</option>
                   <option value="2">Niveau 2</option>
+                  <option value="3">Niveau 3</option>
                 </select>
               </div>
 
@@ -167,7 +190,7 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
                   name="baptized"
                   value={formData.baptized}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="false">Non</option>
                   <option value="true">Oui</option>
@@ -184,7 +207,7 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
                   value={formData.phone}
                   onChange={handleChange}
                   placeholder="Laissez vide si pas de téléphone"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             </div>
@@ -200,7 +223,7 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   placeholder="Mot de passe"
                 />
                 <Button
@@ -220,7 +243,7 @@ export const AddStudentModal = ({ isOpen, onClose, serviceId, onStudentAdded }: 
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
               <Button
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
                 variant="outline"
               >
                 Annuler

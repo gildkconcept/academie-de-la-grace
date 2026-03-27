@@ -8,14 +8,14 @@ export interface User {
   serviceId?: string
   email?: string
   phone?: string
-  level?: 1 | 2 | 3  // Maintenant 1, 2 ou 3
+  level?: 1 | 2 | 3
 }
 
 export interface Student {
   id: string
   full_name: string
   branch: string
-  level: 1 | 2 | 3  // Maintenant 1, 2 ou 3
+  level: 1 | 2 | 3
   service_id: string
   baptized: boolean
   phone?: string
@@ -30,29 +30,46 @@ export interface Service {
   description?: string
 }
 
-export interface Session {
+// Sessions académiques (code)
+export interface AcademySession {
   id: string
-  service_id?: string
   code: string
-  expires_at: Date
-  date: Date
-  created_at?: Date
+  date: string
+  expires_at: string
+  created_at: string
+  created_by?: string
 }
 
-export interface Attendance {
+export interface AcademyAttendance {
   id: string
   student_id: string
-  session_id: string
+  academy_session_id: string
   status: 'present' | 'absent' | 'late'
-  scanned_at?: Date
-  date: Date
+  scanned_at: string
 }
 
-export interface Progress {
+// Sessions de service (checkbox)
+export interface ServiceSession {
+  id: string
+  service_id: string
+  date: string
+  created_at: string
+  created_by?: string
+}
+
+export interface ServiceAttendance {
   id: string
   student_id: string
-  level: 1 | 2 | 3  
-  module: string
-  score: number
-  completed: boolean
+  service_session_id: string
+  status: 'present' | 'absent' | 'late'
+  marked_at: string
+}
+
+// Pour l'analyse croisée
+export interface CrossAttendance {
+  student_id: string
+  student_name: string
+  service: string
+  service_present: boolean
+  academic_present: boolean
 }

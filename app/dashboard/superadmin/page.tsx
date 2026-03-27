@@ -27,7 +27,8 @@ import {
   XMarkIcon,
   ArrowLeftOnRectangleIcon,
   DocumentArrowDownIcon,
-  FunnelIcon
+  FunnelIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline'
 import { ProfileSection } from '@/components/ProfileSection'
 
@@ -59,6 +60,11 @@ export default function SuperAdminDashboard() {
   })
   const [loadingData, setLoadingData] = useState(true)
 
+  // États pour la présence service
+  const [serviceAttendances, setServiceAttendances] = useState<any[]>([])
+  const [selectedServiceForAttendance, setSelectedServiceForAttendance] = useState<string>('all')
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0])
+
   // Données pour les graphiques
   const [presenceByService, setPresenceByService] = useState<any[]>([])
   const [presenceByLevel, setPresenceByLevel] = useState<any[]>([])
@@ -83,6 +89,7 @@ export default function SuperAdminDashboard() {
     if (user?.role === 'superadmin') {
       fetchData()
       fetchAllSessions()
+      fetchServiceAttendances()
     }
   }, [user, loading])
 
@@ -90,9 +97,14 @@ export default function SuperAdminDashboard() {
     applyFilters()
   }, [students, selectedService, selectedBranch, selectedLevel, selectedBaptism])
 
+  useEffect(() => {
+    fetchServiceAttendances()
+  }, [selectedDate, selectedServiceForAttendance])
+
   const fetchData = async () => {
     setLoadingData(true)
     try {
+      // Récupérer les services
       const { data: servicesData } = await supabase
         .from('services')
         .select('*')
@@ -102,6 +114,7 @@ export default function SuperAdminDashboard() {
         setServices(servicesData)
       }
 
+      // Récupérer tous les étudiants
       const { data: studentsData } = await supabase
         .from('students')
         .select('*')
@@ -111,10 +124,12 @@ export default function SuperAdminDashboard() {
         setStudents(studentsData)
         setFilteredStudents(studentsData)
         
+        // Extraire toutes les branches uniques
         const uniqueBranches = [...new Set(studentsData.map(s => s.branch))].sort()
         setBranches(uniqueBranches)
       }
 
+      // Statistiques du jour
       const today = new Date().toISOString().split('T')[0]
       const { data: attendanceData } = await supabase
         .from('attendance')
@@ -137,6 +152,7 @@ export default function SuperAdminDashboard() {
         averageProgress: Math.round(avgProgress)
       })
 
+      // Générer les statistiques pour les graphiques
       generateChartData(studentsData || [], servicesData || [])
       
     } catch (error) {
@@ -147,7 +163,137 @@ export default function SuperAdminDashboard() {
     }
   }
 
+  const fetchServiceAttendances = async () => {
+    try {
+      let url = `/api/service/attendance/all?date=${selectedDate}`
+      if (selectedServiceForAttendance !== 'all') {
+        url += `&serviceId=${selectedServiceForAttendance}`
+      }
+      
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      
+      const data = await res.json()
+      if (res.ok) {
+        setServiceAttendances(data)
+      } else {
+        console.error('Erreur:', data.error)
+      }
+    } catch (error) {
+      console.error('Erreur récupération présences service:', error)
+    }
+  }
+
+  const generateServiceAttendancePDF = async () => {
+    if (serviceAttendances.length === 0) {
+      toast.error('Aucune donnée à exporter');
+      return;
+    }
+
+    try {
+      const { jsPDF } = await import('jspdf');
+      const autoTable = (await import('jspdf-autotable')).default;
+      const doc = new jsPDF();
+
+      // Titre
+      doc.setFontSize(20);
+      doc.text('Académie de la Grâce', 105, 15, { align: 'center' });
+      
+      // Sous-titre
+      doc.setFontSize(16);
+      doc.text('Rapport des présences service', 105, 25, { align: 'center' });
+      
+      // Date
+      const dateFormatted = new Date(selectedDate).toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      doc.setFontSize(12);
+      doc.text(`Date: ${dateFormatted}`, 105, 35, { align: 'center' });
+      
+      // Filtre service
+      if (selectedServiceForAttendance !== 'all') {
+        const serviceName = services.find(s => s.id === selectedServiceForAttendance)?.name || '';
+        doc.text(`Service: ${serviceName}`, 105, 42, { align: 'center' });
+      }
+      
+      // Date de génération
+      const now = new Date();
+      doc.setFontSize(8);
+      doc.text(`Généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`, 105, 280, { align: 'center' });
+      
+      let startY = 55;
+      
+      // Pour chaque session
+      for (const session of serviceAttendances) {
+        const serviceName = services.find(s => s.id === session.service_id)?.name || 'Service';
+        const sessionDate = new Date(session.date).toLocaleDateString('fr-FR');
+        
+        // Titre de la session
+        doc.setFontSize(14);
+        doc.text(`${serviceName} - ${sessionDate}`, 14, startY);
+        startY += 8;
+        
+        // Statistiques
+        const presents = session.service_attendance?.filter((a: any) => a.status === 'present').length || 0;
+        const absents = session.service_attendance?.filter((a: any) => a.status === 'absent').length || 0;
+        const total = session.service_attendance?.length || 0;
+        
+        doc.setFontSize(10);
+        doc.text(`Total: ${total} | Présents: ${presents} | Absents: ${absents}`, 14, startY);
+        startY += 8;
+        
+        // Tableau des présences
+        const tableData = session.service_attendance?.map((att: any) => [
+          att.students?.full_name || 'N/A',
+          att.students?.branch || 'N/A',
+          `Niveau ${att.students?.level || 1}`,
+          att.students?.baptized ? 'Oui' : 'Non',
+          att.students?.phone || '-',
+          att.status === 'present' ? '✓ Présent' : '✗ Absent'
+        ]) || [];
+        
+        if (tableData.length > 0) {
+          autoTable(doc, {
+            head: [['Nom', 'Branche', 'Niveau', 'Baptême', 'Téléphone', 'Statut']],
+            body: tableData,
+            startY: startY,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [79, 70, 229] },
+            alternateRowStyles: { fillColor: [240, 240, 240] },
+            margin: { left: 14, right: 14 },
+          });
+          
+          startY = (doc as any).lastAutoTable.finalY + 15;
+        } else {
+          startY += 10;
+        }
+        
+        // Nouvelle page si nécessaire
+        if (startY > 250) {
+          doc.addPage();
+          startY = 20;
+        }
+      }
+      
+      // Sauvegarder le PDF
+      const fileName = `presences_service_${selectedDate}_${selectedServiceForAttendance !== 'all' ? services.find(s => s.id === selectedServiceForAttendance)?.name : 'tous_services'}.pdf`;
+      doc.save(fileName);
+      
+      toast.success('PDF généré avec succès');
+    } catch (error) {
+      console.error('Erreur génération PDF:', error);
+      toast.error('Erreur lors de la génération du PDF');
+    }
+  };
+
   const generateChartData = (studentsData: Student[], servicesData: Service[]) => {
+    // Présence par service (simulée avec des données aléatoires pour l'exemple)
     const servicePresence = servicesData.map(service => {
       const serviceStudents = studentsData.filter(s => s.service_id === service.id)
       const presentCount = Math.floor(Math.random() * serviceStudents.length)
@@ -160,13 +306,17 @@ export default function SuperAdminDashboard() {
     })
     setPresenceByService(servicePresence)
 
+    // Présence par niveau
     const niveau1 = studentsData.filter(s => s.level === 1)
     const niveau2 = studentsData.filter(s => s.level === 2)
+    const niveau3 = studentsData.filter(s => s.level === 3)
     setPresenceByLevel([
       { name: 'Niveau 1', présents: Math.floor(Math.random() * niveau1.length), total: niveau1.length },
-      { name: 'Niveau 2', présents: Math.floor(Math.random() * niveau2.length), total: niveau2.length }
+      { name: 'Niveau 2', présents: Math.floor(Math.random() * niveau2.length), total: niveau2.length },
+      { name: 'Niveau 3', présents: Math.floor(Math.random() * niveau3.length), total: niveau3.length }
     ])
 
+    // Présence par branche (top 5)
     const branchMap = new Map()
     studentsData.forEach(s => {
       const count = branchMap.get(s.branch) || 0
@@ -182,6 +332,7 @@ export default function SuperAdminDashboard() {
       }))
     setPresenceByBranch(topBranches)
 
+    // Statistiques baptême
     const baptises = studentsData.filter(s => s.baptized).length
     const nonBaptises = studentsData.length - baptises
     setBaptismStats([
@@ -333,6 +484,65 @@ export default function SuperAdminDashboard() {
     setSelectedLevel('all')
     setSelectedBaptism('all')
   }
+
+  const generateCode = async () => {
+    try {
+      toast.loading('Génération du code en cours...', { id: 'generate' });
+
+      const res = await fetch('/api/code/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({})
+      });
+
+      const data = await res.json();
+      
+      toast.dismiss('generate');
+      
+      if (res.ok) {
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isMobile) {
+          showCodeModal(data.code, data.expiresAt);
+        } else {
+          const codeWindow = window.open('', '_blank');
+          if (codeWindow) {
+            displayCodeInWindow(codeWindow, data.code, data.expiresAt);
+          } else {
+            showCodeModal(data.code, data.expiresAt);
+          }
+        }
+
+        setTimeout(async () => {
+          try {
+            await fetch('/api/code/mark-absent', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ sessionId: data.sessionId })
+            });
+            fetchAllSessions();
+            toast.info('Les absents ont été marqués automatiquement');
+          } catch (error) {
+            console.error('Erreur marquage absents:', error)
+          }
+        }, 5 * 60 * 1000);
+        
+        toast.success('Code généré (valable 5 minutes)');
+        fetchAllSessions();
+      } else {
+        toast.error(data.error || 'Erreur lors de la génération');
+      }
+    } catch (error) {
+      console.error('Erreur:', error);
+      toast.dismiss('generate');
+      toast.error('Erreur lors de la génération du code');
+    }
+  };
 
   const showCodeModal = (code: string, expiresAt: string) => {
     const expiresAtDate = new Date(expiresAt);
@@ -563,65 +773,6 @@ export default function SuperAdminDashboard() {
     codeWindow.document.close();
   };
 
-  const generateCode = async () => {
-    try {
-      toast.loading('Génération du code en cours...', { id: 'generate' });
-
-      const res = await fetch('/api/code/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({})
-      });
-
-      const data = await res.json();
-      
-      toast.dismiss('generate');
-      
-      if (res.ok) {
-        const isMobile = window.innerWidth <= 768;
-        
-        if (isMobile) {
-          showCodeModal(data.code, data.expiresAt);
-        } else {
-          const codeWindow = window.open('', '_blank');
-          if (codeWindow) {
-            displayCodeInWindow(codeWindow, data.code, data.expiresAt);
-          } else {
-            showCodeModal(data.code, data.expiresAt);
-          }
-        }
-
-        setTimeout(async () => {
-          try {
-            await fetch('/api/code/mark-absent', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ sessionId: data.sessionId })
-            });
-            fetchAllSessions();
-            toast.info('Les absents ont été marqués automatiquement');
-          } catch (error) {
-            console.error('Erreur marquage absents:', error)
-          }
-        }, 5 * 60 * 1000);
-        
-        toast.success('Code généré (valable 5 minutes)');
-        fetchAllSessions();
-      } else {
-        toast.error(data.error || 'Erreur lors de la génération');
-      }
-    } catch (error) {
-      console.error('Erreur:', error);
-      toast.dismiss('generate');
-      toast.error('Erreur lors de la génération du code');
-    }
-  };
-
   const generatePDF = async (type: 'all' | 'present' | 'absent') => {
     if (selectedSession === 'all') {
       toast.error('Veuillez sélectionner une séance spécifique');
@@ -767,6 +918,7 @@ export default function SuperAdminDashboard() {
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-gray-200 bg-white">
             <div className="px-4 py-3 space-y-2">
+              <p className="text-sm text-gray-600 pb-2 border-b">Connecté en tant que {user.name}</p>
               <button
                 onClick={toggleProfile}
                 className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
@@ -822,10 +974,109 @@ export default function SuperAdminDashboard() {
             </Card>
           </div>
 
-          {/* Génération de code */}
-          <Card className="mb-4 sm:mb-8">
+          {/* Section Présence Service - Vue superadmin */}
+          <Card className="mb-8">
             <CardHeader className="px-4 sm:px-6 py-4">
-              <CardTitle className="text-base sm:text-lg">🎯 Génération du code de présence</CardTitle>
+              <CardTitle className="text-base sm:text-lg flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <UserGroupIcon className="w-5 h-5 text-indigo-600" />
+                  📋 Présence Service - Vue générale
+                </div>
+                {serviceAttendances.length > 0 && (
+                  <Button
+                    onClick={generateServiceAttendancePDF}
+                    size="sm"
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    📄 Exporter PDF
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6 pb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Service
+                  </label>
+                  <select
+                    value={selectedServiceForAttendance}
+                    onChange={(e) => setSelectedServiceForAttendance(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="all">Tous les services</option>
+                    {services.map(service => (
+                      <option key={service.id} value={service.id}>{service.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {serviceAttendances.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 rounded-lg">
+                  <p className="text-gray-500">Aucune session de présence service pour cette date</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {serviceAttendances.map((session) => (
+                    <div key={session.id} className="border rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3 border-b">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="font-semibold text-gray-900">
+                              {services.find(s => s.id === session.service_id)?.name || 'Service'}
+                            </h3>
+                            <p className="text-xs text-gray-500">
+                              Session du {new Date(session.date).toLocaleDateString('fr-FR')}
+                            </p>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-green-600 font-medium">
+                              {session.service_attendance?.filter((a: any) => a.status === 'present').length || 0}
+                            </span>
+                            <span className="text-gray-400 mx-1">/</span>
+                            <span>{session.service_attendance?.length || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {session.service_attendance?.map((att: any) => (
+                            <div key={att.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                              <span className="text-sm font-medium truncate">{att.students?.full_name}</span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                att.status === 'present' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {att.status === 'present' ? '✓ Présent' : '✗ Absent'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Génération de code académique */}
+          <Card className="mb-8">
+            <CardHeader className="px-4 sm:px-6 py-4">
+              <CardTitle className="text-base sm:text-lg">🎯 Génération du code de présence académique</CardTitle>
             </CardHeader>
             <CardContent className="px-4 sm:px-6 pb-6">
               <div className="flex flex-col items-center justify-center py-4">
@@ -843,7 +1094,7 @@ export default function SuperAdminDashboard() {
             </CardContent>
           </Card>
 
-          {/* Filtres - Version mobile avec bouton */}
+          {/* Filtres avancés */}
           <div className="lg:hidden mb-4">
             <Button
               onClick={() => setShowFilters(!showFilters)}
@@ -855,8 +1106,7 @@ export default function SuperAdminDashboard() {
             </Button>
           </div>
 
-          {/* Filtres avancés */}
-          <Card className={`mb-4 sm:mb-8 ${!showFilters && 'hidden lg:block'}`}>
+          <Card className={`mb-8 ${!showFilters && 'hidden lg:block'}`}>
             <CardHeader className="px-4 sm:px-6 py-4">
               <CardTitle className="text-base sm:text-lg">Filtres avancés</CardTitle>
             </CardHeader>
@@ -906,6 +1156,7 @@ export default function SuperAdminDashboard() {
                     <option value="all">Tous</option>
                     <option value="1">Niveau 1</option>
                     <option value="2">Niveau 2</option>
+                    <option value="3">Niveau 3</option>
                   </select>
                 </div>
 
@@ -936,10 +1187,10 @@ export default function SuperAdminDashboard() {
             </CardContent>
           </Card>
 
-          {/* Sélection de séance */}
-          <Card className="mb-4 sm:mb-8">
+          {/* Sélection de séance académique */}
+          <Card className="mb-8">
             <CardHeader className="px-4 sm:px-6 py-4">
-              <CardTitle className="text-base sm:text-lg">Présences par séance</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Présences académiques par séance</CardTitle>
             </CardHeader>
             <CardContent className="px-4 sm:px-6">
               <div className="space-y-4">
@@ -983,7 +1234,7 @@ export default function SuperAdminDashboard() {
                       </div>
                     </div>
 
-                    {/* Liste des présences - Version mobile en cartes */}
+                    {/* Liste des présences académiques */}
                     <div className="mt-4">
                       <h4 className="text-sm sm:text-base font-medium mb-2">Détail :</h4>
                       <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
@@ -1013,41 +1264,6 @@ export default function SuperAdminDashboard() {
                         })}
                       </div>
                     </div>
-
-                    {/* Statistiques par branche */}
-                    {branchStats.length > 0 && (
-                      <div className="mt-6">
-                        <h4 className="text-sm sm:text-base font-medium mb-4">📊 Stats par branche</h4>
-                        
-                        {/* Version mobile : cartes */}
-                        <div className="block lg:hidden space-y-2">
-                          {branchStats.map((branch) => (
-                            <div key={branch.name} className="bg-white border border-gray-200 rounded-lg p-3">
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="font-medium text-sm">{branch.name}</span>
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                  branch.percentage >= 75 ? 'bg-green-100 text-green-800' :
-                                  branch.percentage >= 50 ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-red-100 text-red-800'
-                                }`}>
-                                  {branch.percentage}%
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
-                                <div>Total: {branch.total}</div>
-                                <div className="text-green-600">P: {branch.present}</div>
-                                <div className="text-red-600">A: {branch.absent}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Version desktop : graphique */}
-                        <div className="hidden lg:block">
-                          <BranchStatsChart data={branchStats} />
-                        </div>
-                      </div>
-                    )}
 
                     {/* Options PDF */}
                     <div className="flex flex-col space-y-2 mt-4">
@@ -1121,7 +1337,7 @@ export default function SuperAdminDashboard() {
             </Card>
           </div>
 
-          {/* Liste des étudiants - Version mobile en cartes */}
+          {/* Liste des étudiants */}
           <Card>
             <CardHeader className="px-4 sm:px-6 py-4">
               <CardTitle className="text-base sm:text-lg">
