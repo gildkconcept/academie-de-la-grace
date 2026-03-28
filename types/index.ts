@@ -1,5 +1,5 @@
 export type UserRole = 'superadmin' | 'service_manager' | 'student'
-
+export * from './attendance'
 export interface User {
   id: string
   name: string
@@ -72,4 +72,19 @@ export interface CrossAttendance {
   service: string
   service_present: boolean
   academic_present: boolean
+}
+
+// Pour la présence académique (ancien système)
+export interface Attendance {
+  id: string
+  student_id: string
+  session_id: string
+  status: 'present' | 'absent' | 'late'
+  scanned_at?: Date
+  date: Date
+  sessions?: {
+    code: string
+    date: string
+    created_at: string
+  }
 }

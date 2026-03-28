@@ -621,7 +621,6 @@ export default function ManagerDashboard() {
                   <CalendarIcon className="w-5 h-5 text-indigo-600" />
                   📋 Présence Service - {serviceName}
                 </CardTitle>
-                {/* Toujours afficher le bouton pour créer une nouvelle session */}
                 <Button
                   onClick={startServiceSession}
                   disabled={loadingService}
@@ -641,7 +640,6 @@ export default function ManagerDashboard() {
                 </div>
               ) : (
                 <div>
-                  {/* Sélecteur de session */}
                   {allSessions.length > 1 && (
                     <div className="relative mb-4">
                       <button
@@ -676,7 +674,6 @@ export default function ManagerDashboard() {
                     </div>
                   )}
 
-                  {/* Session en cours */}
                   {serviceSession && (
                     <div>
                       <div className="mb-4 flex justify-between items-center">
