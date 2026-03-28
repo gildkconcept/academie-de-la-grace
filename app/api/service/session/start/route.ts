@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const { date } = await request.json()
     const sessionDate = date || new Date().toISOString().split('T')[0]
 
-    // Créer une nouvelle session (pas de vérification d'existence)
+    // Créer une nouvelle session
     const { data: session, error } = await supabase
       .from('service_sessions')
       .insert([

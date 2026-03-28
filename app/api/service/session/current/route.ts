@@ -2,6 +2,23 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
 
+interface ServiceSession {
+  id: string
+  service_id: string
+  date: string
+  created_at: string
+  created_by: string
+  service_attendance?: Array<{
+    student_id: string
+    status: string
+  }>
+}
+
+interface ServiceAttendance {
+  student_id: string
+  status: string
+}
+
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -46,10 +63,10 @@ export async function GET(request: Request) {
         .select('id, full_name')
         .eq('service_id', user.serviceId)
 
-      const studentList = (students || []).map(student => ({
+      const studentList = (students || []).map((student: { id: string; full_name: string }) => ({
         id: student.id,
         name: student.full_name,
-        status: attendances?.find(a => a.student_id === student.id)?.status || 'absent'
+        status: attendances?.find((a: ServiceAttendance) => a.student_id === student.id)?.status || 'absent'
       }))
 
       return NextResponse.json({
@@ -80,9 +97,9 @@ export async function GET(request: Request) {
     }
 
     // Pour chaque session, ajouter les statistiques
-    const sessionsWithStats = (sessions || []).map((session: any) => {
+    const sessionsWithStats = (sessions || []).map((session: ServiceSession) => {
       const attendances = session.service_attendance || []
-      const present = attendances.filter((a: any) => a.status === 'present').length
+      const present = attendances.filter((a: ServiceAttendance) => a.status === 'present').length
       const total = attendances.length
       return {
         ...session,

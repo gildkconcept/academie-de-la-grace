@@ -18,6 +18,13 @@ export async function POST(request: Request) {
 
     const { sessionId, attendances } = await request.json()
 
+    if (!sessionId || !attendances) {
+      return NextResponse.json(
+        { error: 'Données manquantes' },
+        { status: 400 }
+      )
+    }
+
     // Vérifier la session
     const { data: session, error: sessionError } = await supabase
       .from('service_sessions')
