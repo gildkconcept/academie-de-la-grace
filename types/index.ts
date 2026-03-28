@@ -1,5 +1,5 @@
 export type UserRole = 'superadmin' | 'service_manager' | 'student'
-export * from './attendance'
+
 export interface User {
   id: string
   name: string
@@ -28,6 +28,16 @@ export interface Service {
   id: string
   name: string
   description?: string
+}
+
+// Progression académique
+export interface Progress {
+  id: string
+  student_id: string
+  level: 1 | 2 | 3
+  module: string
+  score: number
+  completed: boolean
 }
 
 // Sessions académiques (code)
