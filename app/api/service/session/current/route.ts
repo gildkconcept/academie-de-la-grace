@@ -80,9 +80,9 @@ export async function GET(request: Request) {
     }
 
     // Pour chaque session, ajouter les statistiques
-    const sessionsWithStats = (sessions || []).map(session => {
+    const sessionsWithStats = (sessions || []).map((session: any) => {
       const attendances = session.service_attendance || []
-      const present = attendances.filter(a => a.status === 'present').length
+      const present = attendances.filter((a: any) => a.status === 'present').length
       const total = attendances.length
       return {
         ...session,
