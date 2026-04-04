@@ -56,11 +56,11 @@ export default function Home() {
           <div className="animate-fade-in">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-sm font-medium mb-6">
               <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
-              Plateforme éducative chrétienne
+              Plateforme de suivie des ouvriers de la Mission évangelique grace abondante (MEGA)
             </div>
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 dark:text-white mb-6">
-              Formez-vous à la
-              <span className="gradient-text block mt-2">Grâce de Dieu</span>
+              Formez
+              <span className="gradient-text block mt-2">pour impacter</span>
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-10">
               Une plateforme complète pour suivre votre formation biblique, gérer vos présences et progresser dans la connaissance de Dieu.
@@ -100,7 +100,7 @@ export default function Home() {
                 <span className="ml-3 text-lg font-bold text-gray-900 dark:text-white">Académie de la Grâce</span>
               </div>
               <p className="text-gray-600 dark:text-gray-400 text-sm">
-                Former des disciples, équiper les croyants, glorifier Dieu.
+                Gagner des âmes, fait d'eux des disciples et manifester Christ
               </p>
             </div>
             
@@ -127,14 +127,14 @@ export default function Home() {
             <div>
               <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Contact</h4>
               <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                <li>Email: contact@academiegrace.com</li>
-                <li>Tél: +225 XX XX XX XX</li>
+               
+               
               </ul>
             </div>
           </div>
           
           <div className="border-t border-gray-200 dark:border-gray-800 mt-8 pt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            <p>&copy; {new Date().getFullYear()} Académie de la Grâce. Tous droits réservés.</p>
+            <p>&copy; {new Date().getFullYear()} Mission évangélique grace abondante (MEGA). Tous droits réservés.</p>
           </div>
         </div>
       </footer>
