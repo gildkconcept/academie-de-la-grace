@@ -17,9 +17,7 @@ import {
   XMarkIcon, 
   CalendarIcon, 
   FunnelIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  UsersIcon,
+  ArrowRightOnRectangleIcon,
   DocumentArrowDownIcon
 } from '@heroicons/react/24/outline'
 import { ProfileSection } from '@/components/ProfileSection'
@@ -54,7 +52,6 @@ export default function ManagerDashboard() {
   const [serviceSession, setServiceSession] = useState<ServiceSession | null>(null)
   const [serviceStudents, setServiceStudents] = useState<any[]>([])
   const [allSessions, setAllSessions] = useState<any[]>([])
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [showSessionSelector, setShowSessionSelector] = useState(false)
   const [loadingService, setLoadingService] = useState(false)
   
@@ -84,7 +81,6 @@ export default function ManagerDashboard() {
       router.push('/dashboard/superadmin')
     }
     if (user?.serviceId) {
-      console.log('📌 Chargement des données pour service:', user.serviceId)
       fetchServiceName()
       fetchData()
       fetchSessions()
@@ -177,35 +173,39 @@ export default function ManagerDashboard() {
 
   const fetchCurrentSession = async () => {
     try {
-      console.log('🔄 Récupération de toutes les sessions...')
+      // Récupérer la session du jour
       const res = await fetch('/api/service/session/current', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       })
       const data = await res.json()
-      console.log('📦 Réponse API:', data)
       
       if (res.ok) {
-        setAllSessions(data.sessions || [])
-        if (data.currentSession) {
-          setServiceSession(data.currentSession)
-          await fetchSessionStudents(data.currentSession.id)
-        } else {
-          setServiceSession(null)
-          setServiceStudents([])
+        setServiceSession(data.session)
+        setServiceStudents(data.students || [])
+        
+        // Récupérer toutes les sessions pour le sélecteur
+        const allRes = await fetch('/api/service/session/all', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
+        const allData = await allRes.json()
+        if (allRes.ok) {
+          setAllSessions(allData.sessions || [])
         }
       } else {
-        console.error('❌ Erreur API:', data.error)
+        console.error('Erreur API:', data.error)
       }
     } catch (error) {
-      console.error('❌ Erreur récupération sessions:', error)
+      console.error('Erreur récupération sessions:', error)
     }
   }
 
   const fetchSessionStudents = async (sessionId: string) => {
     try {
-      const res = await fetch(`/api/service/session/current?sessionId=${sessionId}`, {
+      const res = await fetch(`/api/service/session/get?sessionId=${sessionId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -223,7 +223,6 @@ export default function ManagerDashboard() {
   const startServiceSession = async () => {
     setLoadingService(true)
     try {
-      console.log('🚀 Démarrage d\'une nouvelle session...')
       const res = await fetch('/api/service/session/start', {
         method: 'POST',
         headers: {
@@ -233,7 +232,6 @@ export default function ManagerDashboard() {
         body: JSON.stringify({ date: new Date().toISOString().split('T')[0] })
       })
       const data = await res.json()
-      console.log('📦 Réponse API session/start:', data)
       
       if (res.ok) {
         toast.success('Nouvelle session démarrée')
@@ -242,7 +240,7 @@ export default function ManagerDashboard() {
         toast.error(data.error || 'Erreur lors du démarrage')
       }
     } catch (error) {
-      console.error('❌ Erreur démarrage session:', error)
+      console.error('Erreur démarrage session:', error)
       toast.error('Erreur lors du démarrage')
     } finally {
       setLoadingService(false)
@@ -250,7 +248,6 @@ export default function ManagerDashboard() {
   }
 
   const changeSession = (sessionId: string) => {
-    setSelectedSessionId(sessionId)
     fetchSessionStudents(sessionId)
     setShowSessionSelector(false)
   }
@@ -276,8 +273,6 @@ export default function ManagerDashboard() {
         status: s.status
       }))
 
-      console.log('💾 Enregistrement des présences:', attendances)
-      
       const res = await fetch('/api/service/attendance/mark', {
         method: 'POST',
         headers: {
@@ -291,7 +286,6 @@ export default function ManagerDashboard() {
       })
 
       const data = await res.json()
-      console.log('📦 Réponse API attendance/mark:', data)
       
       if (res.ok) {
         toast.success('Présences enregistrées')
@@ -300,7 +294,7 @@ export default function ManagerDashboard() {
         toast.error(data.error || 'Erreur')
       }
     } catch (error) {
-      console.error('❌ Erreur enregistrement:', error)
+      console.error('Erreur enregistrement:', error)
       toast.error('Erreur lors de l\'enregistrement')
     } finally {
       setLoadingService(false)
@@ -362,6 +356,7 @@ export default function ManagerDashboard() {
     }
   }
 
+  // Générer PDF pour une session académique spécifique
   const generateAcademicPDF = async (type: 'all' | 'present' | 'absent') => {
     if (selectedSession === 'today') {
       toast.error('Veuillez sélectionner une séance académique');
@@ -410,48 +405,75 @@ export default function ManagerDashboard() {
       console.error('Erreur génération PDF:', error);
       toast.error('Erreur lors de la génération du PDF');
     }
-  }
+  };
 
-  const generateServicePDF = async (type: 'all' | 'present' | 'absent') => {
-    if (!serviceSession) {
-      toast.error('Aucune session service active');
+  // Générer PDF pour une session service spécifique
+  const generateServicePDF = async (type: 'all' | 'present' | 'absent', session?: ServiceSession) => {
+    const targetSession = session || serviceSession
+    
+    if (!targetSession) {
+      toast.error('Aucune session service sélectionnée');
       return;
     }
 
     try {
+      let sessionStudentsData = serviceStudents
+      
+      // Si ce n'est pas la session courante, récupérer les données
+      if (targetSession.id !== serviceSession?.id) {
+        const res = await fetch(`/api/service/session/get?sessionId=${targetSession.id}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        })
+        const data = await res.json()
+        if (res.ok) {
+          sessionStudentsData = data.students || []
+        }
+      }
+      
       const doc = new jsPDF();
 
+      // Titre
       doc.setFontSize(20);
       doc.text('Académie de la Grâce', 105, 15, { align: 'center' });
+      
+      // Sous-titre
       doc.setFontSize(16);
       doc.text('Rapport de présence service', 105, 25, { align: 'center' });
+      
+      // Informations
       doc.setFontSize(12);
       doc.text(`Service: ${serviceName}`, 105, 35, { align: 'center' });
-      doc.text(`Date: ${new Date(serviceSession.date).toLocaleDateString('fr-FR')}`, 105, 42, { align: 'center' });
+      doc.text(`Date: ${new Date(targetSession.date).toLocaleDateString('fr-FR')}`, 105, 42, { align: 'center' });
+      doc.text(`Heure: ${new Date(targetSession.created_at).toLocaleTimeString('fr-FR')}`, 105, 49, { align: 'center' });
       
-      const total = serviceStudents.length;
-      const present = serviceStudents.filter(s => s.status === 'present').length;
-      const absent = serviceStudents.filter(s => s.status === 'absent').length;
+      // Statistiques
+      const total = sessionStudentsData.length;
+      const present = sessionStudentsData.filter((s: any) => s.status === 'present').length;
+      const absent = sessionStudentsData.filter((s: any) => s.status === 'absent').length;
       const attendanceRate = total > 0 ? Math.round((present / total) * 100) : 0;
       
       doc.setFontSize(11);
-      doc.text(`Total étudiants: ${total}`, 20, 55);
-      doc.text(`Présents: ${present}`, 20, 62);
-      doc.text(`Absents: ${absent}`, 20, 69);
-      doc.text(`Taux de présence: ${attendanceRate}%`, 20, 76);
+      doc.text(`Total étudiants: ${total}`, 20, 65);
+      doc.text(`Présents: ${present}`, 20, 72);
+      doc.text(`Absents: ${absent}`, 20, 79);
+      doc.text(`Taux de présence: ${attendanceRate}%`, 20, 86);
       
+      // Date de génération
       const now = new Date();
       doc.setFontSize(8);
       doc.text(`Généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`, 105, 280, { align: 'center' });
       
-      let filteredStudents = serviceStudents;
+      // Filtrer les étudiants selon le type
+      let filteredStudents = sessionStudentsData;
+      
       if (type === 'present') {
-        filteredStudents = serviceStudents.filter(s => s.status === 'present');
+        filteredStudents = sessionStudentsData.filter((s: any) => s.status === 'present');
       } else if (type === 'absent') {
-        filteredStudents = serviceStudents.filter(s => s.status === 'absent');
+        filteredStudents = sessionStudentsData.filter((s: any) => s.status === 'absent');
       }
       
-      const tableData = filteredStudents.map(student => [
+      // Tableau
+      const tableData = filteredStudents.map((student: any) => [
         student.name,
         student.status === 'present' ? '✓ Présent' : '✗ Absent'
       ]);
@@ -459,14 +481,17 @@ export default function ManagerDashboard() {
       autoTable(doc, {
         head: [['Nom', 'Statut']],
         body: tableData,
-        startY: 85,
+        startY: 95,
         styles: { fontSize: 10 },
         headStyles: { fillColor: type === 'present' ? [16, 185, 129] : type === 'absent' ? [239, 68, 68] : [79, 70, 229] },
         alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 40 } }
+        columnStyles: {
+          0: { cellWidth: 120 },
+          1: { cellWidth: 40 }
+        }
       });
       
-      const fileName = `presence_service_${serviceName}_${new Date(serviceSession.date).toISOString().split('T')[0]}_${type}.pdf`;
+      const fileName = `presence_service_${serviceName}_${new Date(targetSession.date).toISOString().split('T')[0]}_${type}.pdf`;
       doc.save(fileName);
       
       const typeText = type === 'present' ? 'des présents' : type === 'absent' ? 'des absents' : 'complet';
@@ -558,9 +583,7 @@ export default function ManagerDashboard() {
                 className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                 title="Déconnexion"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
+                <ArrowRightOnRectangleIcon className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -595,6 +618,13 @@ export default function ManagerDashboard() {
               >
                 <UserCircleIcon className="w-5 h-5 mr-3" />
                 {showProfile ? 'Tableau de bord' : 'Mon profil'}
+              </button>
+              <button
+                onClick={logout}
+                className="w-full flex items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" />
+                Déconnexion
               </button>
             </div>
           </div>
@@ -654,20 +684,51 @@ export default function ManagerDashboard() {
                       </button>
                       
                       {showSessionSelector && (
-                        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                        <div className="absolute top-full left-0 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
                           {allSessions.map(session => (
-                            <button
-                              key={session.id}
-                              onClick={() => changeSession(session.id)}
-                              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex justify-between items-center ${
-                                serviceSession?.id === session.id ? 'bg-indigo-50 text-indigo-600' : ''
-                              }`}
-                            >
-                              <span>Session du {new Date(session.date).toLocaleDateString('fr-FR')}</span>
-                              <span className="text-xs text-gray-500">
-                                {session.stats?.present || 0}/{session.stats?.total || 0}
-                              </span>
-                            </button>
+                            <div key={session.id} className="flex items-center justify-between px-4 py-2 hover:bg-gray-50 border-b last:border-b-0">
+                              <button
+                                onClick={() => changeSession(session.id)}
+                                className={`flex-1 text-left text-sm ${
+                                  serviceSession?.id === session.id ? 'text-indigo-600 font-medium' : 'text-gray-700'
+                                }`}
+                              >
+                                <div>Session du {new Date(session.date).toLocaleDateString('fr-FR')}</div>
+                                <div className="text-xs text-gray-400">{new Date(session.created_at).toLocaleTimeString()}</div>
+                              </button>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    generateServicePDF('all', session)
+                                  }}
+                                  className="p-1 text-indigo-600 hover:bg-indigo-50 rounded"
+                                  title="PDF complet"
+                                >
+                                  <DocumentArrowDownIcon className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    generateServicePDF('present', session)
+                                  }}
+                                  className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                  title="PDF présents"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    generateServicePDF('absent', session)
+                                  }}
+                                  className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                  title="PDF absents"
+                                >
+                                  ✗
+                                </button>
+                              </div>
+                            </div>
                           ))}
                         </div>
                       )}
@@ -676,18 +737,44 @@ export default function ManagerDashboard() {
 
                   {serviceSession && (
                     <div>
-                      <div className="mb-4 flex justify-between items-center">
+                      <div className="mb-4 flex justify-between items-center flex-wrap gap-2">
                         <p className="text-sm text-gray-500">
                           Session du {new Date(serviceSession.date).toLocaleDateString('fr-FR')} à {new Date(serviceSession.created_at).toLocaleTimeString()}
                         </p>
-                        <Button
-                          onClick={saveAttendances}
-                          disabled={loadingService}
-                          size="sm"
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                        >
-                          Enregistrer
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => generateServicePDF('all')}
+                            size="sm"
+                            variant="outline"
+                            className="text-indigo-600 border-indigo-600"
+                          >
+                            📄 PDF
+                          </Button>
+                          <Button
+                            onClick={() => generateServicePDF('present')}
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 border-green-600"
+                          >
+                            ✅ PDF présents
+                          </Button>
+                          <Button
+                            onClick={() => generateServicePDF('absent')}
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-600"
+                          >
+                            ❌ PDF absents
+                          </Button>
+                          <Button
+                            onClick={saveAttendances}
+                            disabled={loadingService}
+                            size="sm"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                          >
+                            Enregistrer
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
@@ -727,7 +814,7 @@ export default function ManagerDashboard() {
                                 placeholder="Rechercher un étudiant..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                               />
                               <svg className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -863,13 +950,6 @@ export default function ManagerDashboard() {
             <CardHeader className="px-4 sm:px-6 py-4">
               <div className="flex justify-between items-center flex-wrap gap-2">
                 <CardTitle className="text-base sm:text-lg">Historique Présences Académiques</CardTitle>
-                {selectedSession !== 'today' && selectedSession !== 'all' && attendanceBySession.length > 0 && (
-                  <div className="flex gap-2">
-                    <Button onClick={() => generateAcademicPDF('all')} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">📄 PDF complet</Button>
-                    <Button onClick={() => generateAcademicPDF('present')} size="sm" className="bg-green-600 hover:bg-green-700 text-white">✅ PDF présents</Button>
-                    <Button onClick={() => generateAcademicPDF('absent')} size="sm" className="bg-red-600 hover:bg-red-700 text-white">❌ PDF absents</Button>
-                  </div>
-                )}
               </div>
             </CardHeader>
             <CardContent className="px-4 sm:px-6 pb-6">
@@ -892,6 +972,33 @@ export default function ManagerDashboard() {
 
                 {selectedSession !== 'today' && (
                   <>
+                    <div className="flex justify-end gap-2 mb-4">
+                      <Button
+                        onClick={() => generateAcademicPDF('all')}
+                        size="sm"
+                        variant="outline"
+                        className="text-indigo-600 border-indigo-600"
+                      >
+                        📄 PDF complet
+                      </Button>
+                      <Button
+                        onClick={() => generateAcademicPDF('present')}
+                        size="sm"
+                        variant="outline"
+                        className="text-green-600 border-green-600"
+                      >
+                        ✅ PDF présents
+                      </Button>
+                      <Button
+                        onClick={() => generateAcademicPDF('absent')}
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 border-red-600"
+                      >
+                        ❌ PDF absents
+                      </Button>
+                    </div>
+
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="bg-green-50 p-2 sm:p-4 rounded-lg text-center">
                         <div className="text-lg sm:text-2xl font-bold text-green-600">
@@ -1083,7 +1190,7 @@ export default function ManagerDashboard() {
         </div>
       )}
 
-      {/* Modals */}
+      {/* Modal Historique Étudiant */}
       {showHistoryModal && selectedStudent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
@@ -1143,6 +1250,7 @@ export default function ManagerDashboard() {
         </div>
       )}
 
+      {/* Modal d'ajout d'étudiant */}
       <AddStudentModal
         isOpen={showAddStudentModal}
         onClose={() => setShowAddStudentModal(false)}

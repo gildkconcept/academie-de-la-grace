@@ -28,7 +28,6 @@ export default function LoginPage() {
         localStorage.setItem('token', data.token)
         toast.success('Connexion réussie')
         
-        // Redirection basée sur le rôle
         switch(data.user.role) {
           case 'superadmin':
             router.push('/dashboard/superadmin')

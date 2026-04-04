@@ -16,49 +16,43 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
-    const today = new Date().toISOString().split('T')[0]
-
-    // Récupérer la session la PLUS RÉCENTE du jour (pas toutes)
-    const { data: sessions, error: sessionError } = await supabase
+    // Récupérer TOUTES les sessions du service
+    const { data: sessions, error } = await supabase
       .from('service_sessions')
       .select('*')
       .eq('service_id', user.serviceId)
-      .eq('date', today)
       .order('created_at', { ascending: false })
-      .limit(1)
 
-    if (sessionError) {
-      console.error('Erreur session:', sessionError)
+    if (error) {
+      console.error('Erreur:', error)
       return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
     }
 
-    const session = sessions && sessions.length > 0 ? sessions[0] : null
-
-    let studentsList: any[] = []
-
-    if (session) {
-      // Récupérer les présences
+    // Pour chaque session, compter les présences
+    const sessionsWithStats = await Promise.all((sessions || []).map(async (session) => {
       const { data: attendances } = await supabase
         .from('service_attendance')
-        .select('student_id, status')
+        .select('status')
         .eq('service_session_id', session.id)
-
-      // Récupérer tous les étudiants du service
-      const { data: students } = await supabase
-        .from('students')
-        .select('id, full_name')
-        .eq('service_id', user.serviceId)
-
-      studentsList = (students || []).map(student => ({
-        id: student.id,
-        name: student.full_name,
-        status: attendances?.find(a => a.student_id === student.id)?.status || 'absent'
-      }))
-    }
+      
+      const present = attendances?.filter(a => a.status === 'present').length || 0
+      const total = attendances?.length || 0
+      
+      return {
+        id: session.id,
+        service_id: session.service_id,
+        date: session.date,
+        created_at: session.created_at,
+        stats: {
+          present,
+          absent: total - present,
+          total
+        }
+      }
+    }))
 
     return NextResponse.json({
-      session: session || null,
-      students: studentsList
+      sessions: sessionsWithStats
     })
   } catch (error) {
     console.error('Erreur:', error)

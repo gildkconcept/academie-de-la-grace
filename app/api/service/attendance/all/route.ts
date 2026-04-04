@@ -12,7 +12,8 @@ export async function GET(request: Request) {
     const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
-    if (!user || user.role !== 'superadmin') {
+    // Permettre l'accès aux superadmins ET aux managers
+    if (!user || (user.role !== 'superadmin' && user.role !== 'service_manager')) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
@@ -43,6 +44,9 @@ export async function GET(request: Request) {
 
     if (serviceId && serviceId !== 'all') {
       query = query.eq('service_id', serviceId)
+    } else if (user.role === 'service_manager') {
+      // Si c'est un manager, filtrer par son service
+      query = query.eq('service_id', user.serviceId)
     }
 
     const { data, error } = await query
