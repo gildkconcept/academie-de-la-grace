@@ -6,8 +6,8 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { Service } from '@/types'
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 
-// Liste des branches disponibles
 const branchesList = [
   'Katartizo',
   'Anagkazo',
@@ -23,6 +23,7 @@ const branchesList = [
 export default function RegisterPage() {
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -125,9 +126,7 @@ export default function RegisterPage() {
               >
                 <option value="">Sélectionnez une branche</option>
                 {branchesList.map(branch => (
-                  <option key={branch} value={branch}>
-                    {branch}
-                  </option>
+                  <option key={branch} value={branch}>{branch}</option>
                 ))}
               </select>
             </div>
@@ -215,19 +214,30 @@ export default function RegisterPage() {
               />
             </div>
 
-            <div>
+            <div className="relative">
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Mot de passe
               </label>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 name="password"
                 required
                 minLength={6}
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 pr-10"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 mt-6 mr-3 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? (
+                  <EyeSlashIcon className="h-5 w-5" />
+                ) : (
+                  <EyeIcon className="h-5 w-5" />
+                )}
+              </button>
             </div>
           </div>
 
