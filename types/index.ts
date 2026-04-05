@@ -45,9 +45,15 @@ export interface AcademySession {
   id: string
   code: string
   date: string
+  type?: string
   expires_at: string
   created_at: string
   created_by?: string
+  session_type?: {
+    code: string
+    label: string
+    day_of_week: string
+  }
 }
 
 export interface AcademyAttendance {
@@ -58,13 +64,19 @@ export interface AcademyAttendance {
   scanned_at: string
 }
 
-// Sessions de service (checkbox)
+// Sessions de service (checkbox) – AJOUT de type
 export interface ServiceSession {
   id: string
   service_id: string
   date: string
+  type?: string                           // ← clé ajoutée
   created_at: string
   created_by?: string
+  session_type?: {                       // ← optionnel pour jointure
+    code: string
+    label: string
+    day_of_week: string
+  }
 }
 
 export interface ServiceAttendance {

@@ -463,8 +463,10 @@ export default function ManagerDashboard() {
       doc.setFontSize(12)
       doc.text(`Service: ${serviceName}`, 105, 35, { align: 'center' })
 
-      // Type de culte (label lisible)
-      const cultType = sessionTypes.find(t => t.code === targetSession.type)?.label || targetSession.type || 'Non défini'
+      // Type de culte (label lisible) – version corrigée
+      const cultType = targetSession.type
+        ? sessionTypes.find(t => t.code === targetSession.type)?.label || targetSession.type
+        : 'Non défini'
       doc.text(`Type de culte: ${cultType}`, 105, 42, { align: 'center' })
 
       doc.text(`Date: ${new Date(targetSession.date).toLocaleDateString('fr-FR')}`, 105, 49, { align: 'center' })
