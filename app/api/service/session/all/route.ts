@@ -11,51 +11,46 @@ export async function GET(request: Request) {
 
     const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
-    
-    if (!user || user.role !== 'service_manager') {
+    if (!user || (user.role !== 'service_manager' && user.role !== 'superadmin')) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
-    // Récupérer TOUTES les sessions du service
-    const { data: sessions, error } = await supabase
+    const { searchParams } = new URL(request.url)
+    const type = searchParams.get('type')
+    const serviceId = searchParams.get('serviceId')
+
+    let query = supabase
       .from('service_sessions')
-      .select('*')
-      .eq('service_id', user.serviceId)
+      .select('*, session_types(code, label, day_of_week)')
       .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Erreur:', error)
-      return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+    if (user.role === 'service_manager') {
+      query = query.eq('service_id', user.serviceId)
+    } else if (serviceId && serviceId !== 'all') {
+      query = query.eq('service_id', serviceId)
     }
 
-    // Pour chaque session, compter les présences
-    const sessionsWithStats = await Promise.all((sessions || []).map(async (session) => {
+    if (type && type !== 'all') {
+      query = query.eq('type', type)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+
+    // Ajouter les statistiques
+    const sessionsWithStats = await Promise.all((data || []).map(async (session) => {
       const { data: attendances } = await supabase
         .from('service_attendance')
         .select('status')
         .eq('service_session_id', session.id)
-      
       const present = attendances?.filter(a => a.status === 'present').length || 0
       const total = attendances?.length || 0
-      
-      return {
-        id: session.id,
-        service_id: session.service_id,
-        date: session.date,
-        created_at: session.created_at,
-        stats: {
-          present,
-          absent: total - present,
-          total
-        }
-      }
+      return { ...session, stats: { present, absent: total - present, total } }
     }))
 
-    return NextResponse.json({
-      sessions: sessionsWithStats
-    })
+    return NextResponse.json({ sessions: sessionsWithStats })
   } catch (error) {
-    console.error('Erreur:', error)
+    console.error(error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }

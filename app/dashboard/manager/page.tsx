@@ -60,6 +60,10 @@ export default function ManagerDashboard() {
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [showFilters, setShowFilters] = useState(false)
 
+  // États pour les types de sessions (culte)
+  const [sessionTypes, setSessionTypes] = useState<any[]>([])
+  const [selectedType, setSelectedType] = useState<string>('')
+
   const toggleProfile = () => {
     setShowProfile(!showProfile)
     setMobileMenuOpen(false)
@@ -85,6 +89,7 @@ export default function ManagerDashboard() {
       fetchData()
       fetchSessions()
       fetchCurrentSession()
+      fetchSessionTypes()
     }
   }, [user, loading])
 
@@ -173,7 +178,6 @@ export default function ManagerDashboard() {
 
   const fetchCurrentSession = async () => {
     try {
-      // Récupérer la session du jour
       const res = await fetch('/api/service/session/current', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -185,11 +189,8 @@ export default function ManagerDashboard() {
         setServiceSession(data.session)
         setServiceStudents(data.students || [])
         
-        // Récupérer toutes les sessions pour le sélecteur
         const allRes = await fetch('/api/service/session/all', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
         const allData = await allRes.json()
         if (allRes.ok) {
@@ -206,9 +207,7 @@ export default function ManagerDashboard() {
   const fetchSessionStudents = async (sessionId: string) => {
     try {
       const res = await fetch(`/api/service/session/get?sessionId=${sessionId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })
       const data = await res.json()
       if (res.ok) {
@@ -220,7 +219,26 @@ export default function ManagerDashboard() {
     }
   }
 
+  const fetchSessionTypes = async () => {
+    try {
+      const res = await fetch('/api/session-types', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setSessionTypes(data)
+      }
+    } catch (error) {
+      console.error('Erreur chargement types:', error)
+    }
+  }
+
   const startServiceSession = async () => {
+    if (!selectedType) {
+      toast.error('Veuillez sélectionner un type de culte')
+      return
+    }
+
     setLoadingService(true)
     try {
       const res = await fetch('/api/service/session/start', {
@@ -229,12 +247,16 @@ export default function ManagerDashboard() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ date: new Date().toISOString().split('T')[0] })
+        body: JSON.stringify({ 
+          date: new Date().toISOString().split('T')[0],
+          type: selectedType
+        })
       })
       const data = await res.json()
       
       if (res.ok) {
-        toast.success('Nouvelle session démarrée')
+        toast.success(`Session ${sessionTypes.find(t => t.code === selectedType)?.label} démarrée`)
+        setSelectedType('')
         fetchCurrentSession()
       } else {
         toast.error(data.error || 'Erreur lors du démarrage')
@@ -359,13 +381,13 @@ export default function ManagerDashboard() {
   // Générer PDF pour une session académique spécifique
   const generateAcademicPDF = async (type: 'all' | 'present' | 'absent') => {
     if (selectedSession === 'today') {
-      toast.error('Veuillez sélectionner une séance académique');
-      return;
+      toast.error('Veuillez sélectionner une séance académique')
+      return
     }
 
     try {
-      const session = sessions.find(s => s.id === selectedSession);
-      if (!session) return;
+      const session = sessions.find(s => s.id === selectedSession)
+      if (!session) return
 
       const { data: attendanceDetails } = await supabase
         .from('attendance')
@@ -380,15 +402,15 @@ export default function ManagerDashboard() {
             phone
           )
         `)
-        .eq('session_id', selectedSession);
+        .eq('session_id', selectedSession)
 
       const attendanceData = attendanceDetails?.map(a => ({
         student: a.students,
         status: a.status,
         scanned_at: a.scanned_at
-      })) || [];
+      })) || []
 
-      const sessionDate = new Date(session.date).toLocaleDateString('fr-FR');
+      const sessionDate = new Date(session.date).toLocaleDateString('fr-FR')
 
       generateAttendancePDF(
         session.code,
@@ -397,29 +419,28 @@ export default function ManagerDashboard() {
         attendanceData,
         serviceName,
         type
-      );
+      )
 
-      const typeText = type === 'present' ? 'des présents' : type === 'absent' ? 'des absents' : 'complet';
-      toast.success(`PDF académique ${typeText} généré avec succès`);
+      const typeText = type === 'present' ? 'des présents' : type === 'absent' ? 'des absents' : 'complet'
+      toast.success(`PDF académique ${typeText} généré avec succès`)
     } catch (error) {
-      console.error('Erreur génération PDF:', error);
-      toast.error('Erreur lors de la génération du PDF');
+      console.error('Erreur génération PDF:', error)
+      toast.error('Erreur lors de la génération du PDF')
     }
-  };
+  }
 
-  // Générer PDF pour une session service spécifique
+  // Générer PDF pour une session service spécifique (avec type de culte)
   const generateServicePDF = async (type: 'all' | 'present' | 'absent', session?: ServiceSession) => {
     const targetSession = session || serviceSession
     
     if (!targetSession) {
-      toast.error('Aucune session service sélectionnée');
-      return;
+      toast.error('Aucune session service sélectionnée')
+      return
     }
 
     try {
       let sessionStudentsData = serviceStudents
       
-      // Si ce n'est pas la session courante, récupérer les données
       if (targetSession.id !== serviceSession?.id) {
         const res = await fetch(`/api/service/session/get?sessionId=${targetSession.id}`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
@@ -430,77 +451,72 @@ export default function ManagerDashboard() {
         }
       }
       
-      const doc = new jsPDF();
+      const doc = new jsPDF()
 
       // Titre
-      doc.setFontSize(20);
-      doc.text('Académie de la Grâce', 105, 15, { align: 'center' });
-      
-      // Sous-titre
-      doc.setFontSize(16);
-      doc.text('Rapport de présence service', 105, 25, { align: 'center' });
-      
-      // Informations
-      doc.setFontSize(12);
-      doc.text(`Service: ${serviceName}`, 105, 35, { align: 'center' });
-      doc.text(`Date: ${new Date(targetSession.date).toLocaleDateString('fr-FR')}`, 105, 42, { align: 'center' });
-      doc.text(`Heure: ${new Date(targetSession.created_at).toLocaleTimeString('fr-FR')}`, 105, 49, { align: 'center' });
-      
+      doc.setFontSize(20)
+      doc.text('Académie de la Grâce', 105, 15, { align: 'center' })
+      doc.setFontSize(16)
+      doc.text('Rapport de présence service', 105, 25, { align: 'center' })
+
+      // Informations de la session
+      doc.setFontSize(12)
+      doc.text(`Service: ${serviceName}`, 105, 35, { align: 'center' })
+
+      // Type de culte (label lisible)
+      const cultType = sessionTypes.find(t => t.code === targetSession.type)?.label || targetSession.type || 'Non défini'
+      doc.text(`Type de culte: ${cultType}`, 105, 42, { align: 'center' })
+
+      doc.text(`Date: ${new Date(targetSession.date).toLocaleDateString('fr-FR')}`, 105, 49, { align: 'center' })
+      doc.text(`Heure: ${new Date(targetSession.created_at).toLocaleTimeString('fr-FR')}`, 105, 56, { align: 'center' })
+
       // Statistiques
-      const total = sessionStudentsData.length;
-      const present = sessionStudentsData.filter((s: any) => s.status === 'present').length;
-      const absent = sessionStudentsData.filter((s: any) => s.status === 'absent').length;
-      const attendanceRate = total > 0 ? Math.round((present / total) * 100) : 0;
-      
-      doc.setFontSize(11);
-      doc.text(`Total étudiants: ${total}`, 20, 65);
-      doc.text(`Présents: ${present}`, 20, 72);
-      doc.text(`Absents: ${absent}`, 20, 79);
-      doc.text(`Taux de présence: ${attendanceRate}%`, 20, 86);
-      
+      const total = sessionStudentsData.length
+      const present = sessionStudentsData.filter((s: any) => s.status === 'present').length
+      const absent = sessionStudentsData.filter((s: any) => s.status === 'absent').length
+      const attendanceRate = total > 0 ? Math.round((present / total) * 100) : 0
+
+      doc.setFontSize(11)
+      doc.text(`Total étudiants: ${total}`, 20, 70)
+      doc.text(`Présents: ${present}`, 20, 77)
+      doc.text(`Absents: ${absent}`, 20, 84)
+      doc.text(`Taux de présence: ${attendanceRate}%`, 20, 91)
+
       // Date de génération
-      const now = new Date();
-      doc.setFontSize(8);
-      doc.text(`Généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`, 105, 280, { align: 'center' });
-      
-      // Filtrer les étudiants selon le type
-      let filteredStudents = sessionStudentsData;
-      
-      if (type === 'present') {
-        filteredStudents = sessionStudentsData.filter((s: any) => s.status === 'present');
-      } else if (type === 'absent') {
-        filteredStudents = sessionStudentsData.filter((s: any) => s.status === 'absent');
-      }
-      
-      // Tableau
+      const now = new Date()
+      doc.setFontSize(8)
+      doc.text(`Généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`, 105, 280, { align: 'center' })
+
+      // Filtrer les étudiants selon le type de rapport
+      let filteredStudents = sessionStudentsData
+      if (type === 'present') filteredStudents = sessionStudentsData.filter((s: any) => s.status === 'present')
+      else if (type === 'absent') filteredStudents = sessionStudentsData.filter((s: any) => s.status === 'absent')
+
       const tableData = filteredStudents.map((student: any) => [
         student.name,
         student.status === 'present' ? '✓ Présent' : '✗ Absent'
-      ]);
-      
+      ])
+
       autoTable(doc, {
         head: [['Nom', 'Statut']],
         body: tableData,
-        startY: 95,
+        startY: 100,
         styles: { fontSize: 10 },
         headStyles: { fillColor: type === 'present' ? [16, 185, 129] : type === 'absent' ? [239, 68, 68] : [79, 70, 229] },
         alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: {
-          0: { cellWidth: 120 },
-          1: { cellWidth: 40 }
-        }
-      });
+        columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 40 } }
+      })
+
+      const fileName = `presence_service_${serviceName}_${new Date(targetSession.date).toISOString().split('T')[0]}_${type}.pdf`
+      doc.save(fileName)
       
-      const fileName = `presence_service_${serviceName}_${new Date(targetSession.date).toISOString().split('T')[0]}_${type}.pdf`;
-      doc.save(fileName);
-      
-      const typeText = type === 'present' ? 'des présents' : type === 'absent' ? 'des absents' : 'complet';
-      toast.success(`PDF service ${typeText} généré avec succès`);
+      const typeText = type === 'present' ? 'des présents' : type === 'absent' ? 'des absents' : 'complet'
+      toast.success(`PDF service ${typeText} généré avec succès`)
     } catch (error) {
-      console.error('Erreur génération PDF:', error);
-      toast.error('Erreur lors de la génération du PDF');
+      console.error('Erreur génération PDF:', error)
+      toast.error('Erreur lors de la génération du PDF')
     }
-  };
+  }
 
   const filteredServiceStudents = serviceStudents.filter(student => {
     const matchesStatus = statusFilter === 'all' || student.status === statusFilter
@@ -651,22 +667,47 @@ export default function ManagerDashboard() {
                   <CalendarIcon className="w-5 h-5 text-indigo-600" />
                   📋 Présence Service - {serviceName}
                 </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6 pb-6">
+              {/* Sélection du type de culte */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Type de culte <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Sélectionnez un type</option>
+                  {sessionTypes.map(type => (
+                    <option key={type.code} value={type.code}>
+                      {type.label} ({type.day_of_week === 'Sunday' ? 'Dimanche' : type.day_of_week === 'Tuesday' ? 'Mardi' : 'Vendredi'})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Le type de culte permet d'analyser la fréquentation par jour
+                </p>
+              </div>
+
+              {/* Bouton nouvelle session */}
+              <div className="mb-4">
                 <Button
                   onClick={startServiceSession}
-                  disabled={loadingService}
+                  disabled={loadingService || !selectedType}
                   variant="outline"
-                  size="sm"
-                  className="border-green-500 text-green-600 hover:bg-green-50"
+                  className="w-full border-green-500 text-green-600 hover:bg-green-50 disabled:opacity-50"
                 >
                   + Nouvelle session
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent className="px-4 sm:px-6 pb-6">
+
               {allSessions.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500 mb-4">Aucune session créée</p>
-                  <p className="text-sm text-gray-400">Cliquez sur "Nouvelle session" pour commencer</p>
+                  <p className="text-sm text-gray-400">Sélectionnez un type et cliquez sur "Nouvelle session"</p>
                 </div>
               ) : (
                 <div>
@@ -740,6 +781,11 @@ export default function ManagerDashboard() {
                       <div className="mb-4 flex justify-between items-center flex-wrap gap-2">
                         <p className="text-sm text-gray-500">
                           Session du {new Date(serviceSession.date).toLocaleDateString('fr-FR')} à {new Date(serviceSession.created_at).toLocaleTimeString()}
+                          {serviceSession.type && sessionTypes.find(t => t.code === serviceSession.type) && (
+                            <span className="ml-2 inline-block px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs">
+                              {sessionTypes.find(t => t.code === serviceSession.type)?.label}
+                            </span>
+                          )}
                         </p>
                         <div className="flex gap-2">
                           <Button
@@ -1087,6 +1133,7 @@ export default function ManagerDashboard() {
               <CardTitle className="text-base sm:text-lg">Membres du service</CardTitle>
             </CardHeader>
             <CardContent className="px-2 sm:px-6">
+              {/* Version mobile : cartes */}
               <div className="block lg:hidden space-y-3">
                 {students.map((student) => {
                   const todayAttendance = attendance.find(a => a.student_id === student.id)

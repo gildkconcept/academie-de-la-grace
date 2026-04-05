@@ -28,9 +28,12 @@ import {
   ArrowLeftOnRectangleIcon,
   DocumentArrowDownIcon,
   FunnelIcon,
-  UserGroupIcon
+  UserGroupIcon,
+  CalendarIcon
 } from '@heroicons/react/24/outline'
 import { ProfileSection } from '@/components/ProfileSection'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export default function SuperAdminDashboard() {
   const { user, loading, logout } = useAuth()
@@ -64,6 +67,8 @@ export default function SuperAdminDashboard() {
   const [serviceAttendances, setServiceAttendances] = useState<any[]>([])
   const [selectedServiceForAttendance, setSelectedServiceForAttendance] = useState<string>('all')
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0])
+  const [selectedCultType, setSelectedCultType] = useState<string>('all')
+  const [cultTypes, setCultTypes] = useState<any[]>([])
 
   // Données pour les graphiques
   const [presenceByService, setPresenceByService] = useState<any[]>([])
@@ -90,6 +95,7 @@ export default function SuperAdminDashboard() {
       fetchData()
       fetchAllSessions()
       fetchServiceAttendances()
+      fetchCultTypes()
     }
   }, [user, loading])
 
@@ -99,12 +105,11 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     fetchServiceAttendances()
-  }, [selectedDate, selectedServiceForAttendance])
+  }, [selectedDate, selectedServiceForAttendance, selectedCultType])
 
   const fetchData = async () => {
     setLoadingData(true)
     try {
-      // Récupérer les services
       const { data: servicesData } = await supabase
         .from('services')
         .select('*')
@@ -114,7 +119,6 @@ export default function SuperAdminDashboard() {
         setServices(servicesData)
       }
 
-      // Récupérer tous les étudiants
       const { data: studentsData } = await supabase
         .from('students')
         .select('*')
@@ -124,12 +128,10 @@ export default function SuperAdminDashboard() {
         setStudents(studentsData)
         setFilteredStudents(studentsData)
         
-        // Extraire toutes les branches uniques
         const uniqueBranches = [...new Set(studentsData.map(s => s.branch))].sort()
         setBranches(uniqueBranches)
       }
 
-      // Statistiques du jour
       const today = new Date().toISOString().split('T')[0]
       const { data: attendanceData } = await supabase
         .from('attendance')
@@ -152,7 +154,6 @@ export default function SuperAdminDashboard() {
         averageProgress: Math.round(avgProgress)
       })
 
-      // Générer les statistiques pour les graphiques
       generateChartData(studentsData || [], servicesData || [])
       
     } catch (error) {
@@ -163,19 +164,31 @@ export default function SuperAdminDashboard() {
     }
   }
 
+  const fetchCultTypes = async () => {
+    try {
+      const res = await fetch('/api/session-types', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      })
+      const data = await res.json()
+      if (res.ok) setCultTypes(data)
+    } catch (error) {
+      console.error('Erreur chargement types:', error)
+    }
+  }
+
   const fetchServiceAttendances = async () => {
     try {
       let url = `/api/service/attendance/all?date=${selectedDate}`
       if (selectedServiceForAttendance !== 'all') {
         url += `&serviceId=${selectedServiceForAttendance}`
       }
+      if (selectedCultType !== 'all') {
+        url += `&type=${selectedCultType}`
+      }
       
       const res = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })
-      
       const data = await res.json()
       if (res.ok) {
         setServiceAttendances(data)
@@ -206,7 +219,7 @@ export default function SuperAdminDashboard() {
       doc.setFontSize(16);
       doc.text('Rapport des présences service', 105, 25, { align: 'center' });
       
-      // Date
+      // Filtres appliqués
       const dateFormatted = new Date(selectedDate).toLocaleDateString('fr-FR', {
         weekday: 'long',
         year: 'numeric',
@@ -216,10 +229,13 @@ export default function SuperAdminDashboard() {
       doc.setFontSize(12);
       doc.text(`Date: ${dateFormatted}`, 105, 35, { align: 'center' });
       
-      // Filtre service
       if (selectedServiceForAttendance !== 'all') {
         const serviceName = services.find(s => s.id === selectedServiceForAttendance)?.name || '';
         doc.text(`Service: ${serviceName}`, 105, 42, { align: 'center' });
+      }
+      if (selectedCultType !== 'all') {
+        const typeLabel = cultTypes.find(t => t.code === selectedCultType)?.label || selectedCultType;
+        doc.text(`Type de culte: ${typeLabel}`, 105, 49, { align: 'center' });
       }
       
       // Date de génération
@@ -227,16 +243,17 @@ export default function SuperAdminDashboard() {
       doc.setFontSize(8);
       doc.text(`Généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`, 105, 280, { align: 'center' });
       
-      let startY = 55;
+      let startY = 60;
       
       // Pour chaque session
       for (const session of serviceAttendances) {
         const serviceName = services.find(s => s.id === session.service_id)?.name || 'Service';
         const sessionDate = new Date(session.date).toLocaleDateString('fr-FR');
+        const cultLabel = session.session_types?.label || session.type || 'Non défini';
         
         // Titre de la session
         doc.setFontSize(14);
-        doc.text(`${serviceName} - ${sessionDate}`, 14, startY);
+        doc.text(`${serviceName} - ${sessionDate} (${cultLabel})`, 14, startY);
         startY += 8;
         
         // Statistiques
@@ -281,8 +298,7 @@ export default function SuperAdminDashboard() {
         }
       }
       
-      // Sauvegarder le PDF
-      const fileName = `presences_service_${selectedDate}_${selectedServiceForAttendance !== 'all' ? services.find(s => s.id === selectedServiceForAttendance)?.name : 'tous_services'}.pdf`;
+      const fileName = `presences_service_${selectedDate}_${selectedCultType !== 'all' ? selectedCultType : 'tous'}.pdf`;
       doc.save(fileName);
       
       toast.success('PDF généré avec succès');
@@ -293,7 +309,6 @@ export default function SuperAdminDashboard() {
   };
 
   const generateChartData = (studentsData: Student[], servicesData: Service[]) => {
-    // Présence par service (simulée avec des données aléatoires pour l'exemple)
     const servicePresence = servicesData.map(service => {
       const serviceStudents = studentsData.filter(s => s.service_id === service.id)
       const presentCount = Math.floor(Math.random() * serviceStudents.length)
@@ -306,7 +321,6 @@ export default function SuperAdminDashboard() {
     })
     setPresenceByService(servicePresence)
 
-    // Présence par niveau
     const niveau1 = studentsData.filter(s => s.level === 1)
     const niveau2 = studentsData.filter(s => s.level === 2)
     const niveau3 = studentsData.filter(s => s.level === 3)
@@ -316,7 +330,6 @@ export default function SuperAdminDashboard() {
       { name: 'Niveau 3', présents: Math.floor(Math.random() * niveau3.length), total: niveau3.length }
     ])
 
-    // Présence par branche (top 5)
     const branchMap = new Map()
     studentsData.forEach(s => {
       const count = branchMap.get(s.branch) || 0
@@ -332,7 +345,6 @@ export default function SuperAdminDashboard() {
       }))
     setPresenceByBranch(topBranches)
 
-    // Statistiques baptême
     const baptises = studentsData.filter(s => s.baptized).length
     const nonBaptises = studentsData.length - baptises
     setBaptismStats([
@@ -918,7 +930,7 @@ export default function SuperAdminDashboard() {
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-gray-200 bg-white">
             <div className="px-4 py-3 space-y-2">
-              <p className="text-sm text-gray-600 pb-2 border-b">Connecté en tant que {user.name}</p>
+              <p className="text-sm text-gray-600 pb-2 border-b">Connecté en tant que ${user?.name}</p>
               <button
                 onClick={toggleProfile}
                 className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
@@ -974,27 +986,28 @@ export default function SuperAdminDashboard() {
             </Card>
           </div>
 
-          {/* Section Présence Service - Vue superadmin */}
+          {/* Section Présence Service - Vue générale avec filtres et export PDF */}
           <Card className="mb-8">
             <CardHeader className="px-4 sm:px-6 py-4">
-              <CardTitle className="text-base sm:text-lg flex items-center gap-2 justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
                   <UserGroupIcon className="w-5 h-5 text-indigo-600" />
                   📋 Présence Service - Vue générale
-                </div>
+                </CardTitle>
                 {serviceAttendances.length > 0 && (
                   <Button
                     onClick={generateServiceAttendancePDF}
                     size="sm"
                     className="bg-red-600 hover:bg-red-700 text-white"
                   >
-                    📄 Exporter PDF
+                    <DocumentArrowDownIcon className="w-4 h-4 mr-1" />
+                    Exporter PDF
                   </Button>
                 )}
-              </CardTitle>
+              </div>
             </CardHeader>
             <CardContent className="px-4 sm:px-6 pb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Date
@@ -1021,11 +1034,26 @@ export default function SuperAdminDashboard() {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type de culte
+                  </label>
+                  <select
+                    value={selectedCultType}
+                    onChange={(e) => setSelectedCultType(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="all">Tous les types</option>
+                    {cultTypes.map(type => (
+                      <option key={type.code} value={type.code}>{type.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {serviceAttendances.length === 0 ? (
                 <div className="text-center py-8 bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">Aucune session de présence service pour cette date</p>
+                  <p className="text-gray-500">Aucune session de présence service pour ces critères</p>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -1039,6 +1067,11 @@ export default function SuperAdminDashboard() {
                             </h3>
                             <p className="text-xs text-gray-500">
                               Session du {new Date(session.date).toLocaleDateString('fr-FR')}
+                              {session.session_types && (
+                                <span className="ml-2 inline-block px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-xs">
+                                  {session.session_types.label}
+                                </span>
+                              )}
                             </p>
                           </div>
                           <div className="text-sm">
@@ -1212,7 +1245,33 @@ export default function SuperAdminDashboard() {
 
                 {selectedSession !== 'all' && (
                   <>
-                    {/* Statistiques */}
+                    <div className="flex justify-end gap-2 mb-4">
+                      <Button
+                        onClick={() => generatePDF('all')}
+                        size="sm"
+                        variant="outline"
+                        className="text-indigo-600 border-indigo-600"
+                      >
+                        📄 PDF complet
+                      </Button>
+                      <Button
+                        onClick={() => generatePDF('present')}
+                        size="sm"
+                        variant="outline"
+                        className="text-green-600 border-green-600"
+                      >
+                        ✅ PDF présents
+                      </Button>
+                      <Button
+                        onClick={() => generatePDF('absent')}
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 border-red-600"
+                      >
+                        ❌ PDF absents
+                      </Button>
+                    </div>
+
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="bg-green-50 p-2 sm:p-4 rounded-lg text-center">
                         <div className="text-lg sm:text-2xl font-bold text-green-600">
@@ -1234,7 +1293,6 @@ export default function SuperAdminDashboard() {
                       </div>
                     </div>
 
-                    {/* Liste des présences académiques */}
                     <div className="mt-4">
                       <h4 className="text-sm sm:text-base font-medium mb-2">Détail :</h4>
                       <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
@@ -1262,32 +1320,6 @@ export default function SuperAdminDashboard() {
                             </div>
                           )
                         })}
-                      </div>
-                    </div>
-
-                    {/* Options PDF */}
-                    <div className="flex flex-col space-y-2 mt-4">
-                      <Button
-                        onClick={() => generatePDF('all')}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white w-full text-sm sm:text-base py-3"
-                      >
-                        📄 Rapport complet
-                      </Button>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          onClick={() => generatePDF('present')}
-                          className="bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base py-3"
-                        >
-                          ✅ Présents
-                        </Button>
-                        
-                        <Button
-                          onClick={() => generatePDF('absent')}
-                          className="bg-red-600 hover:bg-red-700 text-white text-sm sm:text-base py-3"
-                        >
-                          ❌ Absents
-                        </Button>
                       </div>
                     </div>
                   </>

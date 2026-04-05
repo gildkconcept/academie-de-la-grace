@@ -11,19 +11,16 @@ export async function GET(request: Request) {
 
     const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
-    
-    if (!user || user.role !== 'service_manager') {
+    if (!user || (user.role !== 'service_manager' && user.role !== 'superadmin')) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
     const sessionId = searchParams.get('sessionId')
-
     if (!sessionId) {
       return NextResponse.json({ error: 'Session ID requis' }, { status: 400 })
     }
 
-    // Récupérer la session
     const { data: session, error: sessionError } = await supabase
       .from('service_sessions')
       .select('*')
@@ -34,8 +31,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Session non trouvée' }, { status: 404 })
     }
 
-    // Vérifier l'accès
-    if (session.service_id !== user.serviceId) {
+    // Vérifier les droits
+    if (user.role === 'service_manager' && session.service_id !== user.serviceId) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
@@ -45,11 +42,10 @@ export async function GET(request: Request) {
       .select('student_id, status')
       .eq('service_session_id', session.id)
 
-    // Récupérer les étudiants
     const { data: students } = await supabase
       .from('students')
       .select('id, full_name')
-      .eq('service_id', user.serviceId)
+      .eq('service_id', session.service_id)
 
     const studentList = (students || []).map(student => ({
       id: student.id,
@@ -57,12 +53,9 @@ export async function GET(request: Request) {
       status: attendances?.find(a => a.student_id === student.id)?.status || 'absent'
     }))
 
-    return NextResponse.json({
-      session: session,
-      students: studentList
-    })
+    return NextResponse.json({ session, students: studentList })
   } catch (error) {
-    console.error('Erreur:', error)
+    console.error(error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }

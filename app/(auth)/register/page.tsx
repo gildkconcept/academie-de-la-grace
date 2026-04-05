@@ -7,6 +7,19 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { Service } from '@/types'
 
+// Liste des branches disponibles
+const branchesList = [
+  'Katartizo',
+  'Anagkazo',
+  'Prodige',
+  'Loyauté',
+  'Faveur Divine',
+  'Dunamis',
+  'Zoé',
+  'Odiéné',
+  'Paris'
+]
+
 export default function RegisterPage() {
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(false)
@@ -103,14 +116,20 @@ export default function RegisterPage() {
               <label htmlFor="branch" className="block text-sm font-medium text-gray-700">
                 Branche de l'église
               </label>
-              <input
-                type="text"
+              <select
                 name="branch"
                 required
                 value={formData.branch}
                 onChange={handleChange}
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              />
+              >
+                <option value="">Sélectionnez une branche</option>
+                {branchesList.map(branch => (
+                  <option key={branch} value={branch}>
+                    {branch}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

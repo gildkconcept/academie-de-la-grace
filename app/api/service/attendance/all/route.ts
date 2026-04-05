@@ -12,7 +12,6 @@ export async function GET(request: Request) {
     const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
-    // Permettre l'accès aux superadmins ET aux managers
     if (!user || (user.role !== 'superadmin' && user.role !== 'service_manager')) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
@@ -20,11 +19,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')
     const serviceId = searchParams.get('serviceId')
+    const type = searchParams.get('type') // 👈 récupération du type
 
     let query = supabase
       .from('service_sessions')
       .select(`
         *,
+        session_types (code, label, day_of_week),
         service_attendance (
           *,
           students (
@@ -45,8 +46,11 @@ export async function GET(request: Request) {
     if (serviceId && serviceId !== 'all') {
       query = query.eq('service_id', serviceId)
     } else if (user.role === 'service_manager') {
-      // Si c'est un manager, filtrer par son service
       query = query.eq('service_id', user.serviceId)
+    }
+
+    if (type && type !== 'all') {
+      query = query.eq('type', type) // 👈 filtrage par type
     }
 
     const { data, error } = await query
