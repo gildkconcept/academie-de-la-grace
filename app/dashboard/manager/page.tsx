@@ -453,17 +453,14 @@ export default function ManagerDashboard() {
       
       const doc = new jsPDF()
 
-      // Titre
       doc.setFontSize(20)
       doc.text('Académie de la Grâce', 105, 15, { align: 'center' })
       doc.setFontSize(16)
       doc.text('Rapport de présence service', 105, 25, { align: 'center' })
 
-      // Informations de la session
       doc.setFontSize(12)
       doc.text(`Service: ${serviceName}`, 105, 35, { align: 'center' })
 
-      // Type de culte (label lisible) – version corrigée
       const cultType = targetSession.type
         ? sessionTypes.find(t => t.code === targetSession.type)?.label || targetSession.type
         : 'Non défini'
@@ -472,7 +469,6 @@ export default function ManagerDashboard() {
       doc.text(`Date: ${new Date(targetSession.date).toLocaleDateString('fr-FR')}`, 105, 49, { align: 'center' })
       doc.text(`Heure: ${new Date(targetSession.created_at).toLocaleTimeString('fr-FR')}`, 105, 56, { align: 'center' })
 
-      // Statistiques
       const total = sessionStudentsData.length
       const present = sessionStudentsData.filter((s: any) => s.status === 'present').length
       const absent = sessionStudentsData.filter((s: any) => s.status === 'absent').length
@@ -484,12 +480,10 @@ export default function ManagerDashboard() {
       doc.text(`Absents: ${absent}`, 20, 84)
       doc.text(`Taux de présence: ${attendanceRate}%`, 20, 91)
 
-      // Date de génération
       const now = new Date()
       doc.setFontSize(8)
       doc.text(`Généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`, 105, 280, { align: 'center' })
 
-      // Filtrer les étudiants selon le type de rapport
       let filteredStudents = sessionStudentsData
       if (type === 'present') filteredStudents = sessionStudentsData.filter((s: any) => s.status === 'present')
       else if (type === 'absent') filteredStudents = sessionStudentsData.filter((s: any) => s.status === 'absent')
@@ -544,14 +538,15 @@ export default function ManagerDashboard() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 pb-20">
+      {/* Barre de navigation responsive */}
       <nav className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center flex-1 lg:flex-none">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 lg:hidden"
               >
                 {mobileMenuOpen ? (
                   <XMarkIcon className="h-6 w-6" />
@@ -559,128 +554,104 @@ export default function ManagerDashboard() {
                   <Bars3Icon className="h-6 w-6" />
                 )}
               </button>
-              <h1 className="text-lg sm:text-xl font-semibold ml-2 lg:ml-0 truncate">
-                {showProfile ? 'Mon profil' : `Dashboard - ${user.name}`}
+              <h1 className="text-base sm:text-lg font-semibold truncate max-w-[180px] sm:max-w-none">
+                {showProfile ? 'Mon profil' : user.name}
               </h1>
               {!showProfile && serviceName && (
-                <span className="hidden lg:inline ml-3 px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm">
+                <span className="hidden lg:inline-block ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-xs">
                   {serviceName}
                 </span>
               )}
             </div>
 
-            <div className="hidden lg:flex items-center space-x-4">
+            {/* Boutons pour desktop */}
+            <div className="hidden lg:flex items-center gap-3">
               {!showProfile && (
-                <Button
-                  onClick={() => setShowAddStudentModal(true)}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <UserPlusIcon className="w-4 h-4" />
-                  Ajouter un étudiant
+                <Button onClick={() => setShowAddStudentModal(true)} variant="outline" size="sm">
+                  <UserPlusIcon className="w-4 h-4 mr-1" />
+                  Ajouter
                 </Button>
               )}
-              <Button
-                onClick={toggleProfile}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <UserCircleIcon className="w-4 h-4" />
-                {showProfile ? 'Tableau de bord' : 'Mon profil'}
+              <Button onClick={toggleProfile} variant="outline" size="sm">
+                <UserCircleIcon className="w-4 h-4 mr-1" />
+                {showProfile ? 'Tableau de bord' : 'Profil'}
               </Button>
               <Button onClick={logout} variant="destructive" size="sm">
                 Déconnexion
               </Button>
             </div>
 
-            <div className="flex items-center lg:hidden">
-              <button
-                onClick={logout}
-                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                title="Déconnexion"
-              >
-                <ArrowRightOnRectangleIcon className="w-5 h-5" />
-              </button>
-            </div>
+            {/* Bouton déconnexion mobile (icône seule) */}
+            <button onClick={logout} className="lg:hidden p-2 text-red-600 hover:bg-red-50 rounded-full">
+              <ArrowRightOnRectangleIcon className="w-5 h-5" />
+            </button>
           </div>
 
-          {!showProfile && serviceName && (
-            <div className="lg:hidden pb-2">
-              <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs">
-                {serviceName}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-200 bg-white">
-            <div className="px-4 py-3 space-y-2">
+          {/* Menu mobile déroulant */}
+          {mobileMenuOpen && (
+            <div className="lg:hidden border-t border-gray-200 py-3 space-y-2">
               {!showProfile && (
                 <button
                   onClick={() => {
                     setShowAddStudentModal(true)
                     setMobileMenuOpen(false)
                   }}
-                  className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
+                  className="flex w-full items-center gap-3 px-3 py-2 text-gray-700 hover:bg-indigo-50 rounded-md"
                 >
-                  <UserPlusIcon className="w-5 h-5 mr-3" />
-                  Ajouter un étudiant
+                  <UserPlusIcon className="w-5 h-5" />
+                  <span>Ajouter un étudiant</span>
                 </button>
               )}
               <button
-                onClick={toggleProfile}
-                className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
+                onClick={() => {
+                  toggleProfile()
+                  setMobileMenuOpen(false)
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2 text-gray-700 hover:bg-indigo-50 rounded-md"
               >
-                <UserCircleIcon className="w-5 h-5 mr-3" />
-                {showProfile ? 'Tableau de bord' : 'Mon profil'}
+                <UserCircleIcon className="w-5 h-5" />
+                <span>{showProfile ? 'Tableau de bord' : 'Mon profil'}</span>
               </button>
               <button
                 onClick={logout}
-                className="w-full flex items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="flex w-full items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-md"
               >
-                <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" />
-                Déconnexion
+                <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                <span>Déconnexion</span>
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </nav>
 
       {!showProfile && serviceName && (
-        <div className="lg:hidden px-4 py-2 bg-indigo-50 border-b border-indigo-100">
-          <p className="text-xs text-indigo-600">
-            <span className="font-medium">Service:</span> {serviceName}
-          </p>
+        <div className="lg:hidden px-4 py-1.5 bg-indigo-50 text-indigo-700 text-xs text-center">
+          Service : {serviceName}
         </div>
       )}
 
       {showProfile ? (
         <ProfileSection user={user} onClose={() => setShowProfile(false)} />
       ) : (
-        <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
-          {/* Section Présence Service (Checkbox) */}
-          <Card className="mb-8">
-            <CardHeader className="px-4 sm:px-6 py-4">
-              <div className="flex justify-between items-center flex-wrap gap-2">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                  <CalendarIcon className="w-5 h-5 text-indigo-600" />
-                  📋 Présence Service - {serviceName}
-                </CardTitle>
-              </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          {/* Section Présence Service */}
+          <Card className="mb-6">
+            <CardHeader className="px-4 py-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-indigo-600" />
+                📋 Présence Service - {serviceName}
+              </CardTitle>
             </CardHeader>
-            <CardContent className="px-4 sm:px-6 pb-6">
-              {/* Sélection du type de culte */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+            <CardContent className="px-4 pb-5 space-y-4">
+              {/* Sélecteur de type de culte */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Type de culte <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedType}
                   onChange={(e) => setSelectedType(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                 >
                   <option value="">Sélectionnez un type</option>
                   {sessionTypes.map(type => (
@@ -689,623 +660,220 @@ export default function ManagerDashboard() {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Le type de culte permet d'analyser la fréquentation par jour
-                </p>
               </div>
 
-              {/* Bouton nouvelle session */}
-              <div className="mb-4">
-                <Button
-                  onClick={startServiceSession}
-                  disabled={loadingService || !selectedType}
-                  variant="outline"
-                  className="w-full border-green-500 text-green-600 hover:bg-green-50 disabled:opacity-50"
-                >
-                  + Nouvelle session
-                </Button>
-              </div>
+              {/* Bouton Nouvelle session */}
+              <Button
+                onClick={startServiceSession}
+                disabled={loadingService || !selectedType}
+                variant="outline"
+                className="w-full border-green-500 text-green-600"
+              >
+                + Nouvelle session
+              </Button>
 
-              {allSessions.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 mb-4">Aucune session créée</p>
-                  <p className="text-sm text-gray-400">Sélectionnez un type et cliquez sur "Nouvelle session"</p>
-                </div>
-              ) : (
-                <div>
-                  {allSessions.length > 1 && (
-                    <div className="relative mb-4">
-                      <button
-                        onClick={() => setShowSessionSelector(!showSessionSelector)}
-                        className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
-                      >
-                        <CalendarIcon className="w-4 h-4" />
-                        Session du {serviceSession ? new Date(serviceSession.date).toLocaleDateString('fr-FR') : 'Choisir une session'}
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      
-                      {showSessionSelector && (
-                        <div className="absolute top-full left-0 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
-                          {allSessions.map(session => (
-                            <div key={session.id} className="flex items-center justify-between px-4 py-2 hover:bg-gray-50 border-b last:border-b-0">
-                              <button
-                                onClick={() => changeSession(session.id)}
-                                className={`flex-1 text-left text-sm ${
-                                  serviceSession?.id === session.id ? 'text-indigo-600 font-medium' : 'text-gray-700'
-                                }`}
-                              >
-                                <div>Session du {new Date(session.date).toLocaleDateString('fr-FR')}</div>
-                                <div className="text-xs text-gray-400">{new Date(session.created_at).toLocaleTimeString()}</div>
-                              </button>
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    generateServicePDF('all', session)
-                                  }}
-                                  className="p-1 text-indigo-600 hover:bg-indigo-50 rounded"
-                                  title="PDF complet"
-                                >
-                                  <DocumentArrowDownIcon className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    generateServicePDF('present', session)
-                                  }}
-                                  className="p-1 text-green-600 hover:bg-green-50 rounded"
-                                  title="PDF présents"
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    generateServicePDF('absent', session)
-                                  }}
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                  title="PDF absents"
-                                >
-                                  ✗
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {serviceSession && (
-                    <div>
-                      <div className="mb-4 flex justify-between items-center flex-wrap gap-2">
-                        <p className="text-sm text-gray-500">
-                          Session du {new Date(serviceSession.date).toLocaleDateString('fr-FR')} à {new Date(serviceSession.created_at).toLocaleTimeString()}
-                          {serviceSession.type && sessionTypes.find(t => t.code === serviceSession.type) && (
-                            <span className="ml-2 inline-block px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs">
-                              {sessionTypes.find(t => t.code === serviceSession.type)?.label}
-                            </span>
-                          )}
-                        </p>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => generateServicePDF('all')}
-                            size="sm"
-                            variant="outline"
-                            className="text-indigo-600 border-indigo-600"
+              {/* Sélecteur de session (si plusieurs) */}
+              {allSessions.length > 1 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowSessionSelector(!showSessionSelector)}
+                    className="flex items-center gap-1 text-sm text-gray-600"
+                  >
+                    <CalendarIcon className="w-4 h-4" />
+                    {serviceSession ? `Session du ${new Date(serviceSession.date).toLocaleDateString('fr-FR')}` : 'Choisir une session'}
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showSessionSelector && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-auto">
+                      {allSessions.map(session => (
+                        <div key={session.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 border-b">
+                          <button
+                            onClick={() => changeSession(session.id)}
+                            className="flex-1 text-left text-sm"
                           >
-                            📄 PDF
-                          </Button>
-                          <Button
-                            onClick={() => generateServicePDF('present')}
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600 border-green-600"
-                          >
-                            ✅ PDF présents
-                          </Button>
-                          <Button
-                            onClick={() => generateServicePDF('absent')}
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600 border-red-600"
-                          >
-                            ❌ PDF absents
-                          </Button>
-                          <Button
-                            onClick={saveAttendances}
-                            disabled={loadingService}
-                            size="sm"
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                          >
-                            Enregistrer
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-                        <div className="bg-gray-50 p-3 rounded-lg text-center">
-                          <div className="text-xl font-bold text-gray-700">{serviceStudents.length}</div>
-                          <div className="text-xs text-gray-500">Total</div>
-                        </div>
-                        <div className="bg-green-50 p-3 rounded-lg text-center">
-                          <div className="text-xl font-bold text-green-600">{presentCount}</div>
-                          <div className="text-xs text-gray-500">Présents</div>
-                        </div>
-                        <div className="bg-red-50 p-3 rounded-lg text-center">
-                          <div className="text-xl font-bold text-red-600">{absentCount}</div>
-                          <div className="text-xs text-gray-500">Absents</div>
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <div className="flex justify-between text-xs text-gray-600 mb-1">
-                          <span>Taux de présence</span>
-                          <span>{attendanceRate}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${attendanceRate}%` }}
-                          ></div>
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <div className="flex flex-col sm:flex-row gap-3">
-                          <div className="flex-1">
-                            <div className="relative">
-                              <input
-                                type="text"
-                                placeholder="Rechercher un étudiant..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                              />
-                              <svg className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                              </svg>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setStatusFilter('all')}
-                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                statusFilter === 'all'
-                                  ? 'bg-indigo-600 text-white'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                              }`}
-                            >
-                              Tous ({serviceStudents.length})
-                            </button>
-                            <button
-                              onClick={() => setStatusFilter('present')}
-                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                statusFilter === 'present'
-                                  ? 'bg-green-600 text-white'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                              }`}
-                            >
-                              Présents ({presentCount})
-                            </button>
-                            <button
-                              onClick={() => setStatusFilter('absent')}
-                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                statusFilter === 'absent'
-                                  ? 'bg-red-600 text-white'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                              }`}
-                            >
-                              Absents ({absentCount})
-                            </button>
+                            {new Date(session.date).toLocaleDateString('fr-FR')}
+                          </button>
+                          <div className="flex gap-1">
+                            <button onClick={() => generateServicePDF('all', session)} className="p-1 text-indigo-600" title="PDF complet">📄</button>
+                            <button onClick={() => generateServicePDF('present', session)} className="p-1 text-green-600" title="PDF présents">✓</button>
+                            <button onClick={() => generateServicePDF('absent', session)} className="p-1 text-red-600" title="PDF absents">✗</button>
                           </div>
                         </div>
-                      </div>
-                      
-                      <div className="space-y-2 max-h-96 overflow-y-auto border rounded-lg p-2">
-                        {filteredServiceStudents.length === 0 ? (
-                          <div className="text-center py-8 text-gray-500">
-                            Aucun étudiant trouvé
-                          </div>
-                        ) : (
-                          filteredServiceStudents.map(student => (
-                            <div
-                              key={student.id}
-                              onClick={() => togglePresence(student.id)}
-                              className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-colors ${
-                                student.status === 'present'
-                                  ? 'bg-green-50 border border-green-200'
-                                  : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={`w-2 h-2 rounded-full ${
-                                  student.status === 'present' ? 'bg-green-500' : 'bg-red-500'
-                                }`} />
-                                <span className="font-medium text-sm sm:text-base">{student.name}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={student.status === 'present'}
-                                  onChange={() => togglePresence(student.id)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
-                                />
-                                <span className={`text-xs sm:text-sm ${student.status === 'present' ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
-                                  {student.status === 'present' ? 'Présent' : 'Absent'}
-                                </span>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
+                      ))}
                     </div>
                   )}
                 </div>
               )}
+
+              {serviceSession && (
+                <>
+                  <div className="flex flex-wrap justify-between items-center gap-2">
+                    <span className="text-xs text-gray-500">
+                      {new Date(serviceSession.date).toLocaleDateString('fr-FR')} à {new Date(serviceSession.created_at).toLocaleTimeString()}
+                    </span>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-600" onClick={() => generateServicePDF('all')}>📄</Button>
+                      <Button size="sm" variant="outline" className="text-green-600 border-green-600" onClick={() => generateServicePDF('present')}>✅</Button>
+                      <Button size="sm" variant="outline" className="text-red-600 border-red-600" onClick={() => generateServicePDF('absent')}>❌</Button>
+                      <Button size="sm" onClick={saveAttendances} disabled={loadingService}>Enregistrer</Button>
+                    </div>
+                  </div>
+
+                  {/* Stats rapides */}
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-gray-50 p-2 rounded"><div className="font-bold">{serviceStudents.length}</div><div className="text-xs">Total</div></div>
+                    <div className="bg-green-50 p-2 rounded"><div className="font-bold text-green-600">{presentCount}</div><div className="text-xs">Présents</div></div>
+                    <div className="bg-red-50 p-2 rounded"><div className="font-bold text-red-600">{absentCount}</div><div className="text-xs">Absents</div></div>
+                  </div>
+
+                  {/* Barre de progression */}
+                  <div>
+                    <div className="flex justify-between text-xs"><span>Taux de présence</span><span>{attendanceRate}%</span></div>
+                    <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full" style={{ width: `${attendanceRate}%` }}></div></div>
+                  </div>
+
+                  {/* Recherche et filtres */}
+                  <div className="flex flex-col gap-2">
+                    <input type="text" placeholder="Rechercher un étudiant..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
+                    <div className="flex gap-2">
+                      {['all', 'present', 'absent'].map(f => (
+                        <button key={f} onClick={() => setStatusFilter(f)} className={`flex-1 py-1 text-sm rounded ${statusFilter === f ? (f === 'present' ? 'bg-green-600 text-white' : f === 'absent' ? 'bg-red-600 text-white' : 'bg-indigo-600 text-white') : 'bg-gray-100 text-gray-700'}`}>
+                          {f === 'all' ? 'Tous' : f === 'present' ? 'Présents' : 'Absents'} ({f === 'all' ? serviceStudents.length : f === 'present' ? presentCount : absentCount})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Liste des étudiants avec checkbox */}
+                  <div className="space-y-2 max-h-80 overflow-auto border rounded-lg p-2">
+                    {filteredServiceStudents.map(student => (
+                      <div key={student.id} onClick={() => togglePresence(student.id)} className={`flex justify-between items-center p-2 rounded cursor-pointer ${student.status === 'present' ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
+                        <span className="text-sm font-medium">{student.name}</span>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked={student.status === 'present'} onChange={() => togglePresence(student.id)} onClick={(e) => e.stopPropagation()} className="w-5 h-5" />
+                          <span className={`text-xs ${student.status === 'present' ? 'text-green-600' : 'text-gray-400'}`}>{student.status === 'present' ? 'Présent' : 'Absent'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
-          {/* Message d'information sur les codes académiques */}
-          <Card className="mb-8 bg-blue-50 border-blue-200">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-start space-x-3 sm:space-x-4">
-                <div className="text-2xl sm:text-3xl flex-shrink-0">🎓</div>
+          {/* Bloc d'information présence académique */}
+          <Card className="mb-6 bg-blue-50 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex gap-3">
+                <span className="text-2xl">🎓</span>
                 <div>
-                  <h3 className="text-base sm:text-lg font-semibold text-blue-800">Présence Académique</h3>
-                  <p className="text-xs sm:text-sm text-blue-600 mt-1">
-                    Les codes de présence académique sont générés par l'administrateur. 
-                    Les étudiants entrent ces codes pour valider leur présence aux cours.
-                  </p>
+                  <h3 className="font-semibold text-blue-800">Présence Académique</h3>
+                  <p className="text-xs text-blue-600">Codes générés par l'administrateur. Les étudiants entrent ces codes pour valider leur présence aux cours.</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Statistiques rapides */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 mb-4 sm:mb-8">
-            <Card className="card-hover">
-              <CardContent className="p-4 sm:pt-6">
-                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Total Étudiants</div>
-                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-gray-900">{stats.totalStudents}</div>
-              </CardContent>
-            </Card>
-            <Card className="card-hover">
-              <CardContent className="p-4 sm:pt-6">
-                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Présents service</div>
-                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-green-600">{presentCount}</div>
-              </CardContent>
-            </Card>
-            <Card className="card-hover">
-              <CardContent className="p-4 sm:pt-6">
-                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Baptisés</div>
-                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-blue-600">{stats.baptized}</div>
-              </CardContent>
-            </Card>
-            <Card className="card-hover">
-              <CardContent className="p-4 sm:pt-6">
-                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Progression</div>
-                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-purple-600">{stats.averageProgress}%</div>
-              </CardContent>
-            </Card>
+          {/* Statistiques rapides (cartes) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <Card><CardContent className="p-3 text-center"><div className="text-xs text-gray-500">Total</div><div className="text-xl font-bold">{stats.totalStudents}</div></CardContent></Card>
+            <Card><CardContent className="p-3 text-center"><div className="text-xs text-gray-500">Présents service</div><div className="text-xl font-bold text-green-600">{presentCount}</div></CardContent></Card>
+            <Card><CardContent className="p-3 text-center"><div className="text-xs text-gray-500">Baptisés</div><div className="text-xl font-bold text-blue-600">{stats.baptized}</div></CardContent></Card>
+            <Card><CardContent className="p-3 text-center"><div className="text-xs text-gray-500">Progression</div><div className="text-xl font-bold text-purple-600">{stats.averageProgress}%</div></CardContent></Card>
           </div>
 
-          {/* Sélecteur de session académique */}
-          <Card className="mb-8">
-            <CardHeader className="px-4 sm:px-6 py-4">
-              <div className="flex justify-between items-center flex-wrap gap-2">
-                <CardTitle className="text-base sm:text-lg">Historique Présences Académiques</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 sm:px-6 pb-6">
-              <div className="space-y-4">
-                <select
-                  value={selectedSession}
-                  onChange={(e) => {
-                    setSelectedSession(e.target.value)
-                    fetchAttendanceBySession(e.target.value)
-                  }}
-                  className="w-full p-2 sm:p-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="today">Aujourd'hui</option>
-                  {sessions.map((session) => (
-                    <option key={session.id} value={session.id}>
-                      {new Date(session.date).toLocaleDateString('fr-FR')} - Code: {session.code}
-                    </option>
-                  ))}
-                </select>
-
-                {selectedSession !== 'today' && (
-                  <>
-                    <div className="flex justify-end gap-2 mb-4">
-                      <Button
-                        onClick={() => generateAcademicPDF('all')}
-                        size="sm"
-                        variant="outline"
-                        className="text-indigo-600 border-indigo-600"
-                      >
-                        📄 PDF complet
-                      </Button>
-                      <Button
-                        onClick={() => generateAcademicPDF('present')}
-                        size="sm"
-                        variant="outline"
-                        className="text-green-600 border-green-600"
-                      >
-                        ✅ PDF présents
-                      </Button>
-                      <Button
-                        onClick={() => generateAcademicPDF('absent')}
-                        size="sm"
-                        variant="outline"
-                        className="text-red-600 border-red-600"
-                      >
-                        ❌ PDF absents
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                      <div className="bg-green-50 p-2 sm:p-4 rounded-lg text-center">
-                        <div className="text-lg sm:text-2xl font-bold text-green-600">
-                          {attendanceBySession.filter(a => a.status === 'present').length}
+          {/* Historique des présences académiques */}
+          <Card className="mb-6">
+            <CardHeader className="px-4 py-3"><CardTitle className="text-base">Historique Présences Académiques</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-5">
+              <select value={selectedSession} onChange={(e) => { setSelectedSession(e.target.value); fetchAttendanceBySession(e.target.value); }} className="w-full p-2 border rounded-lg text-sm mb-3">
+                <option value="today">Aujourd'hui</option>
+                {sessions.map(s => <option key={s.id} value={s.id}>{new Date(s.date).toLocaleDateString('fr-FR')} - Code: {s.code}</option>)}
+              </select>
+              {selectedSession !== 'today' && (
+                <>
+                  <div className="flex justify-end gap-2 mb-3">
+                    <Button size="sm" variant="outline" className="text-indigo-600" onClick={() => generateAcademicPDF('all')}>📄 Complet</Button>
+                    <Button size="sm" variant="outline" className="text-green-600" onClick={() => generateAcademicPDF('present')}>✅ Présents</Button>
+                    <Button size="sm" variant="outline" className="text-red-600" onClick={() => generateAcademicPDF('absent')}>❌ Absents</Button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                    <div className="bg-green-50 p-2 rounded"><div className="font-bold text-green-600">{attendanceBySession.filter(a => a.status === 'present').length}</div><div className="text-xs">Présents</div></div>
+                    <div className="bg-red-50 p-2 rounded"><div className="font-bold text-red-600">{attendanceBySession.filter(a => a.status === 'absent').length}</div><div className="text-xs">Absents</div></div>
+                    <div className="bg-yellow-50 p-2 rounded"><div className="font-bold text-yellow-600">{attendanceBySession.filter(a => a.status === 'late').length}</div><div className="text-xs">Retards</div></div>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-auto border rounded-lg p-2">
+                    {students.map(s => {
+                      const att = attendanceBySession.find(a => a.student_id === s.id);
+                      return (
+                        <div key={s.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                          <span className="text-sm">{s.full_name}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs ${att ? (att.status === 'present' ? 'bg-green-100 text-green-800' : att.status === 'late' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') : 'bg-red-100 text-red-800'}`}>
+                            {att ? (att.status === 'present' ? '✓ Présent' : att.status === 'late' ? '⚠ Retard' : '✗ Absent') : '✗ Absent'}
+                          </span>
                         </div>
-                        <div className="text-xs sm:text-sm text-gray-600">Présents</div>
-                      </div>
-                      <div className="bg-red-50 p-2 sm:p-4 rounded-lg text-center">
-                        <div className="text-lg sm:text-2xl font-bold text-red-600">
-                          {attendanceBySession.filter(a => a.status === 'absent').length}
-                        </div>
-                        <div className="text-xs sm:text-sm text-gray-600">Absents</div>
-                      </div>
-                      <div className="bg-yellow-50 p-2 sm:p-4 rounded-lg text-center">
-                        <div className="text-lg sm:text-2xl font-bold text-yellow-600">
-                          {attendanceBySession.filter(a => a.status === 'late').length}
-                        </div>
-                        <div className="text-xs sm:text-sm text-gray-600">Retards</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <h4 className="text-sm sm:text-base font-medium mb-2">Détail :</h4>
-                      <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
-                        {students.map(student => {
-                          const attendance = attendanceBySession.find(a => a.student_id === student.id)
-                          return (
-                            <div key={student.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                              <span className="text-sm font-medium">{student.full_name}</span>
-                              <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                                attendance ? 
-                                  attendance.status === 'present' ? 'bg-green-100 text-green-800' :
-                                  attendance.status === 'late' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-red-100 text-red-800'
-                                : 'bg-red-100 text-red-800'
-                              }`}>
-                                {attendance ? 
-                                  attendance.status === 'present' ? '✓ Présent' :
-                                  attendance.status === 'late' ? '⚠ Retard' : '✗ Absent'
-                                : '✗ Absent'}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
-          {/* Graphiques */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 mb-4 sm:mb-8">
-            <Card>
-              <CardHeader className="px-4 sm:px-6 py-4">
-                <CardTitle className="text-base sm:text-lg">Présences par mois</CardTitle>
-              </CardHeader>
-              <CardContent className="px-2 sm:px-6">
-                <AttendanceChart data={[
-                  { month: 'Jan', presents: 65 },
-                  { month: 'Fév', presents: 59 },
-                  { month: 'Mar', presents: 80 },
-                  { month: 'Avr', presents: 81 },
-                  { month: 'Mai', presents: 56 },
-                  { month: 'Juin', presents: 55 },
-                ]} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="px-4 sm:px-6 py-4">
-                <CardTitle className="text-base sm:text-lg">Répartition Baptême</CardTitle>
-              </CardHeader>
-              <CardContent className="px-2 sm:px-6">
-                <CustomPieChart data={[
-                  { name: 'Baptisés', value: stats.baptized },
-                  { name: 'Non baptisés', value: stats.totalStudents - stats.baptized }
-                ]} />
-              </CardContent>
-            </Card>
+          {/* Graphiques (version simplifiée pour mobile) */}
+          <div className="grid grid-cols-1 gap-6 mb-6">
+            <Card><CardHeader><CardTitle className="text-base">Présences par mois</CardTitle></CardHeader><CardContent><AttendanceChart data={[{ month: 'Jan', presents: 65 }, { month: 'Fév', presents: 59 }, { month: 'Mar', presents: 80 }, { month: 'Avr', presents: 81 }, { month: 'Mai', presents: 56 }, { month: 'Juin', presents: 55 }]} /></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-base">Répartition Baptême</CardTitle></CardHeader><CardContent><CustomPieChart data={[{ name: 'Baptisés', value: stats.baptized }, { name: 'Non baptisés', value: stats.totalStudents - stats.baptized }]} /></CardContent></Card>
           </div>
 
-          {/* Liste des étudiants */}
+          {/* Liste des membres (cartes mobiles / tableau desktop) */}
           <Card>
-            <CardHeader className="px-4 sm:px-6 py-4">
-              <CardTitle className="text-base sm:text-lg">Membres du service</CardTitle>
-            </CardHeader>
-            <CardContent className="px-2 sm:px-6">
-              {/* Version mobile : cartes */}
+            <CardHeader><CardTitle className="text-base">Membres du service</CardTitle></CardHeader>
+            <CardContent className="px-2">
               <div className="block lg:hidden space-y-3">
-                {students.map((student) => {
-                  const todayAttendance = attendance.find(a => a.student_id === student.id)
+                {students.map(s => {
+                  const todayAtt = attendance.find(a => a.student_id === s.id);
                   return (
-                    <div key={student.id} className="bg-white border border-gray-200 rounded-lg p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-gray-900">{student.full_name}</h3>
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                          todayAttendance?.status === 'present' ? 'bg-green-100 text-green-800' :
-                          todayAttendance?.status === 'late' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {todayAttendance?.status === 'present' ? 'Présent' :
-                           todayAttendance?.status === 'late' ? 'Retard' : 'Absent'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
-                        <div>Niveau {student.level}</div>
-                        <div>Branche: {student.branch}</div>
-                        <div>Baptême: {student.baptized ? 'Oui' : 'Non'}</div>
-                        <div>Tél: {student.phone || '-'}</div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedStudent(student)
-                          fetchStudentHistory(student.id)
-                        }}
-                        className="w-full text-indigo-600 hover:text-indigo-700 text-sm"
-                      >
-                        Voir historique
-                      </Button>
+                    <div key={s.id} className="border rounded-lg p-3">
+                      <div className="flex justify-between"><span className="font-medium">{s.full_name}</span><span className={`px-2 py-0.5 rounded text-xs ${todayAtt?.status === 'present' ? 'bg-green-100 text-green-800' : todayAtt?.status === 'late' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</span></div>
+                      <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2"><div>Niveau {s.level}</div><div>Branche: {s.branch}</div><div>Baptême: {s.baptized ? 'Oui' : 'Non'}</div><div>Tél: {s.phone || '-'}</div></div>
+                      <Button variant="ghost" size="sm" className="w-full mt-2 text-indigo-600" onClick={() => { setSelectedStudent(s); fetchStudentHistory(s.id); }}>Voir historique</Button>
                     </div>
-                  )
+                  );
                 })}
               </div>
               <div className="hidden lg:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Niveau</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Branche</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Baptême</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Présence</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {students.map((student) => {
-                      const todayAttendance = attendance.find(a => a.student_id === student.id)
-                      return (
-                        <tr key={student.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {student.full_name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            Niveau {student.level}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {student.branch}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              student.baptized ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {student.baptized ? 'Oui' : 'Non'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              todayAttendance?.status === 'present' ? 'bg-green-100 text-green-800' :
-                              todayAttendance?.status === 'late' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {todayAttendance?.status === 'present' ? 'Présent' :
-                               todayAttendance?.status === 'late' ? 'Retard' : 'Absent'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedStudent(student)
-                                fetchStudentHistory(student.id)
-                              }}
-                            >
-                              Historique
-                            </Button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                <table className="min-w-full"><thead><tr><th>Nom</th><th>Niveau</th><th>Branche</th><th>Baptême</th><th>Présence</th><th>Actions</th></tr></thead><tbody>
+                  {students.map(s => {
+                    const todayAtt = attendance.find(a => a.student_id === s.id);
+                    return (
+                      <tr key={s.id}><td className="py-2">{s.full_name}</td><td>{s.level}</td><td>{s.branch}</td><td>{s.baptized ? 'Oui' : 'Non'}</td><td><span className={`px-2 py-0.5 rounded text-xs ${todayAtt?.status === 'present' ? 'bg-green-100 text-green-800' : todayAtt?.status === 'late' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</span></td><td><Button variant="ghost" size="sm" onClick={() => { setSelectedStudent(s); fetchStudentHistory(s.id); }}>Historique</Button></td></tr>
+                    );
+                  })}
+                </tbody></table>
               </div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Modal Historique Étudiant */}
+      {/* Modal historique */}
       {showHistoryModal && selectedStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg sm:text-xl font-bold truncate pr-4">Historique de {selectedStudent.full_name}</h2>
-              <button
-                onClick={() => {
-                  setShowHistoryModal(false)
-                  setSelectedStudent(null)
-                  setStudentHistory([])
-                }}
-                className="text-gray-500 hover:text-gray-700 p-1"
-              >
-                ✕
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-auto p-4">
+            <div className="flex justify-between items-center mb-3"><h2 className="font-bold">Historique de {selectedStudent.full_name}</h2><button onClick={() => setShowHistoryModal(false)}>✕</button></div>
             <div className="space-y-2">
-              {studentHistory.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">Aucun historique de présence</p>
-              ) : (
-                studentHistory.map((record) => (
-                  <div key={record.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded gap-2">
-                    <div>
-                      <p className="font-medium text-sm sm:text-base">
-                        {new Date(record.date).toLocaleDateString('fr-FR', {
-                          weekday: 'short',
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Code: {record.sessions?.code || '-'}
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        record.status === 'present' ? 'bg-green-100 text-green-800' :
-                        record.status === 'late' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {record.status === 'present' ? 'Présent' :
-                         record.status === 'late' ? 'Retard' : 'Absent'}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {record.scanned_at ? new Date(record.scanned_at).toLocaleTimeString('fr-FR', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        }) : '-'}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
+              {studentHistory.length === 0 ? <p className="text-center text-gray-500">Aucune présence</p> : studentHistory.map(r => (
+                <div key={r.id} className="border-b pb-2"><div className="font-medium">{new Date(r.date).toLocaleDateString('fr-FR')}</div><div className="flex justify-between"><span className={`text-sm ${r.status === 'present' ? 'text-green-600' : 'text-red-600'}`}>{r.status === 'present' ? 'Présent' : 'Absent'}</span><span className="text-xs text-gray-500">{r.scanned_at ? new Date(r.scanned_at).toLocaleTimeString() : '-'}</span></div></div>
+              ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal d'ajout d'étudiant */}
-      <AddStudentModal
-        isOpen={showAddStudentModal}
-        onClose={() => setShowAddStudentModal(false)}
-        serviceId={user?.serviceId || ''}
-        onStudentAdded={handleStudentAdded}
-      />
+      <AddStudentModal isOpen={showAddStudentModal} onClose={() => setShowAddStudentModal(false)} serviceId={user?.serviceId || ''} onStudentAdded={handleStudentAdded} />
     </div>
   )
 }
