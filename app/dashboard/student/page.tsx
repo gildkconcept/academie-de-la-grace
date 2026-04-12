@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ProgressChart } from '@/components/charts'
 import { toast } from 'sonner'
-import { Attendance, Progress } from '@/types'
+import { Attendance, Progress, Badge } from '@/types'
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -16,7 +16,8 @@ import {
   ArrowLeftOnRectangleIcon,
   QrCodeIcon,
   PencilSquareIcon,
-  AcademicCapIcon
+  AcademicCapIcon,
+  TrophyIcon
 } from '@heroicons/react/24/outline'
 
 export default function StudentDashboard() {
@@ -41,6 +42,9 @@ export default function StudentDashboard() {
   })
   const [loadingUpdate, setLoadingUpdate] = useState(false)
 
+  // === NOUVEAU : États pour les badges ===
+  const [badges, setBadges] = useState<(Badge & { awarded_at?: string })[]>([])
+
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login')
@@ -58,6 +62,7 @@ export default function StudentDashboard() {
       // Récupérer le niveau depuis la base de données pour être sûr
       fetchUserLevel()
       fetchData()
+      fetchBadges() // Charger les badges
       if (user) {
         setProfileData({
           name: user.name || '',
@@ -119,6 +124,32 @@ export default function StudentDashboard() {
     }
   }
 
+  // === NOUVELLE FONCTION : Récupération des badges de l'étudiant ===
+  const fetchBadges = async () => {
+    if (!user?.id) return
+    try {
+      const { data, error } = await supabase
+        .from('student_badges')
+        .select(`
+          awarded_at,
+          badge:badges (*)
+        `)
+        .eq('student_id', user.id)
+        .order('awarded_at', { ascending: false })
+
+      if (error) throw error
+      if (data) {
+        const formatted = data.map((item: any) => ({
+          ...item.badge,
+          awarded_at: item.awarded_at
+        }))
+        setBadges(formatted)
+      }
+    } catch (error) {
+      console.error('Erreur chargement badges:', error)
+    }
+  }
+
   const handleProfileUpdate = async () => {
     if (!profileData.name || !profileData.username) {
       toast.error('Le nom et le nom d\'utilisateur sont requis')
@@ -154,38 +185,73 @@ export default function StudentDashboard() {
     }
   }
 
+  // === FONCTION MODIFIÉE AVEC GÉOLOCALISATION ===
   const verifyCode = async () => {
     if (code.length !== 6) {
       toast.error('Le code doit faire 6 chiffres')
       return
     }
 
-    setVerifying(true)
-    try {
-      const res = await fetch('/api/code/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ code })
-      })
-
-      const data = await res.json()
-
-      if (res.ok) {
-        toast.success('✅ Présence enregistrée !')
-        setShowCodeInput(false)
-        setCode('')
-        fetchData()
-      } else {
-        toast.error(data.error || 'Code invalide')
-      }
-    } catch (error) {
-      toast.error('Erreur lors de la vérification')
-    } finally {
-      setVerifying(false)
+    if (!navigator.geolocation) {
+      toast.error('Géolocalisation non supportée par votre navigateur')
+      return
     }
+
+    toast.loading('Récupération de votre position...', { id: 'loc' })
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        toast.dismiss('loc')
+        const { latitude, longitude } = position.coords
+
+        setVerifying(true)
+        try {
+          const res = await fetch('/api/code/verify', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              code,
+              lat: latitude,
+              lng: longitude
+            })
+          })
+
+          const data = await res.json()
+
+          if (res.ok) {
+            toast.success(`✅ Présence enregistrée (distance: ${data.distance}m)`)
+            setShowCodeInput(false)
+            setCode('')
+            fetchData()
+            fetchBadges() // Rafraîchir les badges après nouvelle présence
+          } else {
+            toast.error(data.error || 'Code invalide ou hors zone')
+          }
+        } catch (error) {
+          console.error('Erreur:', error)
+          toast.error('Erreur lors de la vérification')
+        } finally {
+          setVerifying(false)
+        }
+      },
+      (error: GeolocationPositionError) => {
+        toast.dismiss('loc')
+        console.error(error)
+        let message = 'Impossible d’obtenir votre position'
+        if (error.code === error.PERMISSION_DENIED) {
+          message = '❌ Vous devez activer la localisation pour valider votre présence'
+        } else if (error.code === error.TIMEOUT) {
+          message = 'Délai dépassé, vérifiez votre connexion'
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          message = 'Position indisponible, vérifiez vos paramètres GPS'
+        }
+        toast.error(message)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
   }
 
   const calculateProgress = () => {
@@ -360,6 +426,34 @@ export default function StudentDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* === NOUVEAU : SECTION BADGES === */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrophyIcon className="w-5 h-5 text-yellow-500" />
+                Mes distinctions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {badges.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">Aucun badge obtenu pour le moment. Continuez à participer !</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {badges.map(badge => (
+                    <div key={badge.id} className="border rounded-lg p-4 flex items-start gap-3 bg-gradient-to-r from-yellow-50 to-amber-50">
+                      <div className="text-3xl">🏅</div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{badge.name}</h3>
+                        <p className="text-xs text-gray-600">{badge.description}</p>
+                        <p className="text-xs text-gray-400 mt-1">Obtenu le {new Date(badge.awarded_at!).toLocaleDateString('fr-FR')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       ) : (
         <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
@@ -518,7 +612,7 @@ export default function StudentDashboard() {
               </button>
             </div>
             <p className="text-xs sm:text-sm text-gray-500 text-center mt-4">
-              ⏰ Le code expire après 5 minutes
+              ⏰ Le code expire après 5 minutes. Votre position GPS sera vérifiée.
             </p>
           </div>
         </div>

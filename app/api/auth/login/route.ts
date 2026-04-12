@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       .from('users')
       .select('*')
       .eq('username', username)
-      .single()
+      .maybeSingle()  // ← Remplacer .single() par .maybeSingle()
 
     if (user && await comparePassword(password, user.password)) {
       const token = generateToken(user)
@@ -31,15 +31,18 @@ export async function POST(request: Request) {
       })
     }
 
-    // Vérifier dans students
+    // Vérifier dans students (uniquement ceux qui ne sont pas supprimés)
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('id, full_name, username, password, service_id, level, email, phone')
       .eq('username', username)
-      .single()
+      .is('deleted_at', null)
+      .maybeSingle()  // ← Remplacer .single() par .maybeSingle()
 
     if (student && await comparePassword(password, student.password)) {
-      console.log('📊 Étudiant trouvé - Niveau:', student.level)
+      console.log('📊 Étudiant trouvé - ID:', student.id)
+      console.log('📊 Nom:', student.full_name)
+      console.log('📊 Niveau:', student.level)
       
       const token = generateToken({ 
         id: student.id,
@@ -58,7 +61,7 @@ export async function POST(request: Request) {
           username: student.username,
           role: 'student',
           serviceId: student.service_id,
-          level: student.level  // 1, 2 ou 3
+          level: student.level
         }
       })
     }

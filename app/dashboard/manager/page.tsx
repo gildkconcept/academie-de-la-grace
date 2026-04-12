@@ -18,12 +18,14 @@ import {
   CalendarIcon, 
   FunnelIcon,
   ArrowRightOnRectangleIcon,
-  DocumentArrowDownIcon
+  DocumentArrowDownIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline'
 import { ProfileSection } from '@/components/ProfileSection'
 import { AddStudentModal } from '@/components/AddStudentModal'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts'
 
 export default function ManagerDashboard() {
   const { user, loading, logout } = useAuth()
@@ -64,6 +66,16 @@ export default function ManagerDashboard() {
   const [sessionTypes, setSessionTypes] = useState<any[]>([])
   const [selectedType, setSelectedType] = useState<string>('')
 
+  // === NOUVEAU : Dashboard service ===
+  const [serviceStats, setServiceStats] = useState<{
+    totalMembers: number;
+    averageAttendanceRate: number;
+    activeMembers: number;
+    inactiveMembers: number;
+    members: (Student & { attendanceRate: number; isActive: boolean })[];
+  } | null>(null)
+  const [activeInactiveData, setActiveInactiveData] = useState<{ name: string; value: number }[]>([])
+
   const toggleProfile = () => {
     setShowProfile(!showProfile)
     setMobileMenuOpen(false)
@@ -72,6 +84,7 @@ export default function ManagerDashboard() {
   const handleStudentAdded = () => {
     fetchData()
     fetchCurrentSession()
+    fetchServiceStats() // rafraîchir les stats
   }
 
   useEffect(() => {
@@ -90,6 +103,7 @@ export default function ManagerDashboard() {
       fetchSessions()
       fetchCurrentSession()
       fetchSessionTypes()
+      fetchServiceStats() // charger les stats du service
     }
   }, [user, loading])
 
@@ -116,6 +130,7 @@ export default function ManagerDashboard() {
         .from('students')
         .select('*')
         .eq('service_id', user?.serviceId)
+        .is('deleted_at', null) // ← exclure les supprimés
 
       if (studentsError) throw studentsError
 
@@ -233,6 +248,67 @@ export default function ManagerDashboard() {
     }
   }
 
+  // === NOUVELLE FONCTION : Récupérer les statistiques du service ===
+  const fetchServiceStats = async () => {
+    if (!user?.serviceId) return
+    try {
+      // Récupérer tous les étudiants du service (non supprimés)
+      const { data: studentsData } = await supabase
+        .from('students')
+        .select('*')
+        .eq('service_id', user.serviceId)
+        .is('deleted_at', null)
+      
+      if (!studentsData || studentsData.length === 0) {
+        setServiceStats(null)
+        return
+      }
+
+      // Récupérer toutes les sessions académiques du service
+      const { data: sessionsData } = await supabase
+        .from('sessions')
+        .select('id')
+        .eq('service_id', user.serviceId)
+      
+      const totalSessions = sessionsData?.length || 0
+
+      // Pour chaque étudiant, compter ses présences
+      const studentAttendanceRates = await Promise.all(studentsData.map(async (student) => {
+        const { data: attendances } = await supabase
+          .from('attendance')
+          .select('status')
+          .eq('student_id', student.id)
+          .eq('status', 'present')
+        const presentCount = attendances?.length || 0
+        const rate = totalSessions > 0 ? (presentCount / totalSessions) * 100 : 0
+        return { ...student, attendanceRate: rate, isActive: rate >= 70 }
+      }))
+
+      const averageRate = studentAttendanceRates.reduce((acc, s) => acc + s.attendanceRate, 0) / studentAttendanceRates.length
+      const activeCount = studentAttendanceRates.filter(s => s.isActive).length
+      const inactiveCount = studentAttendanceRates.length - activeCount
+
+      setServiceStats({
+        totalMembers: studentAttendanceRates.length,
+        averageAttendanceRate: Math.round(averageRate),
+        activeMembers: activeCount,
+        inactiveMembers: inactiveCount,
+        members: studentAttendanceRates.map(s => ({
+          ...s,
+          attendanceRate: Math.round(s.attendanceRate),
+          isActive: s.isActive
+        }))
+      })
+
+      setActiveInactiveData([
+        { name: 'Actifs (≥70%)', value: activeCount },
+        { name: 'Inactifs (<70%)', value: inactiveCount }
+      ])
+    } catch (error) {
+      console.error('Erreur calcul stats service:', error)
+    }
+  }
+
   const startServiceSession = async () => {
     if (!selectedType) {
       toast.error('Veuillez sélectionner un type de culte')
@@ -258,6 +334,7 @@ export default function ManagerDashboard() {
         toast.success(`Session ${sessionTypes.find(t => t.code === selectedType)?.label} démarrée`)
         setSelectedType('')
         fetchCurrentSession()
+        fetchServiceStats() // rafraîchir stats
       } else {
         toast.error(data.error || 'Erreur lors du démarrage')
       }
@@ -312,6 +389,7 @@ export default function ManagerDashboard() {
       if (res.ok) {
         toast.success('Présences enregistrées')
         fetchCurrentSession()
+        fetchServiceStats() // rafraîchir stats
       } else {
         toast.error(data.error || 'Erreur')
       }
@@ -514,6 +592,28 @@ export default function ManagerDashboard() {
     }
   }
 
+  // === NOUVELLE FONCTION : Supprimer un étudiant ===
+  const handleDeleteStudent = async (studentId: string) => {
+    if (!confirm('⚠️ Voulez-vous vraiment supprimer cet étudiant ? Cette action est irréversible.')) return
+    try {
+      const res = await fetch(`/api/students/${studentId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success('Étudiant supprimé')
+        fetchData()           // rafraîchir la liste
+        fetchServiceStats()   // rafraîchir les stats
+      } else {
+        toast.error(data.error || 'Erreur lors de la suppression')
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('Erreur serveur')
+    }
+  }
+
   const filteredServiceStudents = serviceStudents.filter(student => {
     const matchesStatus = statusFilter === 'all' || student.status === statusFilter
     const matchesSearch = searchTerm === '' || student.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -539,7 +639,7 @@ export default function ManagerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100 pb-20">
-      {/* Barre de navigation responsive */}
+      {/* Barre de navigation responsive (identique) */}
       <nav className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -548,11 +648,7 @@ export default function ManagerDashboard() {
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 lg:hidden"
               >
-                {mobileMenuOpen ? (
-                  <XMarkIcon className="h-6 w-6" />
-                ) : (
-                  <Bars3Icon className="h-6 w-6" />
-                )}
+                {mobileMenuOpen ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
               </button>
               <h1 className="text-base sm:text-lg font-semibold truncate max-w-[180px] sm:max-w-none">
                 {showProfile ? 'Mon profil' : user.name}
@@ -564,7 +660,6 @@ export default function ManagerDashboard() {
               )}
             </div>
 
-            {/* Boutons pour desktop */}
             <div className="hidden lg:flex items-center gap-3">
               {!showProfile && (
                 <Button onClick={() => setShowAddStudentModal(true)} variant="outline" size="sm">
@@ -581,13 +676,11 @@ export default function ManagerDashboard() {
               </Button>
             </div>
 
-            {/* Bouton déconnexion mobile (icône seule) */}
             <button onClick={logout} className="lg:hidden p-2 text-red-600 hover:bg-red-50 rounded-full">
               <ArrowRightOnRectangleIcon className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Menu mobile déroulant */}
           {mobileMenuOpen && (
             <div className="lg:hidden border-t border-gray-200 py-3 space-y-2">
               {!showProfile && (
@@ -634,7 +727,58 @@ export default function ManagerDashboard() {
         <ProfileSection user={user} onClose={() => setShowProfile(false)} />
       ) : (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-          {/* Section Présence Service */}
+          
+          {/* === NOUVEAU : Dashboard service === */}
+          {serviceStats && (
+            <Card className="mb-6">
+              <CardHeader className="px-4 py-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ChartBarIcon className="w-5 h-5 text-indigo-600" />
+                  📊 Tableau de bord du service
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 p-3 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-indigo-600">{serviceStats.totalMembers}</div>
+                    <div className="text-xs text-gray-500">Membres</div>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-green-600">{serviceStats.averageAttendanceRate}%</div>
+                    <div className="text-xs text-gray-500">Présence moyenne</div>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-blue-600">{serviceStats.activeMembers}</div>
+                    <div className="text-xs text-gray-500">Actifs (≥70%)</div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Répartition actifs / inactifs</h4>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={activeInactiveData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={60}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {activeInactiveData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#ef4444'} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Section Présence Service (inchangée) */}
           <Card className="mb-6">
             <CardHeader className="px-4 py-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -643,7 +787,6 @@ export default function ManagerDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-5 space-y-4">
-              {/* Sélecteur de type de culte */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Type de culte <span className="text-red-500">*</span>
@@ -662,7 +805,6 @@ export default function ManagerDashboard() {
                 </select>
               </div>
 
-              {/* Bouton Nouvelle session */}
               <Button
                 onClick={startServiceSession}
                 disabled={loadingService || !selectedType}
@@ -672,7 +814,6 @@ export default function ManagerDashboard() {
                 + Nouvelle session
               </Button>
 
-              {/* Sélecteur de session (si plusieurs) */}
               {allSessions.length > 1 && (
                 <div className="relative">
                   <button
@@ -721,20 +862,17 @@ export default function ManagerDashboard() {
                     </div>
                   </div>
 
-                  {/* Stats rapides */}
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="bg-gray-50 p-2 rounded"><div className="font-bold">{serviceStudents.length}</div><div className="text-xs">Total</div></div>
                     <div className="bg-green-50 p-2 rounded"><div className="font-bold text-green-600">{presentCount}</div><div className="text-xs">Présents</div></div>
                     <div className="bg-red-50 p-2 rounded"><div className="font-bold text-red-600">{absentCount}</div><div className="text-xs">Absents</div></div>
                   </div>
 
-                  {/* Barre de progression */}
                   <div>
                     <div className="flex justify-between text-xs"><span>Taux de présence</span><span>{attendanceRate}%</span></div>
                     <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full" style={{ width: `${attendanceRate}%` }}></div></div>
                   </div>
 
-                  {/* Recherche et filtres */}
                   <div className="flex flex-col gap-2">
                     <input type="text" placeholder="Rechercher un étudiant..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
                     <div className="flex gap-2">
@@ -746,7 +884,6 @@ export default function ManagerDashboard() {
                     </div>
                   </div>
 
-                  {/* Liste des étudiants avec checkbox */}
                   <div className="space-y-2 max-h-80 overflow-auto border rounded-lg p-2">
                     {filteredServiceStudents.map(student => (
                       <div key={student.id} onClick={() => togglePresence(student.id)} className={`flex justify-between items-center p-2 rounded cursor-pointer ${student.status === 'present' ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
@@ -822,44 +959,87 @@ export default function ManagerDashboard() {
             </CardContent>
           </Card>
 
-          {/* Graphiques (version simplifiée pour mobile) */}
+          {/* Graphiques (inchangés) */}
           <div className="grid grid-cols-1 gap-6 mb-6">
             <Card><CardHeader><CardTitle className="text-base">Présences par mois</CardTitle></CardHeader><CardContent><AttendanceChart data={[{ month: 'Jan', presents: 65 }, { month: 'Fév', presents: 59 }, { month: 'Mar', presents: 80 }, { month: 'Avr', presents: 81 }, { month: 'Mai', presents: 56 }, { month: 'Juin', presents: 55 }]} /></CardContent></Card>
             <Card><CardHeader><CardTitle className="text-base">Répartition Baptême</CardTitle></CardHeader><CardContent><CustomPieChart data={[{ name: 'Baptisés', value: stats.baptized }, { name: 'Non baptisés', value: stats.totalStudents - stats.baptized }]} /></CardContent></Card>
           </div>
 
-          {/* Liste des membres (cartes mobiles / tableau desktop) */}
+          {/* Liste des membres améliorée : ajout du taux de présence, statut actif/inactif, bouton supprimer */}
           <Card>
             <CardHeader><CardTitle className="text-base">Membres du service</CardTitle></CardHeader>
             <CardContent className="px-2">
               <div className="block lg:hidden space-y-3">
-                {students.map(s => {
+                {(serviceStats?.members || students).map(s => {
+                  const member = serviceStats?.members.find(m => m.id === s.id) || { attendanceRate: 0, isActive: false }
                   const todayAtt = attendance.find(a => a.student_id === s.id);
                   return (
                     <div key={s.id} className="border rounded-lg p-3">
-                      <div className="flex justify-between"><span className="font-medium">{s.full_name}</span><span className={`px-2 py-0.5 rounded text-xs ${todayAtt?.status === 'present' ? 'bg-green-100 text-green-800' : todayAtt?.status === 'late' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</span></div>
-                      <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2"><div>Niveau {s.level}</div><div>Branche: {s.branch}</div><div>Baptême: {s.baptized ? 'Oui' : 'Non'}</div><div>Tél: {s.phone || '-'}</div></div>
-                      <Button variant="ghost" size="sm" className="w-full mt-2 text-indigo-600" onClick={() => { setSelectedStudent(s); fetchStudentHistory(s.id); }}>Voir historique</Button>
+                      <div className="flex justify-between">
+                        <span className="font-medium">{s.full_name}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs ${member.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {member.isActive ? 'Actif' : 'Inactif'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2">
+                        <div>Niveau {s.level}</div>
+                        <div>Branche: {s.branch}</div>
+                        <div>Baptême: {s.baptized ? 'Oui' : 'Non'}</div>
+                        <div>Tél: {s.phone || '-'}</div>
+                        <div>Taux présence: {member.attendanceRate}%</div>
+                        <div>Présence jour: {todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</div>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button variant="ghost" size="sm" className="flex-1 text-indigo-600" onClick={() => { setSelectedStudent(s); fetchStudentHistory(s.id); }}>Voir historique</Button>
+                        <Button variant="ghost" size="sm" className="flex-1 text-red-600" onClick={() => handleDeleteStudent(s.id)}>Supprimer</Button>
+                      </div>
                     </div>
-                  );
+                  )
                 })}
               </div>
               <div className="hidden lg:block overflow-x-auto">
-                <table className="min-w-full"><thead><tr><th>Nom</th><th>Niveau</th><th>Branche</th><th>Baptême</th><th>Présence</th><th>Actions</th></tr></thead><tbody>
-                  {students.map(s => {
-                    const todayAtt = attendance.find(a => a.student_id === s.id);
-                    return (
-                      <tr key={s.id}><td className="py-2">{s.full_name}</td><td>{s.level}</td><td>{s.branch}</td><td>{s.baptized ? 'Oui' : 'Non'}</td><td><span className={`px-2 py-0.5 rounded text-xs ${todayAtt?.status === 'present' ? 'bg-green-100 text-green-800' : todayAtt?.status === 'late' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</span></td><td><Button variant="ghost" size="sm" onClick={() => { setSelectedStudent(s); fetchStudentHistory(s.id); }}>Historique</Button></td></tr>
-                    );
-                  })}
-                </tbody></table>
+                <table className="min-w-full">
+                  <thead>
+                    <tr>
+                      <th>Nom</th>
+                      <th>Niveau</th>
+                      <th>Branche</th>
+                      <th>Baptême</th>
+                      <th>Taux présence</th>
+                      <th>Statut</th>
+                      <th>Présence</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(serviceStats?.members || students).map(s => {
+                      const member = serviceStats?.members.find(m => m.id === s.id) || { attendanceRate: 0, isActive: false }
+                      const todayAtt = attendance.find(a => a.student_id === s.id);
+                      return (
+                        <tr key={s.id}>
+                          <td className="py-2">{s.full_name}</td>
+                          <td>{s.level}</td>
+                          <td>{s.branch}</td>
+                          <td>{s.baptized ? 'Oui' : 'Non'}</td>
+                          <td>{member.attendanceRate}%</td>
+                          <td><span className={`px-2 py-0.5 rounded text-xs ${member.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{member.isActive ? 'Actif' : 'Inactif'}</span></td>
+                          <td><span className={`px-2 py-0.5 rounded text-xs ${todayAtt?.status === 'present' ? 'bg-green-100 text-green-800' : todayAtt?.status === 'late' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</span></td>
+                          <td className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => { setSelectedStudent(s); fetchStudentHistory(s.id); }}>Historique</Button>
+                            <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteStudent(s.id)}>Supprimer</Button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Modal historique */}
+      {/* Modal historique (inchangé) */}
       {showHistoryModal && selectedStudent && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-auto p-4">

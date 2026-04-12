@@ -30,7 +30,6 @@ export interface Service {
   description?: string
 }
 
-// Progression académique
 export interface Progress {
   id: string
   student_id: string
@@ -40,7 +39,7 @@ export interface Progress {
   completed: boolean
 }
 
-// Sessions académiques (code)
+// Sessions académiques (code) – avec géolocalisation
 export interface AcademySession {
   id: string
   code: string
@@ -49,6 +48,9 @@ export interface AcademySession {
   expires_at: string
   created_at: string
   created_by?: string
+  lat: number           // latitude du superadmin
+  lng: number           // longitude
+  radius: number        // rayon en mètres
   session_type?: {
     code: string
     label: string
@@ -62,17 +64,20 @@ export interface AcademyAttendance {
   academy_session_id: string
   status: 'present' | 'absent' | 'late'
   scanned_at: string
+  student_lat?: number   // position de l'étudiant
+  student_lng?: number
+  distance?: number      // distance calculée
 }
 
-// Sessions de service (checkbox) – AJOUT de type
+// Sessions de service (checkbox)
 export interface ServiceSession {
   id: string
   service_id: string
   date: string
-  type?: string                           // ← clé ajoutée
+  type?: string
   created_at: string
   created_by?: string
-  session_type?: {                       // ← optionnel pour jointure
+  session_type?: {
     code: string
     label: string
     day_of_week: string
@@ -87,7 +92,6 @@ export interface ServiceAttendance {
   marked_at: string
 }
 
-// Pour l'analyse croisée
 export interface CrossAttendance {
   student_id: string
   student_name: string
@@ -96,7 +100,7 @@ export interface CrossAttendance {
   academic_present: boolean
 }
 
-// Pour la présence académique (ancien système)
+// Pour la présence académique (ancien nom, mais on garde la compatibilité)
 export interface Attendance {
   id: string
   student_id: string
@@ -109,4 +113,62 @@ export interface Attendance {
     date: string
     created_at: string
   }
+  student_lat?: number
+  student_lng?: number
+  distance?: number
+}
+// ... (contenu existant) ...
+
+// === STATISTIQUES GLOBALES POUR SUPERADMIN ===
+export interface GlobalStats {
+  totalStudents: number
+  totalServices: number
+  totalAttendance: number       // nombre total de présences académiques
+  expectedAttendance: number    // nombre total attendu (étudiants × sessions)
+  globalAttendanceRate: number
+  bestService: {
+    id: string
+    name: string
+    rate: number
+    totalStudents: number
+    presentCount: number
+  } | null
+  strugglingService: {
+    id: string
+    name: string
+    rate: number
+    totalStudents: number
+    presentCount: number
+  } | null
+  attendanceByService: {
+    serviceId: string
+    serviceName: string
+    totalStudents: number
+    presentCount: number
+    rate: number
+  }[]
+  attendanceOverTime: {
+    month: string
+    rate: number
+    present: number
+    total: number
+  }[]
+}
+
+// === BADGES ===
+export interface Badge {
+  id: string
+  name: string
+  description: string
+  icon?: string
+  condition_type: 'perfect_attendance' | 'faithful_sunday' | 'disciplined'
+  condition_value?: string
+}
+
+export interface StudentBadge {
+  id: string
+  student_id: string
+  badge_id: string
+  awarded_at: string
+  badge?: Badge
 }

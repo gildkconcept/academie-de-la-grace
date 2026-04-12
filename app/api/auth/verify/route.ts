@@ -25,27 +25,63 @@ export async function GET(request: Request) {
         .from('users')
         .select('*')
         .eq('id', decoded.id)
-        .single()
+        .maybeSingle()
       userData = data
       console.log('👤 Utilisateur admin trouvé:', userData)
-    } else {
-      const { data } = await supabase
+    } else if (decoded.role === 'student') {
+      // Tentative 1 : Recherche par ID (sans la colonne role qui n'existe pas dans students)
+      let { data } = await supabase
         .from('students')
-        .select('id, full_name, username, role, service_id, level, email, phone')
+        .select('id, full_name, username, service_id, level, email, phone, deleted_at')  // ← retiré "role"
         .eq('id', decoded.id)
-        .single()
+        .is('deleted_at', null)
+        .maybeSingle()
+      
+      // Tentative 2 : Si non trouvé par ID, rechercher par username
+      if (!data && decoded.username) {
+        console.log('🔍 Étudiant non trouvé par ID, recherche par username:', decoded.username)
+        const { data: byUsername } = await supabase
+          .from('students')
+          .select('id, full_name, username, service_id, level, email, phone, deleted_at')  // ← retiré "role"
+          .eq('username', decoded.username)
+          .is('deleted_at', null)
+          .maybeSingle()
+        data = byUsername
+        if (data) {
+          console.log('✅ Étudiant trouvé par username, ID réel:', data.id)
+        }
+      }
+      
       userData = data
       console.log('👤 Étudiant trouvé:', userData)
       console.log('📊 Niveau dans la base:', userData?.level)
+      
+      if (userData?.deleted_at) {
+        console.log('❌ Compte désactivé (soft-deleted)')
+        return NextResponse.json(
+          { error: 'Compte désactivé, contactez l\'administrateur' },
+          { status: 403 }
+        )
+      }
     }
 
+    // Si aucun utilisateur trouvé
+    if (!userData) {
+      console.log('❌ Aucun utilisateur trouvé pour ID:', decoded.id)
+      return NextResponse.json(
+        { error: 'Utilisateur non trouvé ou compte désactivé' },
+        { status: 404 }
+      )
+    }
+
+    // Retourner les données en utilisant les infos réelles de la base
     return NextResponse.json({ 
       user: {
-        id: decoded.id,
-        name: decoded.name,
-        username: decoded.username,
+        id: userData.id,
+        name: userData.full_name || decoded.name,
+        username: userData.username,
         role: decoded.role,
-        serviceId: decoded.serviceId,
+        serviceId: userData.service_id || decoded.serviceId,
         email: userData?.email || '',
         phone: userData?.phone || '',
         level: userData?.level || (decoded.role === 'student' ? 1 : null)

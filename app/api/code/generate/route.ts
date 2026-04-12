@@ -19,6 +19,24 @@ export async function POST(request: Request) {
       }, { status: 403 })
     }
 
+    // Récupérer la position et le rayon
+    const { lat, lng, radius = 200 } = await request.json()
+
+    if (lat === undefined || lng === undefined) {
+      return NextResponse.json(
+        { error: 'Position GPS requise pour générer un code' },
+        { status: 400 }
+      )
+    }
+
+    // Validation simple des coordonnées
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      return NextResponse.json(
+        { error: 'Coordonnées invalides' },
+        { status: 400 }
+      )
+    }
+
     // Générer un code aléatoire à 6 chiffres
     const code = Math.floor(100000 + Math.random() * 900000).toString()
     
@@ -39,8 +57,9 @@ export async function POST(request: Request) {
 
     console.log('🔧 GÉNÉRATION CODE (5 min):')
     console.log('Code généré:', code)
+    console.log('Position:', lat, lng)
+    console.log('Rayon:', radius)
     console.log('Expire à (UTC):', expiresAtUTC.toISOString())
-    console.log('Expire à (locale):', expiresAtUTC.toLocaleString())
 
     // Vérifier si le code n'existe pas déjà
     const { data: existingCode } = await supabase
@@ -54,13 +73,16 @@ export async function POST(request: Request) {
       return POST(request)
     }
 
-    // Créer une session SANS service_id (code universel)
+    // Créer une session avec les coordonnées
     const { data: session, error } = await supabase
       .from('sessions')
       .insert([{
         code: code,
         expires_at: expiresAtUTC.toISOString(),
-        date: today
+        date: today,
+        lat: lat,
+        lng: lng,
+        radius: radius
         // Pas de service_id = code pour tous les services
       }])
       .select()
@@ -82,7 +104,8 @@ export async function POST(request: Request) {
       code: code,
       sessionId: session.id,
       expiresAt: session.expires_at,
-      isUniversal: true
+      isUniversal: true,
+      center: { lat, lng, radius }
     })
   } catch (error) {
     console.error('❌ Erreur globale:', error)

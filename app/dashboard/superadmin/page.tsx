@@ -14,12 +14,14 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer 
+  ResponsiveContainer,
+  LineChart,
+  Line
 } from '@/components/charts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { Service, Student } from '@/types'
+import { Service, Student, GlobalStats, Badge } from '@/types'
 import { generateAttendancePDF } from '@/lib/pdf-generator'
 import { 
   UserCircleIcon, 
@@ -29,7 +31,8 @@ import {
   DocumentArrowDownIcon,
   FunnelIcon,
   UserGroupIcon,
-  CalendarIcon
+  CalendarIcon,
+  TrophyIcon
 } from '@heroicons/react/24/outline'
 import { ProfileSection } from '@/components/ProfileSection'
 import { jsPDF } from 'jspdf'
@@ -76,6 +79,13 @@ export default function SuperAdminDashboard() {
   const [presenceByBranch, setPresenceByBranch] = useState<any[]>([])
   const [baptismStats, setBaptismStats] = useState<any[]>([])
 
+  // === NOUVEAUX ÉTATS ===
+  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null)
+  const [badgesList, setBadgesList] = useState<Badge[]>([])
+  const [showBadgeModal, setShowBadgeModal] = useState(false)
+  const [selectedStudentForBadge, setSelectedStudentForBadge] = useState<string>('')
+  const [selectedBadgeId, setSelectedBadgeId] = useState<string>('')
+
   const toggleProfile = () => {
     setShowProfile(!showProfile)
     setMobileMenuOpen(false)
@@ -96,6 +106,8 @@ export default function SuperAdminDashboard() {
       fetchAllSessions()
       fetchServiceAttendances()
       fetchCultTypes()
+      fetchGlobalStats()
+      fetchBadgesList()
     }
   }, [user, loading])
 
@@ -119,9 +131,11 @@ export default function SuperAdminDashboard() {
         setServices(servicesData)
       }
 
+      // MODIFICATION : exclure les étudiants supprimés (soft delete)
       const { data: studentsData } = await supabase
         .from('students')
         .select('*')
+        .is('deleted_at', null)
         .order('full_name')
 
       if (studentsData) {
@@ -211,15 +225,11 @@ export default function SuperAdminDashboard() {
       const autoTable = (await import('jspdf-autotable')).default;
       const doc = new jsPDF();
 
-      // Titre
       doc.setFontSize(20);
       doc.text('Académie de la Grâce', 105, 15, { align: 'center' });
-      
-      // Sous-titre
       doc.setFontSize(16);
       doc.text('Rapport des présences service', 105, 25, { align: 'center' });
       
-      // Filtres appliqués
       const dateFormatted = new Date(selectedDate).toLocaleDateString('fr-FR', {
         weekday: 'long',
         year: 'numeric',
@@ -238,25 +248,21 @@ export default function SuperAdminDashboard() {
         doc.text(`Type de culte: ${typeLabel}`, 105, 49, { align: 'center' });
       }
       
-      // Date de génération
       const now = new Date();
       doc.setFontSize(8);
       doc.text(`Généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`, 105, 280, { align: 'center' });
       
       let startY = 60;
       
-      // Pour chaque session
       for (const session of serviceAttendances) {
         const serviceName = services.find(s => s.id === session.service_id)?.name || 'Service';
         const sessionDate = new Date(session.date).toLocaleDateString('fr-FR');
         const cultLabel = session.session_types?.label || session.type || 'Non défini';
         
-        // Titre de la session
         doc.setFontSize(14);
         doc.text(`${serviceName} - ${sessionDate} (${cultLabel})`, 14, startY);
         startY += 8;
         
-        // Statistiques
         const presents = session.service_attendance?.filter((a: any) => a.status === 'present').length || 0;
         const absents = session.service_attendance?.filter((a: any) => a.status === 'absent').length || 0;
         const total = session.service_attendance?.length || 0;
@@ -265,7 +271,6 @@ export default function SuperAdminDashboard() {
         doc.text(`Total: ${total} | Présents: ${presents} | Absents: ${absents}`, 14, startY);
         startY += 8;
         
-        // Tableau des présences
         const tableData = session.service_attendance?.map((att: any) => [
           att.students?.full_name || 'N/A',
           att.students?.branch || 'N/A',
@@ -291,7 +296,6 @@ export default function SuperAdminDashboard() {
           startY += 10;
         }
         
-        // Nouvelle page si nécessaire
         if (startY > 250) {
           doc.addPage();
           startY = 20;
@@ -452,6 +456,7 @@ export default function SuperAdminDashboard() {
               .from('students')
               .select('*')
               .eq('service_id', session.service_id)
+              .is('deleted_at', null)
             serviceStudents = studentsData || []
           } else {
             serviceStudents = students
@@ -497,66 +502,172 @@ export default function SuperAdminDashboard() {
     setSelectedBaptism('all')
   }
 
-  const generateCode = async () => {
+  // === NOUVELLES FONCTIONS ===
+  const fetchGlobalStats = async () => {
     try {
-      toast.loading('Génération du code en cours...', { id: 'generate' });
+      const res = await fetch('/api/stats/global', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      })
+      const data = await res.json()
+      if (res.ok) setGlobalStats(data)
+      else console.error('Erreur stats globales:', data.error)
+    } catch (error) {
+      console.error('Erreur fetchGlobalStats:', error)
+    }
+  }
 
-      const res = await fetch('/api/code/generate', {
+  const fetchBadgesList = async () => {
+    try {
+      const { data, error } = await supabase.from('badges').select('*')
+      if (error) throw error
+      setBadgesList(data || [])
+    } catch (error) {
+      console.error('Erreur chargement badges:', error)
+    }
+  }
+
+  const assignBadge = async () => {
+    if (!selectedStudentForBadge || !selectedBadgeId) {
+      toast.error('Veuillez sélectionner un étudiant et un badge')
+      return
+    }
+    try {
+      const res = await fetch('/api/badges/assign', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({})
-      });
-
-      const data = await res.json();
-      
-      toast.dismiss('generate');
-      
+        body: JSON.stringify({
+          studentId: selectedStudentForBadge,
+          badgeId: selectedBadgeId
+        })
+      })
+      const data = await res.json()
       if (res.ok) {
-        const isMobile = window.innerWidth <= 768;
-        
-        if (isMobile) {
-          showCodeModal(data.code, data.expiresAt);
-        } else {
-          const codeWindow = window.open('', '_blank');
-          if (codeWindow) {
-            displayCodeInWindow(codeWindow, data.code, data.expiresAt);
-          } else {
-            showCodeModal(data.code, data.expiresAt);
-          }
-        }
-
-        setTimeout(async () => {
-          try {
-            await fetch('/api/code/mark-absent', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ sessionId: data.sessionId })
-            });
-            fetchAllSessions();
-            toast.info('Les absents ont été marqués automatiquement');
-          } catch (error) {
-            console.error('Erreur marquage absents:', error)
-          }
-        }, 5 * 60 * 1000);
-        
-        toast.success('Code généré (valable 5 minutes)');
-        fetchAllSessions();
+        toast.success('Badge attribué avec succès')
+        setShowBadgeModal(false)
+        setSelectedStudentForBadge('')
+        setSelectedBadgeId('')
       } else {
-        toast.error(data.error || 'Erreur lors de la génération');
+        toast.error(data.error || 'Erreur lors de l\'attribution')
       }
     } catch (error) {
-      console.error('Erreur:', error);
-      toast.dismiss('generate');
-      toast.error('Erreur lors de la génération du code');
+      console.error(error)
+      toast.error('Erreur serveur')
     }
-  };
+  }
 
-  const showCodeModal = (code: string, expiresAt: string) => {
+  const handleDeleteStudent = async (studentId: string) => {
+    if (!confirm('⚠️ Voulez-vous vraiment supprimer cet étudiant ? Cette action est irréversible.')) return
+    try {
+      const res = await fetch(`/api/students/${studentId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success('Étudiant supprimé')
+        fetchData()
+        fetchGlobalStats()
+      } else {
+        toast.error(data.error || 'Erreur lors de la suppression')
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('Erreur serveur')
+    }
+  }
+
+  // === FONCTIONS EXISTANTES (génération code, modals, PDF) ===
+  const generateCode = async () => {
+    if (!navigator.geolocation) {
+      toast.error('Géolocalisation non supportée par votre navigateur')
+      return
+    }
+
+    toast.loading('Récupération de votre position...', { id: 'loc' })
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        toast.dismiss('loc')
+        const { latitude, longitude } = position.coords
+
+        try {
+          toast.loading('Génération du code en cours...', { id: 'generate' })
+
+          const res = await fetch('/api/code/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              lat: latitude,
+              lng: longitude,
+              radius: 200
+            })
+          })
+
+          const data = await res.json()
+          toast.dismiss('generate')
+
+          if (res.ok) {
+            const isMobile = window.innerWidth <= 768
+            if (isMobile) {
+              showCodeModal(data.code, data.expiresAt, data.center)
+            } else {
+              const codeWindow = window.open('', '_blank')
+              if (codeWindow) {
+                displayCodeInWindow(codeWindow, data.code, data.expiresAt, data.center)
+              } else {
+                showCodeModal(data.code, data.expiresAt, data.center)
+              }
+            }
+
+            setTimeout(async () => {
+              try {
+                await fetch('/api/code/mark-absent', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ sessionId: data.sessionId })
+                })
+                fetchAllSessions()
+                toast.info('Les absents ont été marqués automatiquement')
+              } catch (error) {
+                console.error('Erreur marquage absents:', error)
+              }
+            }, 5 * 60 * 1000)
+
+            toast.success(`Code généré (valable 5 min, rayon ${data.center.radius}m)`)
+            fetchAllSessions()
+          } else {
+            toast.error(data.error || 'Erreur lors de la génération')
+          }
+        } catch (error) {
+          console.error('Erreur:', error)
+          toast.dismiss('generate')
+          toast.error('Erreur lors de la génération du code')
+        }
+      },
+      (error: GeolocationPositionError) => {
+        toast.dismiss('loc')
+        console.error(error)
+        let message = 'Impossible d’obtenir votre position'
+        if (error.code === error.PERMISSION_DENIED) {
+          message = '❌ Activez la localisation pour générer un code'
+        } else if (error.code === error.TIMEOUT) {
+          message = 'Délai dépassé, vérifiez votre connexion'
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          message = 'Position indisponible, vérifiez vos paramètres GPS'
+        }
+        toast.error(message)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  const showCodeModal = (code: string, expiresAt: string, center?: { lat: number; lng: number; radius: number }) => {
     const expiresAtDate = new Date(expiresAt);
     const expirationLocale = expiresAtDate.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
@@ -583,10 +694,20 @@ export default function SuperAdminDashboard() {
               <span class="text-gray-600">⏰ Expire à :</span>
               <span class="font-bold text-red-600 text-lg">${expirationLocale}</span>
             </div>
+            ${center ? `
+            <div class="flex justify-between items-center py-2 border-b border-gray-200">
+              <span class="text-gray-600">📍 Rayon de validation :</span>
+              <span class="font-bold text-blue-600">${center.radius} mètres</span>
+            </div>
+            <div class="flex justify-between items-center py-2">
+              <span class="text-gray-600">🎯 Position :</span>
+              <span class="font-mono text-sm">${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}</span>
+            </div>
+            ` : ''}
           </div>
           <div class="bg-blue-50 p-4 rounded-xl mb-4">
             <p class="text-sm text-blue-800">
-              📱 Montrez ce code aux étudiants. Ils ont 5 minutes pour l'entrer.
+              📱 Montrez ce code aux étudiants. Ils ont 5 minutes pour l'entrer, et doivent se trouver à moins de ${center?.radius || 200} mètres de votre position.
             </p>
           </div>
           <button onclick="this.closest('.fixed').remove()" 
@@ -603,7 +724,7 @@ export default function SuperAdminDashboard() {
     });
   };
 
-  const displayCodeInWindow = (codeWindow: Window, code: string, expiresAt: string) => {
+  const displayCodeInWindow = (codeWindow: Window, code: string, expiresAt: string, center?: { lat: number; lng: number; radius: number }) => {
     const maintenant = new Date();
     const expiresAtDate = new Date(expiresAt);
     
@@ -720,6 +841,13 @@ export default function SuperAdminDashboard() {
               font-size: 1.3rem;
               font-weight: 800;
             }
+            .radius-info {
+              background: #dbeafe;
+              color: #1e40af;
+              padding: 0.75rem;
+              border-radius: 0.5rem;
+              margin: 1rem 0;
+            }
             .admin-info {
               background: #e0f2fe;
               color: #0369a1;
@@ -766,6 +894,14 @@ export default function SuperAdminDashboard() {
                 <span class="time-value">${heureLocale}</span>
               </div>
             </div>
+
+            ${center ? `
+            <div class="radius-info">
+              <strong>📍 Zone de validation</strong><br/>
+              Rayon de ${center.radius} mètres autour de votre position<br/>
+              <span class="text-xs">(${center.lat.toFixed(5)}, ${center.lng.toFixed(5)})</span>
+            </div>
+            ` : ''}
             
             <div class="admin-info">
               👤 Généré par ${user?.name} (Administrateur)
@@ -776,7 +912,7 @@ export default function SuperAdminDashboard() {
             </p>
             
             <div class="current-time">
-              Les étudiants ont 5 minutes pour entrer ce code
+              Les étudiants doivent se trouver à moins de ${center?.radius || 200} mètres pour valider.
             </div>
           </div>
         </body>
@@ -948,45 +1084,74 @@ export default function SuperAdminDashboard() {
         <ProfileSection user={user} onClose={() => setShowProfile(false)} />
       ) : (
         <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
-          {/* Statistiques globales */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-5 mb-4 sm:mb-8">
-            <Card className="card-hover">
-              <CardContent className="p-4 sm:pt-6">
-                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Total Étudiants</div>
-                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-gray-900">{stats.totalStudents}</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="card-hover">
-              <CardContent className="p-4 sm:pt-6">
-                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Services</div>
-                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-gray-900">{stats.totalServices}</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="card-hover">
-              <CardContent className="p-4 sm:pt-6">
-                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Présents</div>
-                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-green-600">{stats.presentToday}</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="card-hover">
-              <CardContent className="p-4 sm:pt-6">
-                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Baptisés</div>
-                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-blue-600">{stats.baptized}</div>
-              </CardContent>
-            </Card>
+          
+          {/* === NOUVEAU : ANALYSE GLOBALE === */}
+          {globalStats && (
+            <div className="mb-8">
+              <h2 className="text-xl font-bold mb-4">📊 Analyse globale</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <div className="text-3xl font-bold text-indigo-600">{globalStats.globalAttendanceRate}%</div>
+                    <div className="text-sm text-gray-500">Taux de présence global</div>
+                    <div className="text-xs text-gray-400 mt-1">{globalStats.totalAttendance} / {globalStats.expectedAttendance}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <div className="text-3xl font-bold text-green-600">{globalStats.bestService?.rate || 0}%</div>
+                    <div className="text-sm text-gray-500">🏆 Meilleur service</div>
+                    <div className="text-xs text-gray-400 mt-1">{globalStats.bestService?.name || '-'}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <div className="text-3xl font-bold text-red-600">{globalStats.strugglingService?.rate || 0}%</div>
+                    <div className="text-sm text-gray-500">⚠️ Service en difficulté</div>
+                    <div className="text-xs text-gray-400 mt-1">{globalStats.strugglingService?.name || '-'}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <div className="text-3xl font-bold text-blue-600">{globalStats.totalServices}</div>
+                    <div className="text-sm text-gray-500">Services actifs</div>
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <Card>
+                  <CardHeader><CardTitle>Présence par service</CardTitle></CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={globalStats.attendanceByService}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="serviceName" angle={-45} textAnchor="end" height={80} interval={0} />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="rate" fill="#8884d8" name="Taux (%)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle>Évolution mensuelle</CardTitle></CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={globalStats.attendanceOverTime}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="rate" stroke="#10b981" name="Taux (%)" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
 
-            <Card className="card-hover col-span-2 sm:col-span-2 lg:col-span-1">
-              <CardContent className="p-4 sm:pt-6">
-                <div className="text-xs sm:text-sm font-medium text-gray-500 truncate">Progression</div>
-                <div className="mt-1 sm:mt-2 text-xl sm:text-3xl font-semibold text-purple-600">{stats.averageProgress}%</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Section Présence Service - Vue générale avec filtres et export PDF */}
+          {/* Section Présence Service - Vue générale avec filtres et export PDF (inchangée) */}
           <Card className="mb-8">
             <CardHeader className="px-4 sm:px-6 py-4">
               <div className="flex justify-between items-center flex-wrap gap-2">
@@ -1106,7 +1271,7 @@ export default function SuperAdminDashboard() {
             </CardContent>
           </Card>
 
-          {/* Génération de code académique */}
+          {/* Génération de code académique avec géolocalisation */}
           <Card className="mb-8">
             <CardHeader className="px-4 sm:px-6 py-4">
               <CardTitle className="text-base sm:text-lg">🎯 Génération du code de présence académique</CardTitle>
@@ -1117,11 +1282,11 @@ export default function SuperAdminDashboard() {
                   onClick={generateCode}
                   className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-auto py-4 sm:py-6 px-4 sm:px-8 text-base sm:text-lg font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 sm:gap-3"
                 >
-                  <span className="text-xl sm:text-2xl">⏱️</span>
-                  <span>GÉNÉRER LE CODE (5 MIN)</span>
+                  <span className="text-xl sm:text-2xl">📍</span>
+                  <span>GÉNÉRER LE CODE AVEC MA POSITION</span>
                 </Button>
                 <p className="text-xs sm:text-sm text-gray-500 mt-3 text-center">
-                  Les étudiants ont 5 minutes pour entrer ce code
+                  Votre position sera enregistrée. Les étudiants devront être à moins de 200 mètres pour valider.
                 </p>
               </div>
             </CardContent>
@@ -1369,16 +1534,22 @@ export default function SuperAdminDashboard() {
             </Card>
           </div>
 
-          {/* Liste des étudiants */}
+          {/* Liste des étudiants avec bouton Supprimer et Attribution badge */}
           <Card>
             <CardHeader className="px-4 sm:px-6 py-4">
-              <CardTitle className="text-base sm:text-lg">
-                Étudiants
-                {selectedService !== 'all' && ` - ${services.find(s => s.id === selectedService)?.name}`}
-              </CardTitle>
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <CardTitle className="text-base sm:text-lg">
+                  Étudiants
+                  {selectedService !== 'all' && ` - ${services.find(s => s.id === selectedService)?.name}`}
+                </CardTitle>
+                <Button size="sm" onClick={() => setShowBadgeModal(true)} className="bg-yellow-500 hover:bg-yellow-600 text-white">
+                  <TrophyIcon className="w-4 h-4 mr-1" />
+                  Attribuer un badge
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="px-2 sm:px-6">
-              {/* Version mobile : cartes */}
+              {/* Version mobile : cartes avec bouton supprimer */}
               <div className="block lg:hidden space-y-3">
                 {filteredStudents.map((student) => {
                   const studentService = services.find(s => s.id === student.service_id)
@@ -1392,12 +1563,13 @@ export default function SuperAdminDashboard() {
                         <div>Baptême: {student.baptized ? 'Oui' : 'Non'}</div>
                         <div className="col-span-2">Tél: {student.phone || '-'}</div>
                       </div>
+                      <Button variant="outline" size="sm" className="w-full text-red-600 border-red-300" onClick={() => handleDeleteStudent(student.id)}>Supprimer</Button>
                     </div>
                   )
                 })}
               </div>
 
-              {/* Version desktop : tableau */}
+              {/* Version desktop : tableau avec colonne Actions */}
               <div className="hidden lg:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -1408,6 +1580,7 @@ export default function SuperAdminDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Branche</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Baptême</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -1427,6 +1600,9 @@ export default function SuperAdminDashboard() {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">{student.phone || '-'}</td>
+                          <td className="px-6 py-4">
+                            <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteStudent(student.id)}>Supprimer</Button>
+                          </td>
                         </tr>
                       )
                     })}
@@ -1435,6 +1611,35 @@ export default function SuperAdminDashboard() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Modal d'attribution de badge */}
+      {showBadgeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-bold mb-4">Attribuer un badge</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Étudiant</label>
+                <select value={selectedStudentForBadge} onChange={(e) => setSelectedStudentForBadge(e.target.value)} className="w-full p-2 border rounded">
+                  <option value="">Sélectionner un étudiant</option>
+                  {students.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Badge</label>
+                <select value={selectedBadgeId} onChange={(e) => setSelectedBadgeId(e.target.value)} className="w-full p-2 border rounded">
+                  <option value="">Sélectionner un badge</option>
+                  {badgesList.map(b => <option key={b.id} value={b.id}>{b.name} - {b.description}</option>)}
+                </select>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setShowBadgeModal(false)}>Annuler</Button>
+                <Button onClick={assignBadge}>Attribuer</Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
