@@ -22,6 +22,7 @@ export interface Student {
   username: string
   email?: string
   created_at: Date
+  deleted_at?: string | null   // ← Ajout pour la suppression logique
 }
 
 export interface Service {
@@ -117,7 +118,6 @@ export interface Attendance {
   student_lng?: number
   distance?: number
 }
-// ... (contenu existant) ...
 
 // === STATISTIQUES GLOBALES POUR SUPERADMIN ===
 export interface GlobalStats {
