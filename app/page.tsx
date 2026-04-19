@@ -59,7 +59,7 @@ export default function Home() {
               Plateforme de suivie des ouvriers de la Mission évangelique grace abondante (MEGA)
             </div>
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 dark:text-white mb-6">
-              Formez
+              Former
               <span className="gradient-text block mt-2">pour impacter</span>
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-10">

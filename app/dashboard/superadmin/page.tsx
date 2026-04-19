@@ -637,9 +637,9 @@ export default function SuperAdminDashboard() {
               } catch (error) {
                 console.error('Erreur marquage absents:', error)
               }
-            }, 5 * 60 * 1000)
+            }, 15 * 60 * 1000) // ← MODIFIÉ: 5 → 15 minutes
 
-            toast.success(`Code généré (valable 5 min, rayon ${data.center.radius}m)`)
+            toast.success(`Code généré (valable 15 minutes)`) // ← MODIFIÉ
             fetchAllSessions()
           } else {
             toast.error(data.error || 'Erreur lors de la génération')
@@ -687,7 +687,7 @@ export default function SuperAdminDashboard() {
             ${code}
           </div>
           <div class="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full inline-block mb-4">
-            ⏳ Valable 5 minutes
+            ⏳ Valable 15 minutes
           </div>
           <div class="bg-gray-100 p-4 rounded-xl mb-6">
             <div class="flex justify-between items-center py-2 border-b border-gray-200">
@@ -707,7 +707,7 @@ export default function SuperAdminDashboard() {
           </div>
           <div class="bg-blue-50 p-4 rounded-xl mb-4">
             <p class="text-sm text-blue-800">
-              📱 Montrez ce code aux étudiants. Ils ont 5 minutes pour l'entrer, et doivent se trouver à moins de ${center?.radius || 200} mètres de votre position.
+              📱 Montrez ce code aux étudiants. Ils ont 15 minutes pour l'entrer, et doivent se trouver à moins de ${center?.radius || 200} mètres de votre position.
             </p>
           </div>
           <button onclick="this.closest('.fixed').remove()" 
@@ -744,7 +744,7 @@ export default function SuperAdminDashboard() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Code de présence - 5 minutes</title>
+          <title>Code de présence - 15 minutes</title>
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -877,7 +877,7 @@ export default function SuperAdminDashboard() {
         <body>
           <div class="container">
             <div class="universal-badge">🌍 CODE UNIVERSEL</div>
-            <div class="duration">⏳ Valable 5 minutes</div>
+            <div class="duration">⏳ Valable 15 minutes</div>
             <div class="warning">
               ⚠️ Passé ce délai, les absents seront marqués automatiquement
             </div>
@@ -913,6 +913,7 @@ export default function SuperAdminDashboard() {
             
             <div class="current-time">
               Les étudiants doivent se trouver à moins de ${center?.radius || 200} mètres pour valider.
+              Le code expire après 15 minutes.
             </div>
           </div>
         </body>

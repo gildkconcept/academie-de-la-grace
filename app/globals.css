@@ -18,6 +18,35 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* === CORRECTION POUR LES INPUTS === */
+/* Forcer la couleur du texte dans les champs de formulaire */
+input, select, textarea {
+  color: #111827 !important; /* gray-900 en mode clair */
+  background-color: #ffffff !important;
+}
+
+/* En mode sombre, adapter les couleurs */
+@media (prefers-color-scheme: dark) {
+  input, select, textarea {
+    color: #f9fafb !important; /* gray-50 en mode sombre */
+    background-color: #1f2937 !important; /* gray-800 */
+    border-color: #4b5563 !important; /* gray-600 */
+  }
+  
+  /* Placeholder en mode sombre */
+  input::placeholder, textarea::placeholder {
+    color: #9ca3af !important; /* gray-400 */
+  }
+}
+
+/* Pour les selects en mode sombre */
+@media (prefers-color-scheme: dark) {
+  select option {
+    background-color: #1f2937;
+    color: #f9fafb;
+  }
+}
+
 /* Animation pour le scan QR code */
 @keyframes scan {
   0% {

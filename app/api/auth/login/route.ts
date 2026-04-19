@@ -9,12 +9,12 @@ export async function POST(request: Request) {
     console.log('=== TENTATIVE DE CONNEXION ===')
     console.log('Username:', username)
 
-    // Vérifier d'abord dans users (admins/managers)
-    const { data: user, error: userError } = await supabase
+    // Vérifier dans users (admins/managers)
+    const { data: user } = await supabase
       .from('users')
       .select('*')
       .eq('username', username)
-      .maybeSingle()  // ← Remplacer .single() par .maybeSingle()
+      .maybeSingle()
 
     if (user && await comparePassword(password, user.password)) {
       const token = generateToken(user)
@@ -32,12 +32,12 @@ export async function POST(request: Request) {
     }
 
     // Vérifier dans students (uniquement ceux qui ne sont pas supprimés)
-    const { data: student, error: studentError } = await supabase
+    const { data: student } = await supabase
       .from('students')
       .select('id, full_name, username, password, service_id, level, email, phone')
       .eq('username', username)
-      .is('deleted_at', null)
-      .maybeSingle()  // ← Remplacer .single() par .maybeSingle()
+      .is('deleted_at', null)   // ← Ignorer les comptes soft-deleted
+      .maybeSingle()
 
     if (student && await comparePassword(password, student.password)) {
       console.log('📊 Étudiant trouvé - ID:', student.id)

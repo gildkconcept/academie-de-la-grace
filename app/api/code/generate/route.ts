@@ -19,18 +19,19 @@ export async function POST(request: Request) {
       }, { status: 403 })
     }
 
-    // Récupérer la position et le rayon
+    // Récupérer la position et le rayon (optionnels)
     const { lat, lng, radius = 200 } = await request.json()
 
-    if (lat === undefined || lng === undefined) {
-      return NextResponse.json(
-        { error: 'Position GPS requise pour générer un code' },
-        { status: 400 }
-      )
-    }
+    // La position GPS n'est plus obligatoire
+    // if (lat === undefined || lng === undefined) {
+    //   return NextResponse.json(
+    //     { error: 'Position GPS requise pour générer un code' },
+    //     { status: 400 }
+    //   )
+    // }
 
-    // Validation simple des coordonnées
-    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    // Validation des coordonnées si elles sont fournies
+    if (lat !== undefined && (Math.abs(lat) > 90 || Math.abs(lng) > 180)) {
       return NextResponse.json(
         { error: 'Coordonnées invalides' },
         { status: 400 }
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     // Générer un code aléatoire à 6 chiffres
     const code = Math.floor(100000 + Math.random() * 900000).toString()
     
-    // Calculer l'expiration (5 minutes)
+    // Calculer l'expiration (15 minutes au lieu de 5)
     const maintenant = new Date()
     const nowUTC = Date.UTC(
       maintenant.getUTCFullYear(),
@@ -52,13 +53,17 @@ export async function POST(request: Request) {
       maintenant.getUTCMilliseconds()
     )
     
-    const expiresAtUTC = new Date(nowUTC + 5 * 60 * 1000) // +5 minutes
+    const expiresAtUTC = new Date(nowUTC + 15 * 60 * 1000) // +15 minutes
     const today = new Date(nowUTC).toISOString().split('T')[0]
 
-    console.log('🔧 GÉNÉRATION CODE (5 min):')
+    console.log('🔧 GÉNÉRATION CODE (15 min):')
     console.log('Code généré:', code)
-    console.log('Position:', lat, lng)
-    console.log('Rayon:', radius)
+    if (lat !== undefined) {
+      console.log('Position:', lat, lng)
+      console.log('Rayon:', radius)
+    } else {
+      console.log('Position: non spécifiée (aucune contrainte GPS)')
+    }
     console.log('Expire à (UTC):', expiresAtUTC.toISOString())
 
     // Vérifier si le code n'existe pas déjà
@@ -73,18 +78,23 @@ export async function POST(request: Request) {
       return POST(request)
     }
 
-    // Créer une session avec les coordonnées
+    // Créer une session (avec ou sans coordonnées)
+    const sessionData: any = {
+      code: code,
+      expires_at: expiresAtUTC.toISOString(),
+      date: today
+    }
+
+    // Ajouter les coordonnées seulement si fournies
+    if (lat !== undefined && lng !== undefined) {
+      sessionData.lat = lat
+      sessionData.lng = lng
+      sessionData.radius = radius
+    }
+
     const { data: session, error } = await supabase
       .from('sessions')
-      .insert([{
-        code: code,
-        expires_at: expiresAtUTC.toISOString(),
-        date: today,
-        lat: lat,
-        lng: lng,
-        radius: radius
-        // Pas de service_id = code pour tous les services
-      }])
+      .insert([sessionData])
       .select()
       .single()
 
@@ -105,7 +115,7 @@ export async function POST(request: Request) {
       sessionId: session.id,
       expiresAt: session.expires_at,
       isUniversal: true,
-      center: { lat, lng, radius }
+      center: lat !== undefined ? { lat, lng, radius } : null
     })
   } catch (error) {
     console.error('❌ Erreur globale:', error)

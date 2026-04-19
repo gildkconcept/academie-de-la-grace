@@ -185,73 +185,41 @@ export default function StudentDashboard() {
     }
   }
 
-  // === FONCTION MODIFIÉE AVEC GÉOLOCALISATION ===
+  // === FONCTION MODIFIÉE SANS GÉOLOCALISATION ===
   const verifyCode = async () => {
     if (code.length !== 6) {
       toast.error('Le code doit faire 6 chiffres')
       return
     }
 
-    if (!navigator.geolocation) {
-      toast.error('Géolocalisation non supportée par votre navigateur')
-      return
+    setVerifying(true)
+    try {
+      const res = await fetch('/api/code/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ code })
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        toast.success('✅ Présence enregistrée !')
+        setShowCodeInput(false)
+        setCode('')
+        fetchData()
+        fetchBadges() // Rafraîchir les badges après nouvelle présence
+      } else {
+        toast.error(data.error || 'Code invalide')
+      }
+    } catch (error) {
+      console.error('Erreur:', error)
+      toast.error('Erreur lors de la vérification')
+    } finally {
+      setVerifying(false)
     }
-
-    toast.loading('Récupération de votre position...', { id: 'loc' })
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        toast.dismiss('loc')
-        const { latitude, longitude } = position.coords
-
-        setVerifying(true)
-        try {
-          const res = await fetch('/api/code/verify', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({
-              code,
-              lat: latitude,
-              lng: longitude
-            })
-          })
-
-          const data = await res.json()
-
-          if (res.ok) {
-            toast.success(`✅ Présence enregistrée (distance: ${data.distance}m)`)
-            setShowCodeInput(false)
-            setCode('')
-            fetchData()
-            fetchBadges() // Rafraîchir les badges après nouvelle présence
-          } else {
-            toast.error(data.error || 'Code invalide ou hors zone')
-          }
-        } catch (error) {
-          console.error('Erreur:', error)
-          toast.error('Erreur lors de la vérification')
-        } finally {
-          setVerifying(false)
-        }
-      },
-      (error: GeolocationPositionError) => {
-        toast.dismiss('loc')
-        console.error(error)
-        let message = 'Impossible d’obtenir votre position'
-        if (error.code === error.PERMISSION_DENIED) {
-          message = '❌ Vous devez activer la localisation pour valider votre présence'
-        } else if (error.code === error.TIMEOUT) {
-          message = 'Délai dépassé, vérifiez votre connexion'
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          message = 'Position indisponible, vérifiez vos paramètres GPS'
-        }
-        toast.error(message)
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
   }
 
   const calculateProgress = () => {
@@ -612,7 +580,7 @@ export default function StudentDashboard() {
               </button>
             </div>
             <p className="text-xs sm:text-sm text-gray-500 text-center mt-4">
-              ⏰ Le code expire après 5 minutes. Votre position GPS sera vérifiée.
+              ⏰ Le code expire après 15 minutes.
             </p>
           </div>
         </div>

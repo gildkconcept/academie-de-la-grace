@@ -221,7 +221,7 @@ export default function RegisterPage() {
                 value={formData.fullName}
                 onChange={handleChange}
                 placeholder="Gildas koudou"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
               />
             </div>
 
@@ -234,7 +234,7 @@ export default function RegisterPage() {
                 required
                 value={formData.branch}
                 onChange={handleChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
               >
                 <option value="">Sélectionnez une branche</option>
                 {branchesList.map(branch => (
@@ -252,7 +252,7 @@ export default function RegisterPage() {
                 required
                 value={formData.level}
                 onChange={handleChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
               >
                 <option value="1">Niveau 1</option>
                 <option value="2">Niveau 2</option>
@@ -269,7 +269,7 @@ export default function RegisterPage() {
                 required
                 value={formData.serviceId}
                 onChange={handleChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
               >
                 <option value="">Sélectionnez un service</option>
                 {services.map(service => (
@@ -289,7 +289,7 @@ export default function RegisterPage() {
                 required
                 value={formData.baptized}
                 onChange={handleChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
               >
                 <option value="false">Non</option>
                 <option value="true">Oui</option>
@@ -307,7 +307,7 @@ export default function RegisterPage() {
                 value={formData.phone}
                 onChange={handleChange}
                 placeholder="0700000000"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
               />
             </div>
 
@@ -322,7 +322,7 @@ export default function RegisterPage() {
                 minLength={3}
                 value={formData.username}
                 onChange={handleChange}
-                className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 ${
+                className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 ${
                   usernameStatus === 'available' ? 'border-green-500' :
                   usernameStatus === 'taken' ? 'border-red-500' :
                   'border-gray-300'
@@ -373,7 +373,7 @@ export default function RegisterPage() {
                   minLength={6}
                   value={formData.password}
                   onChange={handleChange}
-                  className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 pr-10"
+                  className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 pr-10 text-gray-900"
                   placeholder="Minimum 6 caractères"
                 />
                 <button

@@ -1,6 +1,5 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
-import { supabase } from './supabase'
 
 const JWT_SECRET = process.env.JWT_SECRET!
 
@@ -22,7 +21,7 @@ export function generateToken(user: any) {
   const payload: any = { 
     id: user.id, 
     username: user.username,
-    name: user.name,
+    name: user.name || user.full_name,
     role: user.role,
     serviceId: user.service_id
   }
