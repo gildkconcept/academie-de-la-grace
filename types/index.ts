@@ -186,7 +186,7 @@ export interface Quiz {
   updated_at: string
   questions?: Question[]
   completed?: boolean
-  result?: QuizResult
+  result?: QuizResult | null  // ← Modifié: accepte aussi null
 }
 
 export interface Question {
@@ -228,7 +228,19 @@ export interface QuizResult {
   quiz?: Quiz
 }
 
-export interface QuizWithStatus extends Quiz {
+// QuizWithStatus n'étend plus Quiz pour éviter le conflit
+export interface QuizWithStatus {
+  id: string
+  title: string
+  description?: string
+  level: 1 | 2 | 3
+  start_date: string
+  end_date: string
+  is_active: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
+  questions?: Question[]
   completed: boolean
   result: QuizResult | null
 }
