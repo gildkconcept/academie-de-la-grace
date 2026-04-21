@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { UserCircleIcon, KeyIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
+import { UserCircleIcon, KeyIcon, ArrowLeftIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 
 interface ProfileSectionProps {
   user: any
@@ -14,13 +14,17 @@ interface ProfileSectionProps {
 export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
   const [activeTab, setActiveTab] = useState('profile')
   const [loadingUpdate, setLoadingUpdate] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
   // États pour le profil
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     username: user?.username || '',
     email: user?.email || '',
-    phone: user?.phone || ''
+    phone: user?.phone || '',
+    baptized: user?.baptized === true || user?.baptized === 'true' || false
   })
 
   // États pour le mot de passe
@@ -30,6 +34,12 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
     confirmPassword: ''
   })
 
+  const getRoleLabel = () => {
+    if (user?.role === 'superadmin') return 'Administrateur'
+    if (user?.role === 'service_manager') return 'Responsable de service'
+    return 'Étudiant'
+  }
+
   const handleProfileUpdate = async () => {
     if (!profileData.name || !profileData.username) {
       toast.error('Le nom et le nom d\'utilisateur sont requis')
@@ -38,13 +48,25 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
 
     setLoadingUpdate(true)
     try {
+      const body: any = {
+        name: profileData.name,
+        username: profileData.username,
+        email: profileData.email
+      }
+
+      // Ajouter le téléphone et baptême seulement pour les étudiants
+      if (user?.role === 'student') {
+        body.phone = profileData.phone
+        body.baptized = profileData.baptized
+      }
+
       const res = await fetch('/api/profile/update', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(profileData)
+        body: JSON.stringify(body)
       })
 
       const data = await res.json()
@@ -146,10 +168,11 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">{profileData.name}</h2>
-              <p className="text-sm text-gray-500 capitalize">
-                {user?.role === 'superadmin' ? 'Administrateur' : 'Responsable de service'}
-              </p>
+              <p className="text-sm text-gray-500 capitalize">{getRoleLabel()}</p>
               <p className="text-sm text-gray-500">@{profileData.username}</p>
+              {user?.role === 'student' && (
+                <p className="text-sm text-gray-500 mt-1">Niveau {user?.level || 1}</p>
+              )}
             </div>
           </div>
         </CardContent>
@@ -185,7 +208,7 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
         </button>
       </div>
 
-      {/* Contenu */}
+      {/* Contenu - Profil */}
       {activeTab === 'profile' && (
         <Card>
           <CardHeader>
@@ -205,7 +228,7 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                     type="text"
                     value={profileData.name}
                     onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
                   />
                 </div>
 
@@ -217,7 +240,7 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                     type="text"
                     value={profileData.username}
                     onChange={(e) => setProfileData({ ...profileData, username: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
                   />
                 </div>
 
@@ -229,9 +252,43 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                     type="email"
                     value={profileData.email}
                     onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="exemple@email.com"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
                   />
+                  <p className="text-xs text-gray-400 mt-1">Optionnel</p>
                 </div>
+
+                {/* Section étudiant uniquement */}
+                {user?.role === 'student' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Téléphone
+                      </label>
+                      <input
+                        type="tel"
+                        value={profileData.phone}
+                        onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                        placeholder="0700000000"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Statut de baptême
+                      </label>
+                      <select
+                        value={profileData.baptized ? 'true' : 'false'}
+                        onChange={(e) => setProfileData({ ...profileData, baptized: e.target.value === 'true' })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+                      >
+                        <option value="false">Non baptisé</option>
+                        <option value="true">Baptisé</option>
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="flex justify-end">
@@ -248,6 +305,7 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
         </Card>
       )}
 
+      {/* Contenu - Sécurité (Changement de mot de passe) */}
       {activeTab === 'security' && (
         <Card>
           <CardHeader>
@@ -258,44 +316,92 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
           </CardHeader>
           <CardContent>
             <div className="space-y-6 max-w-md">
+              {/* Mot de passe actuel */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mot de passe actuel
                 </label>
-                <input
-                  type="password"
-                  value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
+                <div className="relative">
+                  <input
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 pr-10"
+                    placeholder="Votre mot de passe actuel"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  >
+                    {showCurrentPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
 
+              {/* Nouveau mot de passe */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Nouveau mot de passe
                 </label>
-                <input
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 pr-10"
+                    placeholder="Minimum 6 caractères"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  >
+                    {showNewPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                  </button>
+                </div>
                 <p className="text-xs text-gray-500 mt-1">Minimum 6 caractères</p>
               </div>
 
+              {/* Confirmation */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Confirmer le nouveau mot de passe
                 </label>
-                <input
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 pr-10"
+                    placeholder="Retapez votre nouveau mot de passe"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
 
-              <div className="flex justify-end">
+              {/* Indicateur de correspondance */}
+              {passwordData.newPassword && passwordData.confirmPassword && (
+                <div className="text-sm">
+                  {passwordData.newPassword === passwordData.confirmPassword ? (
+                    <span className="text-green-600 flex items-center gap-1">
+                      ✅ Les mots de passe correspondent
+                    </span>
+                  ) : (
+                    <span className="text-red-600 flex items-center gap-1">
+                      ❌ Les mots de passe ne correspondent pas
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4">
                 <Button
                   onClick={handlePasswordUpdate}
                   disabled={loadingUpdate}

@@ -101,6 +101,11 @@ export async function POST(request: Request) {
     // Hasher le mot de passe
     const hashedPassword = await hashPassword(password)
 
+    // Convertir la valeur du baptême en booléen (gère string et boolean)
+    const baptizedBoolean = baptized === 'true' || baptized === true
+
+    console.log('📝 Inscription - Baptême reçu:', baptized, 'converti en:', baptizedBoolean)
+
     // Créer l'étudiant
     const { data: student, error } = await supabase
       .from('students')
@@ -113,7 +118,7 @@ export async function POST(request: Request) {
           branch,
           level: levelNumber,
           service_id: serviceId,
-          baptized: baptized === 'true',
+          baptized: baptizedBoolean,  // ← Utilisation de la valeur booléenne convertie
           phone,
           password: hashedPassword
         }

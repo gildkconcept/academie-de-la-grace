@@ -16,7 +16,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const { name, username, email, phone } = await request.json()
+    const { name, username, email, phone, baptized } = await request.json()
 
     // Validation
     if (!name || !username) {
@@ -77,6 +77,10 @@ export async function PUT(request: Request) {
         username,
         email: email || null,
         phone: phone || null
+      }
+      // Ajouter le baptême si fourni (uniquement pour les étudiants)
+      if (baptized !== undefined) {
+        updateData.baptized = baptized === 'true' || baptized === true
       }
     }
 

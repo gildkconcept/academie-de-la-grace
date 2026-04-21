@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ProgressChart } from '@/components/charts'
 import { toast } from 'sonner'
 import { Attendance, Progress, Badge } from '@/types'
+import { StudentQuiz } from '@/components/StudentQuiz'
+import { ProfileSection } from '@/components/ProfileSection'
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -31,9 +33,8 @@ export default function StudentDashboard() {
   const [code, setCode] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
-  const [userLevel, setUserLevel] = useState<number>(1) // État local pour le niveau
+  const [userLevel, setUserLevel] = useState<number>(1)
   
-  // États pour le profil
   const [profileData, setProfileData] = useState({
     name: '',
     username: '',
@@ -42,7 +43,6 @@ export default function StudentDashboard() {
   })
   const [loadingUpdate, setLoadingUpdate] = useState(false)
 
-  // === NOUVEAU : États pour les badges ===
   const [badges, setBadges] = useState<(Badge & { awarded_at?: string })[]>([])
 
   useEffect(() => {
@@ -59,10 +59,9 @@ export default function StudentDashboard() {
       console.log('👤 Utilisateur connecté:', user)
       console.log('📊 Niveau depuis user:', user.level)
       
-      // Récupérer le niveau depuis la base de données pour être sûr
       fetchUserLevel()
       fetchData()
-      fetchBadges() // Charger les badges
+      fetchBadges()
       if (user) {
         setProfileData({
           name: user.name || '',
@@ -124,7 +123,6 @@ export default function StudentDashboard() {
     }
   }
 
-  // === NOUVELLE FONCTION : Récupération des badges de l'étudiant ===
   const fetchBadges = async () => {
     if (!user?.id) return
     try {
@@ -185,7 +183,6 @@ export default function StudentDashboard() {
     }
   }
 
-  // === FONCTION MODIFIÉE SANS GÉOLOCALISATION ===
   const verifyCode = async () => {
     if (code.length !== 6) {
       toast.error('Le code doit faire 6 chiffres')
@@ -210,7 +207,7 @@ export default function StudentDashboard() {
         setShowCodeInput(false)
         setCode('')
         fetchData()
-        fetchBadges() // Rafraîchir les badges après nouvelle présence
+        fetchBadges()
       } else {
         toast.error(data.error || 'Code invalide')
       }
@@ -320,109 +317,7 @@ export default function StudentDashboard() {
       </nav>
 
       {showProfile ? (
-        <div className="max-w-3xl mx-auto py-4 sm:py-6 px-4 sm:px-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PencilSquareIcon className="w-5 h-5" />
-                Modifier mon profil
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="flex items-center justify-center sm:justify-start space-x-4">
-                  <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center">
-                    <span className="text-3xl font-bold text-indigo-600">
-                      {profileData.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{profileData.name}</p>
-                    <p className="text-sm text-gray-500">@{profileData.username}</p>
-                    <p className="text-xs text-gray-400 mt-1">Niveau {currentLevel}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
-                    <input
-                      type="text"
-                      value={profileData.name}
-                      onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nom d'utilisateur</label>
-                    <input
-                      type="text"
-                      value={profileData.username}
-                      onChange={(e) => setProfileData({ ...profileData, username: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                    <input
-                      type="email"
-                      value={profileData.email}
-                      onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
-                    <input
-                      type="tel"
-                      value={profileData.phone}
-                      onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleProfileUpdate}
-                    disabled={loadingUpdate}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                  >
-                    {loadingUpdate ? 'Mise à jour...' : 'Enregistrer'}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* === NOUVEAU : SECTION BADGES === */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrophyIcon className="w-5 h-5 text-yellow-500" />
-                Mes distinctions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {badges.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">Aucun badge obtenu pour le moment. Continuez à participer !</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {badges.map(badge => (
-                    <div key={badge.id} className="border rounded-lg p-4 flex items-start gap-3 bg-gradient-to-r from-yellow-50 to-amber-50">
-                      <div className="text-3xl">🏅</div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{badge.name}</h3>
-                        <p className="text-xs text-gray-600">{badge.description}</p>
-                        <p className="text-xs text-gray-400 mt-1">Obtenu le {new Date(badge.awarded_at!).toLocaleDateString('fr-FR')}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <ProfileSection user={user} onClose={() => setShowProfile(false)} />
       ) : (
         <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
           {/* Statistiques personnelles */}
@@ -463,6 +358,19 @@ export default function StudentDashboard() {
                 name: p.module,
                 progress: p.score
               }))} />
+            </CardContent>
+          </Card>
+
+          {/* Section Quiz */}
+          <Card className="mb-4 sm:mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-xl">📝</span>
+                Quiz bibliques hebdomadaires
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <StudentQuiz />
             </CardContent>
           </Card>
 

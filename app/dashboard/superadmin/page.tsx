@@ -35,6 +35,7 @@ import {
   TrophyIcon
 } from '@heroicons/react/24/outline'
 import { ProfileSection } from '@/components/ProfileSection'
+import { AdminQuiz } from '@/components/AdminQuiz'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -85,6 +86,7 @@ export default function SuperAdminDashboard() {
   const [showBadgeModal, setShowBadgeModal] = useState(false)
   const [selectedStudentForBadge, setSelectedStudentForBadge] = useState<string>('')
   const [selectedBadgeId, setSelectedBadgeId] = useState<string>('')
+  const [showQuizSection, setShowQuizSection] = useState(false)
 
   const toggleProfile = () => {
     setShowProfile(!showProfile)
@@ -1533,6 +1535,20 @@ export default function SuperAdminDashboard() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Section Quiz pour superadmin */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">📝 Quiz bibliques</h2>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowQuizSection(!showQuizSection)}
+              >
+                {showQuizSection ? 'Masquer' : 'Afficher'} la gestion des quiz
+              </Button>
+            </div>
+            {showQuizSection && <AdminQuiz />}
           </div>
 
           {/* Liste des étudiants avec bouton Supprimer et Attribution badge */}

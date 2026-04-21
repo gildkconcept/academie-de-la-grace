@@ -22,7 +22,7 @@ export interface Student {
   username: string
   email?: string
   created_at: Date
-  deleted_at?: string | null   // ← Ajout pour la suppression logique
+  deleted_at?: string | null
 }
 
 export interface Service {
@@ -49,9 +49,9 @@ export interface AcademySession {
   expires_at: string
   created_at: string
   created_by?: string
-  lat: number           // latitude du superadmin
-  lng: number           // longitude
-  radius: number        // rayon en mètres
+  lat: number
+  lng: number
+  radius: number
   session_type?: {
     code: string
     label: string
@@ -65,9 +65,9 @@ export interface AcademyAttendance {
   academy_session_id: string
   status: 'present' | 'absent' | 'late'
   scanned_at: string
-  student_lat?: number   // position de l'étudiant
+  student_lat?: number
   student_lng?: number
-  distance?: number      // distance calculée
+  distance?: number
 }
 
 // Sessions de service (checkbox)
@@ -101,7 +101,6 @@ export interface CrossAttendance {
   academic_present: boolean
 }
 
-// Pour la présence académique (ancien nom, mais on garde la compatibilité)
 export interface Attendance {
   id: string
   student_id: string
@@ -123,8 +122,8 @@ export interface Attendance {
 export interface GlobalStats {
   totalStudents: number
   totalServices: number
-  totalAttendance: number       // nombre total de présences académiques
-  expectedAttendance: number    // nombre total attendu (étudiants × sessions)
+  totalAttendance: number
+  expectedAttendance: number
   globalAttendanceRate: number
   bestService: {
     id: string
@@ -161,7 +160,7 @@ export interface Badge {
   name: string
   description: string
   icon?: string
-  condition_type: 'perfect_attendance' | 'faithful_sunday' | 'disciplined'
+  condition_type: 'perfect_attendance' | 'faithful_sunday' | 'disciplined' | 'perfect_quiz' | 'faithful_quiz'
   condition_value?: string
 }
 
@@ -171,4 +170,65 @@ export interface StudentBadge {
   badge_id: string
   awarded_at: string
   badge?: Badge
+}
+
+// === QUIZ ===
+export interface Quiz {
+  id: string
+  title: string
+  description?: string
+  level: 1 | 2 | 3
+  start_date: string
+  end_date: string
+  is_active: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
+  questions?: Question[]
+  completed?: boolean
+  result?: QuizResult
+}
+
+export interface Question {
+  id: string
+  quiz_id: string
+  question: string
+  option_a: string
+  option_b: string
+  option_c: string
+  option_d: string
+  correct_answer: 'A' | 'B' | 'C' | 'D'
+  order_index: number
+  created_at: string
+}
+
+export interface QuizAnswer {
+  id: string
+  student_id: string
+  quiz_id: string
+  question_id: string
+  selected_answer: 'A' | 'B' | 'C' | 'D' | null
+  is_correct: boolean
+  answered_at: string
+}
+
+export interface QuizResult {
+  id: string
+  student_id: string
+  quiz_id: string
+  score: number
+  total_questions: number
+  percentage: number
+  submitted_at: string
+  student?: {
+    id: string
+    full_name: string
+    username: string
+  }
+  quiz?: Quiz
+}
+
+export interface QuizWithStatus extends Quiz {
+  completed: boolean
+  result: QuizResult | null
 }
