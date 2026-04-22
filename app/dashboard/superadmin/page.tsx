@@ -351,7 +351,7 @@ export default function SuperAdminDashboard() {
         total
       }))
     setPresenceByBranch(topBranches)
-const baptises = studentsData.filter(s => s.baptized === true || s.baptized === 'true').length
+const baptises = studentsData.filter(s => s.baptized === true).length
     const nonBaptises = studentsData.length - baptises
     setBaptismStats([
       { name: 'Baptisés', value: baptises },
