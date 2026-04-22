@@ -984,7 +984,7 @@ export default function ManagerDashboard() {
                       <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2">
                         <div>Niveau {s.level}</div>
                         <div>Branche: {s.branch}</div>
-                       <div>Baptême: {(s.baptized === true || s.baptized === 'true') ? 'Oui' : 'Non'}</div>
+<div>Baptême: {s.baptized ? 'Oui' : 'Non'}</div>
                         <div>Tél: {s.phone || '-'}</div>
                         <div>Taux présence: {member.attendanceRate}%</div>
                         <div>Présence jour: {todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</div>
