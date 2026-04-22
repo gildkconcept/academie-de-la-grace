@@ -97,18 +97,35 @@ export async function GET(request: Request) {
       }
     }
 
-    // Liste détaillée
-    const details = attendances?.map(a => ({
-      id: a.id,
-      studentName: a.students?.full_name || 'N/A',
-      serviceName: serviceMap.get(a.students?.service_id) || a.students?.service_id,
-      level: a.students?.level,
-      branch: a.students?.branch,
-      status: a.status === 'present' ? 'Présent' : a.status === 'late' ? 'Retard' : 'Absent',
-      method: a.method === 'code' ? 'Code' : 'Manuel',
-      date: a.service_sessions?.date,
-      hasPhone: a.students?.has_phone
-    })) || []
+    // Liste détaillée - correction de l'accès aux propriétés
+    const details = attendances?.map(a => {
+      // Récupérer les données de l'étudiant depuis la jointure
+      const studentData = a.students as unknown as {
+        id: string
+        full_name: string
+        branch: string
+        level: number
+        service_id: string
+      }
+      const sessionData = a.service_sessions as unknown as {
+        id: string
+        service_id: string
+        date: string
+        type: string
+      }
+
+      return {
+        id: a.id,
+        studentName: studentData?.full_name || 'N/A',
+        serviceName: serviceMap.get(studentData?.service_id) || studentData?.service_id,
+        level: studentData?.level,
+        branch: studentData?.branch,
+        status: a.status === 'present' ? 'Présent' : a.status === 'late' ? 'Retard' : 'Absent',
+        method: a.method === 'code' ? 'Code' : 'Manuel',
+        date: sessionData?.date,
+        hasPhone: false
+      }
+    }) || []
 
     return NextResponse.json({ stats, details })
   } catch (error) {
