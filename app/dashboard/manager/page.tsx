@@ -159,12 +159,12 @@ export default function ManagerDashboard() {
           ? progressData.reduce((acc, p) => acc + (p.score || 0), 0) / progressData.length 
           : 0
 
-        setStats({
-          totalStudents: studentsData.length,
-          presentToday: attendanceData?.filter(a => a.status === 'present').length || 0,
-          baptized: studentsData.filter(s => s.baptized).length,
-          averageProgress: Math.round(avgProgress)
-        })
+       setStats({
+  totalStudents: studentsData.length,
+  presentToday: attendanceData?.filter(a => a.status === 'present').length || 0,
+  baptized: studentsData.filter(s => s.baptized === true || s.baptized === 'true').length,
+  averageProgress: Math.round(avgProgress)
+})
       }
     } catch (error) {
       console.error('Erreur:', error)
@@ -567,9 +567,9 @@ export default function ManagerDashboard() {
       else if (type === 'absent') filteredStudents = sessionStudentsData.filter((s: any) => s.status === 'absent')
 
       const tableData = filteredStudents.map((student: any) => [
-        student.name,
-        student.status === 'present' ? '✓ Présent' : '✗ Absent'
-      ])
+  student.name || 'N/A',
+  student.status === 'present' ? 'Présent' : 'Absent'
+])
 
       autoTable(doc, {
         head: [['Nom', 'Statut']],
@@ -984,7 +984,7 @@ export default function ManagerDashboard() {
                       <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2">
                         <div>Niveau {s.level}</div>
                         <div>Branche: {s.branch}</div>
-                        <div>Baptême: {s.baptized ? 'Oui' : 'Non'}</div>
+                       <div>Baptême: {(s.baptized === true || s.baptized === 'true') ? 'Oui' : 'Non'}</div>
                         <div>Tél: {s.phone || '-'}</div>
                         <div>Taux présence: {member.attendanceRate}%</div>
                         <div>Présence jour: {todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</div>

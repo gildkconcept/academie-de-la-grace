@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Présence déjà enregistrée' }, { status: 400 })
     }
 
-    // Enregistrer la présence
+    // Enregistrer la présence avec la méthode 'code'
     const today = new Date().toISOString().split('T')[0]
     const { error: attendanceError } = await supabase
       .from('attendance')
@@ -71,7 +71,8 @@ export async function POST(request: Request) {
         session_id: session.id,
         status: 'present',
         date: today,
-        scanned_at: new Date().toISOString()
+        scanned_at: new Date().toISOString(),
+        method: 'code'  // ← AJOUT : indique que la présence a été validée par code
       }])
 
     if (attendanceError) {
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erreur lors de l\'enregistrement' }, { status: 500 })
     }
 
-    console.log('✅ Présence enregistrée')
+    console.log('✅ Présence enregistrée avec méthode "code"')
     return NextResponse.json({ success: true, message: 'Présence enregistrée avec succès' })
     
   } catch (error) {

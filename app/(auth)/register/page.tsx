@@ -37,7 +37,8 @@ export default function RegisterPage() {
     baptized: 'false',
     phone: '',
     username: '',
-    password: ''
+    password: '',
+    maisonGrace: ''
   })
 
   useEffect(() => {
@@ -119,7 +120,8 @@ export default function RegisterPage() {
           baptized: formData.baptized === 'true',
           phone: formData.phone,
           username: formData.username,
-          password: formData.password
+          password: formData.password,
+          maisonGrace: formData.maisonGrace
         })
       })
 
@@ -309,6 +311,22 @@ export default function RegisterPage() {
                 placeholder="0700000000"
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
               />
+            </div>
+
+            {/* Maison de grâce - champ texte libre */}
+            <div>
+              <label htmlFor="maisonGrace" className="block text-sm font-medium text-gray-700">
+                Maison de grâce
+              </label>
+              <input
+                type="text"
+                name="maisonGrace"
+                value={formData.maisonGrace}
+                onChange={handleChange}
+                placeholder="Ex: Abobo n'dotré, Magasin, Azito felin, etc."
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+              />
+              <p className="text-xs text-gray-400 mt-1">Optionnel - Indiquez votre maison de grâce</p>
             </div>
 
             <div>

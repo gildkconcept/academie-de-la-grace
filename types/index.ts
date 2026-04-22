@@ -9,6 +9,7 @@ export interface User {
   email?: string
   phone?: string
   level?: 1 | 2 | 3
+  maisonGrace?: string  
 }
 
 export interface Student {
@@ -23,6 +24,7 @@ export interface Student {
   email?: string
   created_at: Date
   deleted_at?: string | null
+  maison_grace?: string
 }
 
 export interface Service {
@@ -108,6 +110,8 @@ export interface Attendance {
   status: 'present' | 'absent' | 'late'
   scanned_at?: Date
   date: Date
+  method?: 'code' | 'manual'
+  marked_by?: string
   sessions?: {
     code: string
     date: string
@@ -186,7 +190,7 @@ export interface Quiz {
   updated_at: string
   questions?: Question[]
   completed?: boolean
-  result?: QuizResult | null  // ← Modifié: accepte aussi null
+  result?: QuizResult | null
 }
 
 export interface Question {
@@ -228,7 +232,6 @@ export interface QuizResult {
   quiz?: Quiz
 }
 
-// QuizWithStatus n'étend plus Quiz pour éviter le conflit
 export interface QuizWithStatus {
   id: string
   title: string

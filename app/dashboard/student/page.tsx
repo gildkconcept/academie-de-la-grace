@@ -268,6 +268,11 @@ export default function StudentDashboard() {
                 <AcademicCapIcon className="w-4 h-4" />
                 Niveau {currentLevel}
               </div>
+              {user?.maisonGrace && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                  🏠 {user.maisonGrace}
+                </div>
+              )}
               <Button
                 onClick={() => setShowProfile(!showProfile)}
                 variant="outline"
@@ -301,6 +306,11 @@ export default function StudentDashboard() {
                 <AcademicCapIcon className="w-4 h-4 text-indigo-600" />
                 <span className="text-sm text-indigo-600">Niveau {currentLevel}</span>
               </div>
+              {user?.maisonGrace && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-lg">
+                  <span className="text-sm text-green-600">🏠 {user.maisonGrace}</span>
+                </div>
+              )}
               <button
                 onClick={() => {
                   setShowProfile(!showProfile)

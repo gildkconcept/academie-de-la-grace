@@ -19,10 +19,7 @@ export async function POST(request: Request) {
     const { sessionId, attendances } = await request.json()
 
     if (!sessionId || !attendances) {
-      return NextResponse.json(
-        { error: 'Données manquantes' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
     }
 
     // Vérifier la session
@@ -33,27 +30,21 @@ export async function POST(request: Request) {
       .single()
 
     if (sessionError || !session) {
-      return NextResponse.json(
-        { error: 'Session non trouvée' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Session non trouvée' }, { status: 404 })
     }
 
-    // Vérifier que le manager a le droit sur cette session
+    // Vérifier les droits (manager ou superadmin)
     if (user.role === 'service_manager' && session.service_id !== user.serviceId) {
-      return NextResponse.json(
-        { error: 'Accès refusé à cette session' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
-    // Enregistrer les présences avec la méthode 'manual'
+    // Préparer les enregistrements
     const records = attendances.map((a: any) => ({
       student_id: a.studentId,
       service_session_id: sessionId,
       status: a.status,
-      method: 'manual',  // ← AJOUT : indique que la présence a été marquée manuellement
-      marked_by: user.id  // ← AJOUT : trace qui a fait le marquage
+      method: 'manual',
+      marked_by: user.id
     }))
 
     const { error: insertError } = await supabase
@@ -62,10 +53,7 @@ export async function POST(request: Request) {
 
     if (insertError) {
       console.error('Erreur enregistrement:', insertError)
-      return NextResponse.json(
-        { error: 'Erreur lors de l\'enregistrement' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Erreur lors de l\'enregistrement' }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -74,9 +62,6 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('Erreur:', error)
-    return NextResponse.json(
-      { error: 'Erreur serveur' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }

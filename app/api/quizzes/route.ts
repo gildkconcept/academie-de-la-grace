@@ -18,7 +18,6 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const quizId = searchParams.get('id')
-    const level = searchParams.get('level')
 
     // Récupérer un quiz spécifique avec ses questions
     if (quizId) {
@@ -52,8 +51,20 @@ export async function GET(request: Request) {
       .gte('end_date', today)
       .order('created_at', { ascending: false })
 
-    if (user.role === 'student' && level) {
-      query = query.eq('level', parseInt(level))
+    // FILTRAGE PAR NIVEAU POUR LES ÉTUDIANTS
+    if (user.role === 'student') {
+      // Récupérer le niveau de l'étudiant depuis la base de données
+      const { data: student } = await supabase
+        .from('students')
+        .select('level')
+        .eq('id', user.id)
+        .single()
+      
+      const studentLevel = student?.level || 1
+      console.log('📚 ÉTUDIANT connecté - Niveau:', studentLevel)
+      
+      // Filtrer les quizzes par le niveau de l'étudiant
+      query = query.eq('level', studentLevel)
     }
 
     const { data: quizzes, error } = await query

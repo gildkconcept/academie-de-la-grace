@@ -29,7 +29,8 @@ export function useAuth() {
               serviceId: data.user.serviceId,
               email: data.user.email || '',
               phone: data.user.phone || '',
-              level: data.user.level || 1
+              level: data.user.level || 1,
+              maisonGrace: data.user.maisonGrace || null  // ← AJOUT
             })
           } else {
             localStorage.removeItem('token')

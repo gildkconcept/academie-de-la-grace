@@ -18,6 +18,7 @@ import {
   LineChart,
   Line
 } from '@/components/charts'
+import { AttendanceStatsView } from '@/components/AttendanceStatsView'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
@@ -350,8 +351,7 @@ export default function SuperAdminDashboard() {
         total
       }))
     setPresenceByBranch(topBranches)
-
-    const baptises = studentsData.filter(s => s.baptized).length
+const baptises = studentsData.filter(s => s.baptized === true || s.baptized === 'true').length
     const nonBaptises = studentsData.length - baptises
     setBaptismStats([
       { name: 'Baptisés', value: baptises },
@@ -1294,7 +1294,7 @@ export default function SuperAdminDashboard() {
               </div>
             </CardContent>
           </Card>
-
+          
           {/* Filtres avancés */}
           <div className="lg:hidden mb-4">
             <Button

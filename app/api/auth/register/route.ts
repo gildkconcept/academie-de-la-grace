@@ -42,7 +42,7 @@ function extractFirstAndLastName(fullName: string): { prenom: string; nom: strin
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { fullName, branch, level, serviceId, baptized, phone, username: userProvidedUsername, password } = body
+    const { fullName, branch, level, serviceId, baptized, phone, username: userProvidedUsername, password, maisonGrace } = body
 
     // Validation du niveau (1, 2 ou 3)
     const levelNumber = parseInt(level)
@@ -105,6 +105,7 @@ export async function POST(request: Request) {
     const baptizedBoolean = baptized === 'true' || baptized === true
 
     console.log('📝 Inscription - Baptême reçu:', baptized, 'converti en:', baptizedBoolean)
+    console.log('📝 Maison de grâce:', maisonGrace || 'non spécifiée')
 
     // Créer l'étudiant
     const { data: student, error } = await supabase
@@ -118,9 +119,10 @@ export async function POST(request: Request) {
           branch,
           level: levelNumber,
           service_id: serviceId,
-          baptized: baptizedBoolean,  // ← Utilisation de la valeur booléenne convertie
+          baptized: baptizedBoolean,
           phone,
-          password: hashedPassword
+          password: hashedPassword,
+          maison_grace: maisonGrace || null  // ← AJOUT : maison de grâce (optionnel)
         }
       ])
       .select()
