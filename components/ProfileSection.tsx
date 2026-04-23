@@ -24,7 +24,8 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
     username: user?.username || '',
     email: user?.email || '',
     phone: user?.phone || '',
-    baptized: user?.baptized === true || user?.baptized === 'true' || false
+    baptized: user?.baptized === true || user?.baptized === 'true' || false,
+    maisonGrace: user?.maisonGrace || ''  // ← AJOUT
   })
 
   // États pour le mot de passe
@@ -54,10 +55,11 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
         email: profileData.email
       }
 
-      // Ajouter le téléphone et baptême seulement pour les étudiants
+      // Ajouter le téléphone, baptême et maisonGrace seulement pour les étudiants
       if (user?.role === 'student') {
         body.phone = profileData.phone
         body.baptized = profileData.baptized
+        body.maisonGrace = profileData.maisonGrace  // ← AJOUT
       }
 
       const res = await fetch('/api/profile/update', {
@@ -171,7 +173,12 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
               <p className="text-sm text-gray-500 capitalize">{getRoleLabel()}</p>
               <p className="text-sm text-gray-500">@{profileData.username}</p>
               {user?.role === 'student' && (
-                <p className="text-sm text-gray-500 mt-1">Niveau {user?.level || 1}</p>
+                <>
+                  <p className="text-sm text-gray-500 mt-1">Niveau {user?.level || 1}</p>
+                  {profileData.maisonGrace && (
+                    <p className="text-sm text-gray-500">🏠 Maison de grâce: {profileData.maisonGrace}</p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -286,6 +293,21 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                         <option value="false">Non baptisé</option>
                         <option value="true">Baptisé</option>
                       </select>
+                    </div>
+
+                    {/* Maison de grâce - champ modifiable */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Maison de grâce
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.maisonGrace}
+                        onChange={(e) => setProfileData({ ...profileData, maisonGrace: e.target.value })}
+                        placeholder="Ex: Abobo N'dotré,Azito Felin"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Optionnel - Indiquez votre maison de grâce</p>
                     </div>
                   </>
                 )}

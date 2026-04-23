@@ -36,22 +36,32 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
-    // Récupérer les présences
+    // Récupérer les présences avec la méthode
     const { data: attendances } = await supabase
       .from('service_attendance')
-      .select('student_id, status')
+      .select('student_id, status, method')
       .eq('service_session_id', session.id)
 
+    const attendanceMap = new Map(attendances?.map(a => [a.student_id, { status: a.status, method: a.method }]))
+
+    // Récupérer tous les étudiants du service avec leur téléphone
     const { data: students } = await supabase
       .from('students')
-      .select('id, full_name')
+      .select('id, full_name, phone, has_phone')
       .eq('service_id', session.service_id)
+      .is('deleted_at', null)
 
-    const studentList = (students || []).map(student => ({
-      id: student.id,
-      name: student.full_name,
-      status: attendances?.find(a => a.student_id === student.id)?.status || 'absent'
-    }))
+    const studentList = (students || []).map(student => {
+      const attendance = attendanceMap.get(student.id)
+      return {
+        id: student.id,
+        name: student.full_name,
+        phone: student.phone || '-',
+        hasPhone: student.has_phone !== undefined ? student.has_phone : (student.phone ? true : false),
+        status: attendance?.status || 'absent',
+        method: attendance?.method || null
+      }
+    })
 
     return NextResponse.json({ session, students: studentList })
   } catch (error) {

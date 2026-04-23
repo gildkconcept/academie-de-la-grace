@@ -16,7 +16,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const { name, username, email, phone, baptized } = await request.json()
+    const { name, username, email, phone, baptized, maisonGrace } = await request.json()  // ← AJOUT maisonGrace
 
     // Validation
     if (!name || !username) {
@@ -81,6 +81,10 @@ export async function PUT(request: Request) {
       // Ajouter le baptême si fourni (uniquement pour les étudiants)
       if (baptized !== undefined) {
         updateData.baptized = baptized === 'true' || baptized === true
+      }
+      // Ajouter la maison de grâce si fournie (uniquement pour les étudiants)
+      if (maisonGrace !== undefined) {
+        updateData.maison_grace = maisonGrace || null  // ← AJOUT maison_grace
       }
     }
 

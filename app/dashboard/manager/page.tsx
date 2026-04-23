@@ -26,6 +26,7 @@ import { AddStudentModal } from '@/components/AddStudentModal'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts'
+import { SessionHistory } from '@/components/SessionHistory'
 
 export default function ManagerDashboard() {
   const { user, loading, logout } = useAuth()
@@ -66,7 +67,7 @@ export default function ManagerDashboard() {
   const [sessionTypes, setSessionTypes] = useState<any[]>([])
   const [selectedType, setSelectedType] = useState<string>('')
 
-  // === NOUVEAU : Dashboard service ===
+  // Dashboard service
   const [serviceStats, setServiceStats] = useState<{
     totalMembers: number;
     averageAttendanceRate: number;
@@ -80,11 +81,13 @@ export default function ManagerDashboard() {
     setShowProfile(!showProfile)
     setMobileMenuOpen(false)
   }
+  
+  const [showHistory, setShowHistory] = useState(false)
 
   const handleStudentAdded = () => {
     fetchData()
     fetchCurrentSession()
-    fetchServiceStats() // rafraîchir les stats
+    fetchServiceStats()
   }
 
   useEffect(() => {
@@ -103,7 +106,7 @@ export default function ManagerDashboard() {
       fetchSessions()
       fetchCurrentSession()
       fetchSessionTypes()
-      fetchServiceStats() // charger les stats du service
+      fetchServiceStats()
     }
   }, [user, loading])
 
@@ -130,7 +133,7 @@ export default function ManagerDashboard() {
         .from('students')
         .select('*')
         .eq('service_id', user?.serviceId)
-        .is('deleted_at', null) // ← exclure les supprimés
+        .is('deleted_at', null)
 
       if (studentsError) throw studentsError
 
@@ -159,12 +162,12 @@ export default function ManagerDashboard() {
           ? progressData.reduce((acc, p) => acc + (p.score || 0), 0) / progressData.length 
           : 0
 
-       setStats({
-  totalStudents: studentsData.length,
-  presentToday: attendanceData?.filter(a => a.status === 'present').length || 0,
-  baptized: studentsData.filter(s => s.baptized === true || s.baptized === 'true').length,
-  averageProgress: Math.round(avgProgress)
-})
+        setStats({
+          totalStudents: studentsData.length,
+          presentToday: attendanceData?.filter(a => a.status === 'present').length || 0,
+          baptized: studentsData.filter(s => s.baptized === true || s.baptized === 'true').length,
+          averageProgress: Math.round(avgProgress)
+        })
       }
     } catch (error) {
       console.error('Erreur:', error)
@@ -248,11 +251,9 @@ export default function ManagerDashboard() {
     }
   }
 
-  // === NOUVELLE FONCTION : Récupérer les statistiques du service ===
   const fetchServiceStats = async () => {
     if (!user?.serviceId) return
     try {
-      // Récupérer tous les étudiants du service (non supprimés)
       const { data: studentsData } = await supabase
         .from('students')
         .select('*')
@@ -264,7 +265,6 @@ export default function ManagerDashboard() {
         return
       }
 
-      // Récupérer toutes les sessions académiques du service
       const { data: sessionsData } = await supabase
         .from('sessions')
         .select('id')
@@ -272,7 +272,6 @@ export default function ManagerDashboard() {
       
       const totalSessions = sessionsData?.length || 0
 
-      // Pour chaque étudiant, compter ses présences
       const studentAttendanceRates = await Promise.all(studentsData.map(async (student) => {
         const { data: attendances } = await supabase
           .from('attendance')
@@ -334,7 +333,7 @@ export default function ManagerDashboard() {
         toast.success(`Session ${sessionTypes.find(t => t.code === selectedType)?.label} démarrée`)
         setSelectedType('')
         fetchCurrentSession()
-        fetchServiceStats() // rafraîchir stats
+        fetchServiceStats()
       } else {
         toast.error(data.error || 'Erreur lors du démarrage')
       }
@@ -389,7 +388,7 @@ export default function ManagerDashboard() {
       if (res.ok) {
         toast.success('Présences enregistrées')
         fetchCurrentSession()
-        fetchServiceStats() // rafraîchir stats
+        fetchServiceStats()
       } else {
         toast.error(data.error || 'Erreur')
       }
@@ -456,7 +455,6 @@ export default function ManagerDashboard() {
     }
   }
 
-  // Générer PDF pour une session académique spécifique
   const generateAcademicPDF = async (type: 'all' | 'present' | 'absent') => {
     if (selectedSession === 'today') {
       toast.error('Veuillez sélectionner une séance académique')
@@ -507,7 +505,6 @@ export default function ManagerDashboard() {
     }
   }
 
-  // Générer PDF pour une session service spécifique (avec type de culte)
   const generateServicePDF = async (type: 'all' | 'present' | 'absent', session?: ServiceSession) => {
     const targetSession = session || serviceSession
     
@@ -567,9 +564,9 @@ export default function ManagerDashboard() {
       else if (type === 'absent') filteredStudents = sessionStudentsData.filter((s: any) => s.status === 'absent')
 
       const tableData = filteredStudents.map((student: any) => [
-  student.name || 'N/A',
-  student.status === 'present' ? 'Présent' : 'Absent'
-])
+        student.name || 'N/A',
+        student.status === 'present' ? 'Présent' : 'Absent'
+      ])
 
       autoTable(doc, {
         head: [['Nom', 'Statut']],
@@ -592,7 +589,6 @@ export default function ManagerDashboard() {
     }
   }
 
-  // === NOUVELLE FONCTION : Supprimer un étudiant ===
   const handleDeleteStudent = async (studentId: string) => {
     if (!confirm('⚠️ Voulez-vous vraiment supprimer cet étudiant ? Cette action est irréversible.')) return
     try {
@@ -603,8 +599,8 @@ export default function ManagerDashboard() {
       const data = await res.json()
       if (res.ok) {
         toast.success('Étudiant supprimé')
-        fetchData()           // rafraîchir la liste
-        fetchServiceStats()   // rafraîchir les stats
+        fetchData()
+        fetchServiceStats()
       } else {
         toast.error(data.error || 'Erreur lors de la suppression')
       }
@@ -639,7 +635,7 @@ export default function ManagerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100 pb-20">
-      {/* Barre de navigation responsive (identique) */}
+      {/* Barre de navigation responsive */}
       <nav className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -660,6 +656,7 @@ export default function ManagerDashboard() {
               )}
             </div>
 
+            {/* Boutons desktop */}
             <div className="hidden lg:flex items-center gap-3">
               {!showProfile && (
                 <Button onClick={() => setShowAddStudentModal(true)} variant="outline" size="sm">
@@ -667,6 +664,13 @@ export default function ManagerDashboard() {
                   Ajouter
                 </Button>
               )}
+              <Button
+                onClick={() => setShowHistory(!showHistory)}
+                variant="outline"
+                size="sm"
+              >
+                {showHistory ? 'Masquer' : 'Afficher'} l'historique
+              </Button>
               <Button onClick={toggleProfile} variant="outline" size="sm">
                 <UserCircleIcon className="w-4 h-4 mr-1" />
                 {showProfile ? 'Tableau de bord' : 'Profil'}
@@ -728,7 +732,7 @@ export default function ManagerDashboard() {
       ) : (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           
-          {/* === NOUVEAU : Dashboard service === */}
+          {/* Dashboard service */}
           {serviceStats && (
             <Card className="mb-6">
               <CardHeader className="px-4 py-3">
@@ -778,7 +782,19 @@ export default function ManagerDashboard() {
             </Card>
           )}
 
-          {/* Section Présence Service (inchangée) */}
+          {/* Section Historique des sessions */}
+          {showHistory && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>📋 Historique des sessions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SessionHistory userRole={user?.role || 'service_manager'} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Section Présence Service */}
           <Card className="mb-6">
             <CardHeader className="px-4 py-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -913,7 +929,7 @@ export default function ManagerDashboard() {
             </CardContent>
           </Card>
 
-          {/* Statistiques rapides (cartes) */}
+          {/* Statistiques rapides */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <Card><CardContent className="p-3 text-center"><div className="text-xs text-gray-500">Total</div><div className="text-xl font-bold">{stats.totalStudents}</div></CardContent></Card>
             <Card><CardContent className="p-3 text-center"><div className="text-xs text-gray-500">Présents service</div><div className="text-xl font-bold text-green-600">{presentCount}</div></CardContent></Card>
@@ -959,13 +975,13 @@ export default function ManagerDashboard() {
             </CardContent>
           </Card>
 
-          {/* Graphiques (inchangés) */}
+          {/* Graphiques */}
           <div className="grid grid-cols-1 gap-6 mb-6">
             <Card><CardHeader><CardTitle className="text-base">Présences par mois</CardTitle></CardHeader><CardContent><AttendanceChart data={[{ month: 'Jan', presents: 65 }, { month: 'Fév', presents: 59 }, { month: 'Mar', presents: 80 }, { month: 'Avr', presents: 81 }, { month: 'Mai', presents: 56 }, { month: 'Juin', presents: 55 }]} /></CardContent></Card>
             <Card><CardHeader><CardTitle className="text-base">Répartition Baptême</CardTitle></CardHeader><CardContent><CustomPieChart data={[{ name: 'Baptisés', value: stats.baptized }, { name: 'Non baptisés', value: stats.totalStudents - stats.baptized }]} /></CardContent></Card>
           </div>
 
-          {/* Liste des membres améliorée : ajout du taux de présence, statut actif/inactif, bouton supprimer */}
+          {/* Liste des membres */}
           <Card>
             <CardHeader><CardTitle className="text-base">Membres du service</CardTitle></CardHeader>
             <CardContent className="px-2">
@@ -984,7 +1000,7 @@ export default function ManagerDashboard() {
                       <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2">
                         <div>Niveau {s.level}</div>
                         <div>Branche: {s.branch}</div>
-<div>Baptême: {s.baptized ? 'Oui' : 'Non'}</div>
+                        <div>Baptême: {s.baptized ? 'Oui' : 'Non'}</div>
                         <div>Tél: {s.phone || '-'}</div>
                         <div>Taux présence: {member.attendanceRate}%</div>
                         <div>Présence jour: {todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</div>
@@ -1039,7 +1055,7 @@ export default function ManagerDashboard() {
         </div>
       )}
 
-      {/* Modal historique (inchangé) */}
+      {/* Modal historique */}
       {showHistoryModal && selectedStudent && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-auto p-4">
