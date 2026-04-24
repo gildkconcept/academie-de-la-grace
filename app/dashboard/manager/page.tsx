@@ -19,7 +19,8 @@ import {
   FunnelIcon,
   ArrowRightOnRectangleIcon,
   DocumentArrowDownIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline'
 import { ProfileSection } from '@/components/ProfileSection'
 import { AddStudentModal } from '@/components/AddStudentModal'
@@ -633,6 +634,8 @@ export default function ManagerDashboard() {
 
   if (!user) return null
 
+  const currentLevel = user?.level || 1
+
   return (
     <div className="min-h-screen bg-gray-100 pb-20">
       {/* Barre de navigation responsive */}
@@ -685,37 +688,52 @@ export default function ManagerDashboard() {
             </button>
           </div>
 
+          {/* Menu mobile — VERSION MISE À JOUR */}
           {mobileMenuOpen && (
-            <div className="lg:hidden border-t border-gray-200 py-3 space-y-2">
-              {!showProfile && (
+            <div className="lg:hidden border-t border-gray-200 bg-white">
+              <div className="px-4 py-3 space-y-2">
+                <p className="text-sm text-gray-600 pb-2 border-b">Connecté en tant que {user.name}</p>
+          
+                {!showProfile && (
+                  <button
+                    onClick={() => {
+                      setShowAddStudentModal(true)
+                      setMobileMenuOpen(false)
+                    }}
+                    className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
+                  >
+                    <UserPlusIcon className="w-5 h-5 mr-3" />
+                    Ajouter un étudiant
+                  </button>
+                )}
                 <button
                   onClick={() => {
-                    setShowAddStudentModal(true)
+                    setShowHistory(!showHistory)
                     setMobileMenuOpen(false)
                   }}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-gray-700 hover:bg-indigo-50 rounded-md"
+                  className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
                 >
-                  <UserPlusIcon className="w-5 h-5" />
-                  <span>Ajouter un étudiant</span>
+                  <CalendarIcon className="w-5 h-5 mr-3" />
+                  {showHistory ? 'Masquer' : 'Afficher'} l'historique
                 </button>
-              )}
-              <button
-                onClick={() => {
-                  toggleProfile()
-                  setMobileMenuOpen(false)
-                }}
-                className="flex w-full items-center gap-3 px-3 py-2 text-gray-700 hover:bg-indigo-50 rounded-md"
-              >
-                <UserCircleIcon className="w-5 h-5" />
-                <span>{showProfile ? 'Tableau de bord' : 'Mon profil'}</span>
-              </button>
-              <button
-                onClick={logout}
-                className="flex w-full items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-md"
-              >
-                <ArrowRightOnRectangleIcon className="w-5 h-5" />
-                <span>Déconnexion</span>
-              </button>
+                <button
+                  onClick={() => {
+                    setShowProfile(!showProfile)
+                    setMobileMenuOpen(false)
+                  }}
+                  className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
+                >
+                  <UserCircleIcon className="w-5 h-5 mr-3" />
+                  {showProfile ? 'Tableau de bord' : 'Mon profil'}
+                </button>
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" />
+                  Déconnexion
+                </button>
+              </div>
             </div>
           )}
         </div>
