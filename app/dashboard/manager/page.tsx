@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Student, Attendance, ServiceSession } from '@/types'
 import { generateAttendancePDF } from '@/lib/pdf-generator'
+import { NotificationBell } from '@/components/NotificationBell'
 import { 
   UserCircleIcon, 
   UserPlusIcon, 
@@ -792,6 +793,8 @@ export default function ManagerDashboard() {
                   Ajouter
                 </Button>
               )}
+              {/* 🔔 Cloche de notifications */}
+              <NotificationBell />
               <Button
                 onClick={() => setShowHistory(!showHistory)}
                 variant="outline"
@@ -808,9 +811,14 @@ export default function ManagerDashboard() {
               </Button>
             </div>
 
-            <button onClick={logout} className="lg:hidden p-2 text-red-600 hover:bg-red-50 rounded-full">
-              <ArrowRightOnRectangleIcon className="w-5 h-5" />
-            </button>
+            {/* Boutons mobile */}
+            <div className="flex items-center gap-2 lg:hidden">
+              {/* 🔔 Cloche de notifications mobile */}
+              <NotificationBell />
+              <button onClick={logout} className="p-2 text-red-600 hover:bg-red-50 rounded-full">
+                <ArrowRightOnRectangleIcon className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Menu mobile */}
@@ -863,6 +871,9 @@ export default function ManagerDashboard() {
           )}
         </div>
       </nav>
+
+      {/* ... LE RESTE DU CODE RESTE IDENTIQUE ... */}
+      {/* (tout le contenu après la navbar jusqu'à la fin) */}
 
       {!showProfile && serviceName && (
         <div className="lg:hidden px-4 py-1.5 bg-indigo-50 text-indigo-700 text-xs text-center">

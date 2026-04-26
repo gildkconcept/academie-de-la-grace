@@ -18,6 +18,7 @@ import {
   LineChart,
   Line
 } from '@/components/charts'
+import { NotificationBell } from '@/components/NotificationBell'
 import { AttendanceStatsView } from '@/components/AttendanceStatsView'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -88,6 +89,17 @@ export default function SuperAdminDashboard() {
   const [selectedStudentForBadge, setSelectedStudentForBadge] = useState<string>('')
   const [selectedBadgeId, setSelectedBadgeId] = useState<string>('')
   const [showQuizSection, setShowQuizSection] = useState(false)
+
+    // === ÉTATS POUR LA LISTE DES ÉTUDIANTS (RECHERCHE + FILTRES + PDF) ===
+  const [studentSearchTerm, setStudentSearchTerm] = useState<string>('')
+  const [studentServiceFilter, setStudentServiceFilter] = useState<string>('all')
+  const [studentLevelFilter, setStudentLevelFilter] = useState<string>('all')
+  const [studentBranchFilter, setStudentBranchFilter] = useState<string>('all')
+  const [studentBaptismFilter, setStudentBaptismFilter] = useState<string>('all')
+  const [studentMaisonGraceFilter, setStudentMaisonGraceFilter] = useState<string>('all')
+  const [studentMaisonGraceSearch, setStudentMaisonGraceSearch] = useState<string>('')
+  const [studentMaisonGraceList, setStudentMaisonGraceList] = useState<string[]>([])
+  const [showStudentFilters, setShowStudentFilters] = useState(false)
 
   const toggleProfile = () => {
     setShowProfile(!showProfile)
@@ -474,21 +486,18 @@ const baptises = studentsData.filter(s => s.baptized === true).length
     }
   }
 
-  const applyFilters = () => {
+   const applyFilters = () => {
     let filtered = [...students]
 
     if (selectedService !== 'all') {
       filtered = filtered.filter(s => s.service_id === selectedService)
     }
-
     if (selectedBranch !== 'all') {
       filtered = filtered.filter(s => s.branch === selectedBranch)
     }
-
     if (selectedLevel !== 'all') {
       filtered = filtered.filter(s => s.level === parseInt(selectedLevel))
     }
-
     if (selectedBaptism !== 'all') {
       const isBaptized = selectedBaptism === 'yes'
       filtered = filtered.filter(s => s.baptized === isBaptized)
@@ -578,6 +587,108 @@ const baptises = studentsData.filter(s => s.baptized === true).length
     } catch (error) {
       console.error(error)
       toast.error('Erreur serveur')
+    }
+  }
+    // === FILTRER LES ÉTUDIANTS (RECHERCHE + FILTRES AVANCÉS) ===
+  const getFilteredStudents = () => {
+    let filtered = [...filteredStudents]
+
+    // Mettre à jour la liste des maisons de grâce
+    const maisons = new Set<string>()
+    filtered.forEach(s => {
+      if ((s as any).maison_grace && (s as any).maison_grace.trim() !== '') {
+        maisons.add((s as any).maison_grace.trim())
+      }
+    })
+    const newList = Array.from(maisons).sort()
+    if (JSON.stringify(newList) !== JSON.stringify(studentMaisonGraceList)) {
+      setStudentMaisonGraceList(newList)
+    }
+
+    return filtered.filter(student => {
+      const matchesSearch = studentSearchTerm === '' || 
+        (student.full_name || '').toLowerCase().includes(studentSearchTerm.toLowerCase())
+      
+      const matchesServiceFilter = studentServiceFilter === 'all' || 
+        student.service_id === studentServiceFilter
+      
+      const matchesLevelFilter = studentLevelFilter === 'all' || 
+        student.level?.toString() === studentLevelFilter
+      
+      const matchesBranchFilter = studentBranchFilter === 'all' || 
+        student.branch === studentBranchFilter
+      
+      const matchesBaptismFilter = studentBaptismFilter === 'all' || 
+        (studentBaptismFilter === 'yes' && student.baptized === true) ||
+        (studentBaptismFilter === 'no' && student.baptized !== true)
+      
+      const matchesMaisonGrace = studentMaisonGraceFilter === 'all' || 
+        ((student as any).maison_grace || '').trim() === studentMaisonGraceFilter
+      
+      const matchesMaisonGraceSearch = studentMaisonGraceSearch === '' || 
+        ((student as any).maison_grace || '').toLowerCase().includes(studentMaisonGraceSearch.toLowerCase())
+      
+      return matchesSearch && matchesServiceFilter && matchesLevelFilter && 
+             matchesBranchFilter && matchesBaptismFilter && matchesMaisonGrace && matchesMaisonGraceSearch
+    })
+  }
+
+  const displayedStudents = getFilteredStudents()
+    // === GÉNÉRER LE PDF DE LA LISTE DES ÉTUDIANTS FILTRÉS ===
+  const generateStudentsPDF = async () => {
+    try {
+      const { jsPDF } = await import('jspdf')
+      const autoTable = (await import('jspdf-autotable')).default
+      const doc = new jsPDF()
+
+      doc.setFontSize(20)
+      doc.text('Académie de la Grâce', 105, 15, { align: 'center' })
+      doc.setFontSize(16)
+      doc.text('Liste des étudiants', 105, 25, { align: 'center' })
+      
+      const now = new Date()
+      doc.setFontSize(10)
+      doc.text(`Généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`, 105, 33, { align: 'center' })
+      
+      doc.setFontSize(12)
+      doc.text(`Total: ${displayedStudents.length} étudiants`, 14, 45)
+
+      const tableData = displayedStudents.map(student => {
+        const studentService = services.find(s => s.id === student.service_id)
+        const maisonGrace = (student as any).maison_grace || '-'
+        
+        return [
+          student.full_name || 'N/A',
+          student.username || '-',
+          studentService?.name || '-',
+          `Niv. ${student.level || 1}`,
+          student.branch || '-',
+          student.baptized ? 'Oui' : 'Non',
+          maisonGrace,
+          student.phone || '-'
+        ]
+      })
+
+      autoTable(doc, {
+        head: [['Nom', 'Username', 'Service', 'Niveau', 'Branche', 'Baptême', 'Maison grâce', 'Téléphone']],
+        body: tableData,
+        startY: 52,
+        styles: { fontSize: 7 },
+        headStyles: { fillColor: [79, 70, 229] },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: {
+          0: { cellWidth: 28 }, 1: { cellWidth: 20 }, 2: { cellWidth: 22 },
+          3: { cellWidth: 14 }, 4: { cellWidth: 20 }, 5: { cellWidth: 16 },
+          6: { cellWidth: 24 }, 7: { cellWidth: 24 }
+        }
+      })
+
+      const dateStr = now.toISOString().split('T')[0]
+      doc.save(`etudiants_${dateStr}.pdf`)
+      toast.success('PDF des étudiants généré avec succès')
+    } catch (error) {
+      console.error('Erreur génération PDF:', error)
+      toast.error('Erreur lors de la génération du PDF')
     }
   }
 
@@ -1036,8 +1147,10 @@ const baptises = studentsData.filter(s => s.baptized === true).length
               </h1>
             </div>
 
-            {/* Boutons desktop */}
+                        {/* Boutons desktop */}
             <div className="hidden lg:flex items-center space-x-4">
+              {/* 🔔 Cloche de notifications */}
+              <NotificationBell />
               <Button
                 onClick={toggleProfile}
                 variant="outline"
@@ -1052,8 +1165,10 @@ const baptises = studentsData.filter(s => s.baptized === true).length
               </Button>
             </div>
 
-            {/* Bouton déconnexion mobile */}
-            <div className="flex items-center lg:hidden">
+                       {/* Boutons mobile */}
+            <div className="flex items-center gap-2 lg:hidden">
+              {/* 🔔 Cloche de notifications mobile */}
+              <NotificationBell />
               <button
                 onClick={logout}
                 className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
@@ -1551,81 +1666,111 @@ const baptises = studentsData.filter(s => s.baptized === true).length
             {showQuizSection && <AdminQuiz />}
           </div>
 
-          {/* Liste des étudiants avec bouton Supprimer et Attribution badge */}
+             {/* === LISTE DES ÉTUDIANTS AVEC RECHERCHE, FILTRES ET PDF === */}
           <Card>
             <CardHeader className="px-4 sm:px-6 py-4">
               <div className="flex justify-between items-center flex-wrap gap-2">
                 <CardTitle className="text-base sm:text-lg">
-                  Étudiants
+                  Étudiants ({displayedStudents.length})
                   {selectedService !== 'all' && ` - ${services.find(s => s.id === selectedService)?.name}`}
                 </CardTitle>
-                <Button size="sm" onClick={() => setShowBadgeModal(true)} className="bg-yellow-500 hover:bg-yellow-600 text-white">
-                  <TrophyIcon className="w-4 h-4 mr-1" />
-                  Attribuer un badge
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => setShowStudentFilters(!showStudentFilters)} variant="outline" size="sm">
+                    <FunnelIcon className="w-4 h-4 mr-1" />{showStudentFilters ? 'Masquer' : 'Filtres'}
+                  </Button>
+                  <Button onClick={generateStudentsPDF} size="sm" className="bg-red-600 hover:bg-red-700 text-white">
+                    <DocumentArrowDownIcon className="w-4 h-4 mr-1" />PDF
+                  </Button>
+                  <Button size="sm" onClick={() => setShowBadgeModal(true)} className="bg-yellow-500 hover:bg-yellow-600 text-white">
+                    <TrophyIcon className="w-4 h-4 mr-1" />Badge
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="px-2 sm:px-6">
-              {/* Version mobile : cartes avec bouton supprimer */}
-              <div className="block lg:hidden space-y-3">
-                {filteredStudents.map((student) => {
-                  const studentService = services.find(s => s.id === student.service_id)
-                  return (
-                    <div key={student.id} className="bg-white border border-gray-200 rounded-lg p-3">
-                      <h3 className="font-medium text-gray-900 mb-2">{student.full_name}</h3>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
-                        <div>Service: {studentService?.name || '-'}</div>
-                        <div>Niveau {student.level}</div>
-                        <div>Branche: {student.branch}</div>
-                        <div>Baptême: {student.baptized ? 'Oui' : 'Non'}</div>
-                        <div className="col-span-2">Tél: {student.phone || '-'}</div>
-                      </div>
-                      <Button variant="outline" size="sm" className="w-full text-red-600 border-red-300" onClick={() => handleDeleteStudent(student.id)}>Supprimer</Button>
-                    </div>
-                  )
-                })}
+              {/* Barre de recherche */}
+              <div className="mb-3">
+                <input type="text" placeholder="🔍 Rechercher par nom..." value={studentSearchTerm} onChange={(e) => setStudentSearchTerm(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" />
               </div>
 
-              {/* Version desktop : tableau avec colonne Actions */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Niveau</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Branche</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Baptême</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredStudents.map((student) => {
+              {/* Filtres avancés */}
+              {showStudentFilters && (
+                <div className="space-y-2 mb-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div><label className="text-xs text-gray-500 mb-1 block">Service</label><select value={studentServiceFilter} onChange={(e) => setStudentServiceFilter(e.target.value)} className="w-full p-1 text-sm border border-gray-300 rounded"><option value="all">Tous</option>{services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                    <div><label className="text-xs text-gray-500 mb-1 block">Niveau</label><select value={studentLevelFilter} onChange={(e) => setStudentLevelFilter(e.target.value)} className="w-full p-1 text-sm border border-gray-300 rounded"><option value="all">Tous</option><option value="1">Niveau 1</option><option value="2">Niveau 2</option><option value="3">Niveau 3</option></select></div>
+                    <div><label className="text-xs text-gray-500 mb-1 block">Branche</label><select value={studentBranchFilter} onChange={(e) => setStudentBranchFilter(e.target.value)} className="w-full p-1 text-sm border border-gray-300 rounded"><option value="all">Toutes</option>{branches.map(b => <option key={b} value={b}>{b}</option>)}</select></div>
+                    <div><label className="text-xs text-gray-500 mb-1 block">Baptême</label><select value={studentBaptismFilter} onChange={(e) => setStudentBaptismFilter(e.target.value)} className="w-full p-1 text-sm border border-gray-300 rounded"><option value="all">Tous</option><option value="yes">Baptisés</option><option value="no">Non baptisés</option></select></div>
+                    <div><label className="text-xs text-gray-500 mb-1 block">Maison de grâce</label><select value={studentMaisonGraceFilter} onChange={(e) => setStudentMaisonGraceFilter(e.target.value)} className="w-full p-1 text-sm border border-gray-300 rounded"><option value="all">Toutes</option>{studentMaisonGraceList.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+                    <div><label className="text-xs text-gray-500 mb-1 block">Recherche maison</label><input type="text" placeholder="Ex: Abobo..." value={studentMaisonGraceSearch} onChange={(e) => setStudentMaisonGraceSearch(e.target.value)} className="w-full p-1 text-sm border border-gray-300 rounded" /></div>
+                  </div>
+                  <div className="pt-1">
+                    <button onClick={() => { setStudentSearchTerm(''); setStudentServiceFilter('all'); setStudentLevelFilter('all'); setStudentBranchFilter('all'); setStudentBaptismFilter('all'); setStudentMaisonGraceFilter('all'); setStudentMaisonGraceSearch(''); }} className="text-xs text-indigo-600 hover:underline">Réinitialiser tous les filtres</button>
+                  </div>
+                </div>
+              )}
+
+              {displayedStudents.length === 0 ? <div className="text-center py-8 text-gray-500">Aucun étudiant trouvé</div> : (
+                <>
+                  {/* Version mobile */}
+                  <div className="block lg:hidden space-y-3">
+                    {displayedStudents.map((student) => {
                       const studentService = services.find(s => s.id === student.service_id)
                       return (
-                        <tr key={student.id}>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{student.full_name}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{studentService?.name || '-'}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500">Niveau {student.level}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{student.branch}</td>
-                          <td className="px-6 py-4">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              student.baptized ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {student.baptized ? 'Oui' : 'Non'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{student.phone || '-'}</td>
-                          <td className="px-6 py-4">
-                            <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteStudent(student.id)}>Supprimer</Button>
-                          </td>
-                        </tr>
+                        <div key={student.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                          <h3 className="font-medium text-gray-900 mb-2">{student.full_name}</h3>
+                          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
+                            <div>Service: {studentService?.name || '-'}</div>
+                            <div>Niveau {student.level}</div>
+                            <div>Branche: {student.branch}</div>
+                            <div>Baptême: {student.baptized ? 'Oui' : 'Non'}</div>
+                            <div className="col-span-2">Tél: {student.phone || '-'}</div>
+                            {(student as any).maison_grace && <div className="col-span-2">🏠 {(student as any).maison_grace}</div>}
+                          </div>
+                          <Button variant="outline" size="sm" className="w-full text-red-600 border-red-300" onClick={() => handleDeleteStudent(student.id)}>Supprimer</Button>
+                        </div>
                       )
                     })}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+
+                  {/* Version desktop */}
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Niveau</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Branche</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Baptême</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Maison</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {displayedStudents.map((student) => {
+                          const studentService = services.find(s => s.id === student.service_id)
+                          return (
+                            <tr key={student.id}>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{student.full_name}</td>
+                              <td className="px-4 py-3 text-xs text-gray-500">@{student.username}</td>
+                              <td className="px-4 py-3 text-sm text-gray-500">{studentService?.name || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-500">Niv. {student.level}</td>
+                              <td className="px-4 py-3 text-sm text-gray-500">{student.branch}</td>
+                              <td className="px-4 py-3"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${student.baptized ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{student.baptized ? 'Oui' : 'Non'}</span></td>
+                              <td className="px-4 py-3 text-xs text-gray-500">{(student as any).maison_grace || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-500">{student.phone || '-'}</td>
+                              <td className="px-4 py-3"><Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteStudent(student.id)}>Supprimer</Button></td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

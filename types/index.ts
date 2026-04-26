@@ -247,3 +247,24 @@ export interface QuizWithStatus {
   completed: boolean
   result: QuizResult | null
 }
+
+// === NOTIFICATIONS ===
+export type NotificationType = 
+  | 'session'      // Rappel de session académique
+  | 'seance'       // Rappel de séance service
+  | 'quiz'         // Nouveau quiz disponible
+  | 'result'       // Résultat de quiz
+  | 'promotion'    // Changement de niveau
+  | 'absence'      // Alerte absences répétées
+  | 'announcement' // Annonce manuelle
+
+export interface Notification {
+  id: string
+  user_id: string
+  title: string
+  message: string
+  type: NotificationType
+  link?: string        // Lien optionnel (ex: /dashboard/student)
+  is_read: boolean
+  created_at: string
+}

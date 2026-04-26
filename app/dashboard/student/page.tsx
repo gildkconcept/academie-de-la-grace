@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { Attendance, Progress, Badge } from '@/types'
 import { StudentQuiz } from '@/components/StudentQuiz'
 import { ProfileSection } from '@/components/ProfileSection'
+import { NotificationBell } from '@/components/NotificationBell'
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -273,6 +274,8 @@ export default function StudentDashboard() {
                   🏠 {user.maisonGrace}
                 </div>
               )}
+              {/* 🔔 Cloche de notifications */}
+              <NotificationBell />
               <Button
                 onClick={() => setShowProfile(!showProfile)}
                 variant="outline"
@@ -287,7 +290,9 @@ export default function StudentDashboard() {
               </Button>
             </div>
 
-            <div className="flex items-center lg:hidden">
+            <div className="flex items-center gap-2 lg:hidden">
+              {/* 🔔 Cloche de notifications mobile */}
+              <NotificationBell />
               <button
                 onClick={logout}
                 className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
