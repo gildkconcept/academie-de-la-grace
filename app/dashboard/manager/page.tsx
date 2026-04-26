@@ -78,6 +78,15 @@ export default function ManagerDashboard() {
   } | null>(null)
   const [activeInactiveData, setActiveInactiveData] = useState<{ name: string; value: number }[]>([])
 
+  // === ÉTATS POUR LA LISTE DES MEMBRES (RECHERCHE + FILTRES) ===
+  const [memberSearchTerm, setMemberSearchTerm] = useState<string>('')
+  const [memberLevelFilter, setMemberLevelFilter] = useState<string>('all')
+  const [memberBaptismFilter, setMemberBaptismFilter] = useState<string>('all')
+  const [memberMaisonGraceFilter, setMemberMaisonGraceFilter] = useState<string>('all')
+  const [memberMaisonGraceSearch, setMemberMaisonGraceSearch] = useState<string>('')
+  const [maisonGraceList, setMaisonGraceList] = useState<string[]>([])
+  const [showMemberFilters, setShowMemberFilters] = useState(false)
+
   const toggleProfile = () => {
     setShowProfile(!showProfile)
     setMobileMenuOpen(false)
@@ -590,6 +599,81 @@ export default function ManagerDashboard() {
     }
   }
 
+  // === GÉNÉRER LE PDF DE LA LISTE DES MEMBRES FILTRÉS ===
+  const generateMembersPDF = async () => {
+    try {
+      const { jsPDF } = await import('jspdf')
+      const autoTable = (await import('jspdf-autotable')).default
+      const doc = new jsPDF()
+
+      doc.setFontSize(20)
+      doc.text('Académie de la Grâce', 105, 15, { align: 'center' })
+      doc.setFontSize(16)
+      doc.text(`Liste des membres - ${serviceName}`, 105, 25, { align: 'center' })
+      
+      const now = new Date()
+      doc.setFontSize(10)
+      doc.text(`Généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`, 105, 33, { align: 'center' })
+      
+      doc.setFontSize(12)
+      doc.text(`Total: ${filteredMembers.length} membres`, 14, 45)
+      
+      const activeCount = filteredMembers.filter(m => {
+        const member = serviceStats?.members.find(sm => sm.id === m.id)
+        return member?.isActive
+      }).length
+      
+      doc.text(`Actifs (≥70%): ${activeCount}`, 14, 52)
+      doc.text(`Inactifs (<70%): ${filteredMembers.length - activeCount}`, 14, 59)
+
+      const tableData = filteredMembers.map(member => {
+        const stats = serviceStats?.members.find(m => m.id === member.id)
+        const attendanceRate = stats?.attendanceRate || 0
+        const isActive = stats?.isActive || false
+        const maisonGrace = (member as any).maison_grace || '-'
+        
+        return [
+          member.full_name || 'N/A',
+          member.username || '-',
+          `Niv. ${member.level || 1}`,
+          member.branch || '-',
+          (member.baptized === true || member.baptized === 'true') ? 'Oui' : 'Non',
+          maisonGrace,
+          member.phone || '-',
+          `${attendanceRate}%`,
+          isActive ? 'Actif' : 'Inactif'
+        ]
+      })
+
+      autoTable(doc, {
+        head: [['Nom', 'Username', 'Niveau', 'Branche', 'Baptême', 'Maison grâce', 'Téléphone', 'Présence', 'Statut']],
+        body: tableData,
+        startY: 65,
+        styles: { fontSize: 7 },
+        headStyles: { fillColor: [79, 70, 229] },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: {
+          0: { cellWidth: 28 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 14 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 16 },
+          5: { cellWidth: 22 },
+          6: { cellWidth: 22 },
+          7: { cellWidth: 18 },
+          8: { cellWidth: 18 }
+        }
+      })
+
+      const dateStr = now.toISOString().split('T')[0]
+      doc.save(`membres_${serviceName.replace(/\s+/g, '_')}_${dateStr}.pdf`)
+      toast.success('PDF des membres généré avec succès')
+    } catch (error) {
+      console.error('Erreur génération PDF:', error)
+      toast.error('Erreur lors de la génération du PDF')
+    }
+  }
+
   const handleDeleteStudent = async (studentId: string) => {
     if (!confirm('⚠️ Voulez-vous vraiment supprimer cet étudiant ? Cette action est irréversible.')) return
     try {
@@ -620,6 +704,47 @@ export default function ManagerDashboard() {
   const presentCount = serviceStudents.filter(s => s.status === 'present').length
   const absentCount = serviceStudents.filter(s => s.status === 'absent').length
   const attendanceRate = serviceStudents.length > 0 ? Math.round((presentCount / serviceStudents.length) * 100) : 0
+
+  // === FILTRER LES MEMBRES DU SERVICE ===
+  const getFilteredMembers = () => {
+    const members = serviceStats?.members || students
+    
+    // Mettre à jour la liste des maisons de grâce
+    const maisons = new Set<string>()
+    members.forEach(m => {
+      if ((m as any).maison_grace && (m as any).maison_grace.trim() !== '') {
+        maisons.add((m as any).maison_grace.trim())
+      }
+    })
+    const newList = Array.from(maisons).sort()
+    if (JSON.stringify(newList) !== JSON.stringify(maisonGraceList)) {
+      setMaisonGraceList(newList)
+    }
+    
+    return members.filter(member => {
+      const matchesSearch = memberSearchTerm === '' || 
+        (member.full_name || '').toLowerCase().includes(memberSearchTerm.toLowerCase())
+      
+      const matchesLevel = memberLevelFilter === 'all' || 
+        member.level?.toString() === memberLevelFilter
+      
+      const matchesBaptism = memberBaptismFilter === 'all' || 
+        (memberBaptismFilter === 'yes' && (member.baptized === true || member.baptized === 'true')) ||
+        (memberBaptismFilter === 'no' && member.baptized !== true && member.baptized !== 'true')
+      
+      // Filtre par maison de grâce (sélection)
+      const matchesMaisonGrace = memberMaisonGraceFilter === 'all' || 
+        ((member as any).maison_grace || '').trim() === memberMaisonGraceFilter
+      
+      // Recherche par maison de grâce (texte libre)
+      const matchesMaisonGraceSearch = memberMaisonGraceSearch === '' || 
+        ((member as any).maison_grace || '').toLowerCase().includes(memberMaisonGraceSearch.toLowerCase())
+      
+      return matchesSearch && matchesLevel && matchesBaptism && matchesMaisonGrace && matchesMaisonGraceSearch
+    })
+  }
+
+  const filteredMembers = getFilteredMembers()
 
   if (loading || loadingData) {
     return (
@@ -688,7 +813,7 @@ export default function ManagerDashboard() {
             </button>
           </div>
 
-          {/* Menu mobile — VERSION MISE À JOUR */}
+          {/* Menu mobile */}
           {mobileMenuOpen && (
             <div className="lg:hidden border-t border-gray-200 bg-white">
               <div className="px-4 py-3 space-y-2">
@@ -999,75 +1124,211 @@ export default function ManagerDashboard() {
             <Card><CardHeader><CardTitle className="text-base">Répartition Baptême</CardTitle></CardHeader><CardContent><CustomPieChart data={[{ name: 'Baptisés', value: stats.baptized }, { name: 'Non baptisés', value: stats.totalStudents - stats.baptized }]} /></CardContent></Card>
           </div>
 
-          {/* Liste des membres */}
+          {/* === LISTE DES MEMBRES AVEC RECHERCHE, FILTRES ET PDF === */}
           <Card>
-            <CardHeader><CardTitle className="text-base">Membres du service</CardTitle></CardHeader>
-            <CardContent className="px-2">
-              <div className="block lg:hidden space-y-3">
-                {(serviceStats?.members || students).map(s => {
-                  const member = serviceStats?.members.find(m => m.id === s.id) || { attendanceRate: 0, isActive: false }
-                  const todayAtt = attendance.find(a => a.student_id === s.id);
-                  return (
-                    <div key={s.id} className="border rounded-lg p-3">
-                      <div className="flex justify-between">
-                        <span className="font-medium">{s.full_name}</span>
-                        <span className={`px-2 py-0.5 rounded text-xs ${member.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {member.isActive ? 'Actif' : 'Inactif'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2">
-                        <div>Niveau {s.level}</div>
-                        <div>Branche: {s.branch}</div>
-                        <div>Baptême: {s.baptized ? 'Oui' : 'Non'}</div>
-                        <div>Tél: {s.phone || '-'}</div>
-                        <div>Taux présence: {member.attendanceRate}%</div>
-                        <div>Présence jour: {todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</div>
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <Button variant="ghost" size="sm" className="flex-1 text-indigo-600" onClick={() => { setSelectedStudent(s); fetchStudentHistory(s.id); }}>Voir historique</Button>
-                        <Button variant="ghost" size="sm" className="flex-1 text-red-600" onClick={() => handleDeleteStudent(s.id)}>Supprimer</Button>
-                      </div>
-                    </div>
-                  )
-                })}
+            <CardHeader className="px-4 py-3">
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <CardTitle className="text-base">
+                  Membres du service ({filteredMembers.length})
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => setShowMemberFilters(!showMemberFilters)} 
+                    variant="outline" 
+                    size="sm"
+                  >
+                    <FunnelIcon className="w-4 h-4 mr-1" />
+                    {showMemberFilters ? 'Masquer' : 'Filtres'}
+                  </Button>
+                  <Button 
+                    onClick={generateMembersPDF} 
+                    size="sm" 
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <DocumentArrowDownIcon className="w-4 h-4 mr-1" />
+                    PDF Membres
+                  </Button>
+                </div>
               </div>
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="min-w-full">
-                  <thead>
-                    <tr>
-                      <th>Nom</th>
-                      <th>Niveau</th>
-                      <th>Branche</th>
-                      <th>Baptême</th>
-                      <th>Taux présence</th>
-                      <th>Statut</th>
-                      <th>Présence</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(serviceStats?.members || students).map(s => {
+            </CardHeader>
+            <CardContent className="px-2">
+              {/* Barre de recherche */}
+              <div className="mb-3 px-2">
+                <input
+                  type="text"
+                  placeholder="🔍 Rechercher par nom..."
+                  value={memberSearchTerm}
+                  onChange={(e) => setMemberSearchTerm(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Filtres avancés */}
+              {showMemberFilters && (
+                <div className="space-y-2 mb-3 p-3 bg-gray-50 rounded-lg mx-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Niveau</label>
+                      <select
+                        value={memberLevelFilter}
+                        onChange={(e) => setMemberLevelFilter(e.target.value)}
+                        className="w-full p-1 text-sm border border-gray-300 rounded"
+                      >
+                        <option value="all">Tous</option>
+                        <option value="1">Niveau 1</option>
+                        <option value="2">Niveau 2</option>
+                        <option value="3">Niveau 3</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Baptême</label>
+                      <select
+                        value={memberBaptismFilter}
+                        onChange={(e) => setMemberBaptismFilter(e.target.value)}
+                        className="w-full p-1 text-sm border border-gray-300 rounded"
+                      >
+                        <option value="all">Tous</option>
+                        <option value="yes">Baptisés</option>
+                        <option value="no">Non baptisés</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Filtre Maison de grâce (sélection) */}
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Maison de grâce</label>
+                    <select
+                      value={memberMaisonGraceFilter}
+                      onChange={(e) => setMemberMaisonGraceFilter(e.target.value)}
+                      className="w-full p-1 text-sm border border-gray-300 rounded"
+                    >
+                      <option value="all">Toutes</option>
+                      {maisonGraceList.map(maison => (
+                        <option key={maison} value={maison}>{maison}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Recherche par maison de grâce (texte libre) */}
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Recherche maison de grâce</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Abobo, Azito..."
+                      value={memberMaisonGraceSearch}
+                      onChange={(e) => setMemberMaisonGraceSearch(e.target.value)}
+                      className="w-full p-1 text-sm border border-gray-300 rounded"
+                    />
+                  </div>
+                  
+                  <div className="pt-1">
+                    <button
+                      onClick={() => {
+                        setMemberSearchTerm('')
+                        setMemberLevelFilter('all')
+                        setMemberBaptismFilter('all')
+                        setMemberMaisonGraceFilter('all')
+                        setMemberMaisonGraceSearch('')
+                      }}
+                      className="text-xs text-indigo-600 hover:underline"
+                    >
+                      Réinitialiser tous les filtres
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {filteredMembers.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  Aucun membre trouvé
+                </div>
+              ) : (
+                <>
+                  {/* Version mobile */}
+                  <div className="block lg:hidden space-y-3">
+                    {filteredMembers.map(s => {
                       const member = serviceStats?.members.find(m => m.id === s.id) || { attendanceRate: 0, isActive: false }
-                      const todayAtt = attendance.find(a => a.student_id === s.id);
                       return (
-                        <tr key={s.id}>
-                          <td className="py-2">{s.full_name}</td>
-                          <td>{s.level}</td>
-                          <td>{s.branch}</td>
-                          <td>{s.baptized ? 'Oui' : 'Non'}</td>
-                          <td>{member.attendanceRate}%</td>
-                          <td><span className={`px-2 py-0.5 rounded text-xs ${member.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{member.isActive ? 'Actif' : 'Inactif'}</span></td>
-                          <td><span className={`px-2 py-0.5 rounded text-xs ${todayAtt?.status === 'present' ? 'bg-green-100 text-green-800' : todayAtt?.status === 'late' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{todayAtt?.status === 'present' ? 'Présent' : todayAtt?.status === 'late' ? 'Retard' : 'Absent'}</span></td>
-                          <td className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => { setSelectedStudent(s); fetchStudentHistory(s.id); }}>Historique</Button>
-                            <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteStudent(s.id)}>Supprimer</Button>
-                          </td>
-                        </tr>
+                        <div key={s.id} className="border rounded-lg p-3">
+                          <div className="flex justify-between">
+                            <span className="font-medium">{s.full_name}</span>
+                            <span className={`px-2 py-0.5 rounded text-xs ${member.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                              {member.isActive ? 'Actif' : 'Inactif'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2">
+                            <div>Niveau {s.level}</div>
+                            <div>Branche: {s.branch}</div>
+                            <div>Baptême: {(s.baptized === true || s.baptized === 'true') ? 'Oui' : 'Non'}</div>
+                            <div>Tél: {s.phone || '-'}</div>
+                            <div>Présence: {member.attendanceRate}%</div>
+                            <div>@{s.username}</div>
+                            {(s as any).maison_grace && (
+                              <div className="col-span-2">🏠 {(s as any).maison_grace}</div>
+                            )}
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Button variant="ghost" size="sm" className="flex-1 text-indigo-600" onClick={() => { setSelectedStudent(s); fetchStudentHistory(s.id); }}>Historique</Button>
+                            <Button variant="ghost" size="sm" className="flex-1 text-red-600" onClick={() => handleDeleteStudent(s.id)}>Supprimer</Button>
+                          </div>
+                        </div>
                       )
                     })}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+
+                  {/* Version desktop */}
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="min-w-full">
+                      <thead>
+                        <tr className="text-left text-xs text-gray-500 uppercase">
+                          <th className="py-2 px-2">Nom</th>
+                          <th className="py-2 px-2">Username</th>
+                          <th className="py-2 px-2">Niv.</th>
+                          <th className="py-2 px-2">Branche</th>
+                          <th className="py-2 px-2">Bapt.</th>
+                          <th className="py-2 px-2">Maison</th>
+                          <th className="py-2 px-2">Tél</th>
+                          <th className="py-2 px-2">Présence</th>
+                          <th className="py-2 px-2">Statut</th>
+                          <th className="py-2 px-2">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredMembers.map(s => {
+                          const member = serviceStats?.members.find(m => m.id === s.id) || { attendanceRate: 0, isActive: false }
+                          return (
+                            <tr key={s.id} className="border-t hover:bg-gray-50">
+                              <td className="py-2 px-2 text-sm font-medium">{s.full_name}</td>
+                              <td className="py-2 px-2 text-xs text-gray-500">@{s.username}</td>
+                              <td className="py-2 px-2 text-sm">{s.level}</td>
+                              <td className="py-2 px-2 text-sm">{s.branch}</td>
+                              <td className="py-2 px-2 text-sm">{(s.baptized === true || s.baptized === 'true') ? 'Oui' : 'Non'}</td>
+                              <td className="py-2 px-2 text-xs">{(s as any).maison_grace || '-'}</td>
+                              <td className="py-2 px-2 text-sm">{s.phone || '-'}</td>
+                              <td className="py-2 px-2 text-sm font-medium">
+                                <span className={member.attendanceRate >= 70 ? 'text-green-600' : 'text-red-600'}>
+                                  {member.attendanceRate}%
+                                </span>
+                              </td>
+                              <td className="py-2 px-2">
+                                <span className={`px-2 py-0.5 rounded text-xs ${member.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                  {member.isActive ? 'Actif' : 'Inactif'}
+                                </span>
+                              </td>
+                              <td className="py-2 px-2">
+                                <div className="flex gap-1">
+                                  <Button variant="ghost" size="sm" className="text-indigo-600" onClick={() => { setSelectedStudent(s); fetchStudentHistory(s.id); }}>Historique</Button>
+                                  <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteStudent(s.id)}>Supprimer</Button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

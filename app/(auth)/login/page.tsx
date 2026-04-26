@@ -96,6 +96,16 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Lien mot de passe oublié */}
+          <div className="flex justify-end">
+            <Link 
+              href="/forgot-credentials" 
+              className="text-sm text-indigo-600 hover:text-indigo-500"
+            >
+              Nom d'utilisateur ou mot de passe oublié ?
+            </Link>
+          </div>
+
           <div>
             <button
               type="submit"
