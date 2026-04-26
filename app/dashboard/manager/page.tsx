@@ -637,7 +637,7 @@ export default function ManagerDashboard() {
           member.username || '-',
           `Niv. ${member.level || 1}`,
           member.branch || '-',
-          (member.baptized === true || member.baptized === 'true') ? 'Oui' : 'Non',
+          (member.baptized === true || String(member.baptized) === 'true') ? 'Oui' : 'Non'
           maisonGrace,
           member.phone || '-',
           `${attendanceRate}%`,
