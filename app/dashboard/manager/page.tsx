@@ -175,7 +175,7 @@ export default function ManagerDashboard() {
         setStats({
           totalStudents: studentsData.length,
           presentToday: attendanceData?.filter(a => a.status === 'present').length || 0,
-          baptized: studentsData.filter(s => s.baptized === true || s.baptized === 'true').length,
+          baptized: studentsData.filter(s => s.baptized === true || String(s.baptized) === 'true').length,
           averageProgress: Math.round(avgProgress)
         })
       }
@@ -637,7 +637,7 @@ export default function ManagerDashboard() {
           member.username || '-',
           `Niv. ${member.level || 1}`,
           member.branch || '-',
-          (member.baptized === true || String(member.baptized) === 'true') ? 'Oui' : 'Non'
+          (member.baptized === true || String(member.baptized) === 'true') ? 'Oui' : 'Non',
           maisonGrace,
           member.phone || '-',
           `${attendanceRate}%`,
@@ -729,8 +729,8 @@ export default function ManagerDashboard() {
         member.level?.toString() === memberLevelFilter
       
       const matchesBaptism = memberBaptismFilter === 'all' || 
-        (memberBaptismFilter === 'yes' && (member.baptized === true || member.baptized === 'true')) ||
-        (memberBaptismFilter === 'no' && member.baptized !== true && member.baptized !== 'true')
+        (memberBaptismFilter === 'yes' && (member.baptized === true || String(member.baptized) === 'true')) ||
+        (memberBaptismFilter === 'no' && member.baptized !== true && String(member.baptized) !== 'true')
       
       // Filtre par maison de grâce (sélection)
       const matchesMaisonGrace = memberMaisonGraceFilter === 'all' || 
@@ -1259,7 +1259,7 @@ export default function ManagerDashboard() {
                           <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2">
                             <div>Niveau {s.level}</div>
                             <div>Branche: {s.branch}</div>
-                            <div>Baptême: {(s.baptized === true || s.baptized === 'true') ? 'Oui' : 'Non'}</div>
+                            <div>Baptême: {(s.baptized === true || String(s.baptized) === 'true') ? 'Oui' : 'Non'}</div>
                             <div>Tél: {s.phone || '-'}</div>
                             <div>Présence: {member.attendanceRate}%</div>
                             <div>@{s.username}</div>
@@ -1302,7 +1302,7 @@ export default function ManagerDashboard() {
                               <td className="py-2 px-2 text-xs text-gray-500">@{s.username}</td>
                               <td className="py-2 px-2 text-sm">{s.level}</td>
                               <td className="py-2 px-2 text-sm">{s.branch}</td>
-                              <td className="py-2 px-2 text-sm">{(s.baptized === true || s.baptized === 'true') ? 'Oui' : 'Non'}</td>
+                              <td className="py-2 px-2 text-sm">{(s.baptized === true || String(s.baptized) === 'true') ? 'Oui' : 'Non'}</td>
                               <td className="py-2 px-2 text-xs">{(s as any).maison_grace || '-'}</td>
                               <td className="py-2 px-2 text-sm">{s.phone || '-'}</td>
                               <td className="py-2 px-2 text-sm font-medium">
