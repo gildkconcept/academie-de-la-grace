@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   try {
-    // 🔄 Lire le token depuis le cookie (au lieu du header Authorization)
-    const token = request.cookies.get('token')?.value
+    // ✅ Utiliser cookies() de next/headers
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
     
     if (!token) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -14,11 +16,12 @@ export async function GET(request: Request) {
     const decoded = verifyToken(token)
 
     if (!decoded) {
-      // Token invalide → supprimer le cookie
       const response = NextResponse.json({ error: 'Token invalide' }, { status: 401 })
       response.cookies.set('token', '', { maxAge: 0, path: '/' })
       return response
     }
+
+    // ... le reste du code est identique ...
 
     console.log('🔍 Token décodé:', decoded)
 
