@@ -270,7 +270,7 @@ export default function StudentDashboard() {
                 <img 
                   src={user.profileImageUrl} 
                   alt="Photo" 
-                  className="w-8 h-8 rounded-full object-cover border-2 border-indigo-300"
+                  className="w-12 h-12 rounded-full object-cover border-2 border-indigo-300"
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
@@ -278,6 +278,7 @@ export default function StudentDashboard() {
                     {user?.name?.charAt(0)?.toUpperCase() || '?'}
                   </span>
                 </div>
+
               )}
               <div className="flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm">
                 <AcademicCapIcon className="w-4 h-4" />
@@ -309,10 +310,10 @@ export default function StudentDashboard() {
                 <img 
                   src={user.profileImageUrl} 
                   alt="Photo" 
-                  className="w-8 h-8 rounded-full object-cover border-2 border-indigo-300"
+                  className="w-12 h-12 rounded-full object-cover border-2 border-indigo-300"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
                   <span className="text-sm font-bold text-indigo-600">
                     {user?.name?.charAt(0)?.toUpperCase() || '?'}
                   </span>

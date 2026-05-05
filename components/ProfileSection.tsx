@@ -249,7 +249,7 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                 <img
                   src={profileData.profileImageUrl}
                   alt="Photo de profil"
-                  className="w-20 h-20 rounded-full object-cover border-4 border-indigo-200"
+                 className="w-28 h-28 rounded-full object-cover border-4 border-indigo-200"
                 />
               ) : (
                 <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center border-4 border-indigo-200">

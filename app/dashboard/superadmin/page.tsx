@@ -40,6 +40,8 @@ import { ProfileSection } from '@/components/ProfileSection'
 import { AdminQuiz } from '@/components/AdminQuiz'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { SendAnnouncement } from '@/components/SendAnnouncement'
+import { MegaphoneIcon } from '@heroicons/react/24/outline'
 
 export default function SuperAdminDashboard() {
   const { user, loading, logout } = useAuth()
@@ -89,6 +91,7 @@ export default function SuperAdminDashboard() {
   const [selectedStudentForBadge, setSelectedStudentForBadge] = useState<string>('')
   const [selectedBadgeId, setSelectedBadgeId] = useState<string>('')
   const [showQuizSection, setShowQuizSection] = useState(false)
+  const [showAnnouncement, setShowAnnouncement] = useState(false)
 
     // === ÉTATS POUR LA LISTE DES ÉTUDIANTS (RECHERCHE + FILTRES + PDF) ===
   const [studentSearchTerm, setStudentSearchTerm] = useState<string>('')
@@ -1169,6 +1172,7 @@ const baptises = studentsData.filter(s => s.baptized === true).length
             <div className="flex items-center gap-2 lg:hidden">
               {/* 🔔 Cloche de notifications mobile */}
               <NotificationBell />
+              
               <button
                 onClick={logout}
                 className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
@@ -1651,7 +1655,7 @@ const baptises = studentsData.filter(s => s.baptized === true).length
               </CardContent>
             </Card>
           </div>
-
+           
           {/* Section Quiz pour superadmin */}
           <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
@@ -1664,6 +1668,25 @@ const baptises = studentsData.filter(s => s.baptized === true).length
               </Button>
             </div>
             {showQuizSection && <AdminQuiz />}
+          </div>
+                    {/* Section Annonces */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">📢 Annonces</h2>
+              <Button 
+                onClick={() => setShowAnnouncement(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                size="sm"
+              >
+                <MegaphoneIcon className="w-4 h-4 mr-1" />
+                Nouvelle annonce
+              </Button>
+            </div>
+            <Card>
+              <CardContent className="p-4 text-center text-gray-500 text-sm">
+                Envoyez des notifications à tous les étudiants ou à un service spécifique.
+              </CardContent>
+            </Card>
           </div>
 
              {/* === LISTE DES ÉTUDIANTS AVEC RECHERCHE, FILTRES ET PDF === */}
@@ -1721,9 +1744,9 @@ const baptises = studentsData.filter(s => s.baptized === true).length
                           {/* 📸 Photo + Nom */}
                           <div className="flex items-center gap-3 mb-2">
                             {(student as any).profile_image_url ? (
-                              <img src={(student as any).profile_image_url} alt="Photo" className="w-10 h-10 rounded-full object-cover border-2 border-indigo-200" />
+                              <img src={(student as any).profile_image_url} alt="Photo" className="w-12 h-12 rounded-full object-cover border-2 border-indigo-200" />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                              <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
                                 <span className="font-bold text-indigo-600">{student.full_name?.charAt(0)?.toUpperCase()}</span>
                               </div>
                             )}
@@ -1769,7 +1792,7 @@ const baptises = studentsData.filter(s => s.baptized === true).length
                                 {(student as any).profile_image_url ? (
                                   <img src={(student as any).profile_image_url} alt="Photo" className="w-8 h-8 rounded-full object-cover" />
                                 ) : (
-                                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                  <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
                                     <span className="text-xs font-bold text-indigo-600">{student.full_name?.charAt(0)?.toUpperCase()}</span>
                                   </div>
                                 )}
@@ -1795,6 +1818,12 @@ const baptises = studentsData.filter(s => s.baptized === true).length
           </Card>
         </div>
       )}
+            {/* Modal d'annonce */}
+      {showAnnouncement && (
+        <SendAnnouncement onClose={() => setShowAnnouncement(false)} />
+      )}
+
+     
       {/* Modal d'attribution de badge */}
       {showBadgeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

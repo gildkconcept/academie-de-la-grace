@@ -1294,9 +1294,9 @@ const [baptismStatsData, setBaptismStatsData] = useState<any[]>([])
                           {/* 📸 Photo + Nom + Statut */}
                           <div className="flex items-center gap-3 mb-2">
                             {(s as any).profile_image_url ? (
-                              <img src={(s as any).profile_image_url} alt="Photo" className="w-10 h-10 rounded-full object-cover border-2 border-indigo-200 shrink-0" />
+                              <img src={(s as any).profile_image_url} alt="Photo" className="w-12 h-12 rounded-full object-cover border-2 border-indigo-200 shrink-0" />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                              <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
                                 <span className="font-bold text-indigo-600">{s.full_name?.charAt(0)?.toUpperCase()}</span>
                               </div>
                             )}
@@ -1354,7 +1354,7 @@ const [baptismStatsData, setBaptismStatsData] = useState<any[]>([])
                                 {(s as any).profile_image_url ? (
                                   <img src={(s as any).profile_image_url} alt="Photo" className="w-8 h-8 rounded-full object-cover" />
                                 ) : (
-                                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                  <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
                                     <span className="text-xs font-bold text-indigo-600">{s.full_name?.charAt(0)?.toUpperCase()}</span>
                                   </div>
                                 )}
