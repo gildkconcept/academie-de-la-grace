@@ -272,7 +272,7 @@ export default function RegisterPage() {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
-            {/* 📸 Photo de profil */}
+                       {/* 📸 Photo de profil */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Photo de profil <span className="text-xs text-gray-400">(optionnel)</span>
@@ -303,7 +303,6 @@ export default function RegisterPage() {
                     <input
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       onChange={handlePhotoUpload}
                       className="hidden"
                       disabled={uploadingPhoto}

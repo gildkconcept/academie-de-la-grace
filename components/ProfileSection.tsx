@@ -279,7 +279,7 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                 </>
               )}
               
-              {/* Boutons photo */}
+                          {/* Boutons photo */}
               <div className="flex gap-2 mt-3 justify-center sm:justify-start">
                 <label className="cursor-pointer inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm hover:bg-indigo-100 transition-colors">
                   <CameraIcon className="w-4 h-4" />
@@ -287,7 +287,6 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                   <input
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     onChange={handlePhotoUpload}
                     className="hidden"
                     disabled={uploadingPhoto}
