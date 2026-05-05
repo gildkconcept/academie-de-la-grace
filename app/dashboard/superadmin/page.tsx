@@ -1712,13 +1712,23 @@ const baptises = studentsData.filter(s => s.baptized === true).length
 
               {displayedStudents.length === 0 ? <div className="text-center py-8 text-gray-500">Aucun étudiant trouvé</div> : (
                 <>
-                  {/* Version mobile */}
+                                 {/* Version mobile */}
                   <div className="block lg:hidden space-y-3">
                     {displayedStudents.map((student) => {
                       const studentService = services.find(s => s.id === student.service_id)
                       return (
                         <div key={student.id} className="bg-white border border-gray-200 rounded-lg p-3">
-                          <h3 className="font-medium text-gray-900 mb-2">{student.full_name}</h3>
+                          {/* 📸 Photo + Nom */}
+                          <div className="flex items-center gap-3 mb-2">
+                            {(student as any).profile_image_url ? (
+                              <img src={(student as any).profile_image_url} alt="Photo" className="w-10 h-10 rounded-full object-cover border-2 border-indigo-200" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                                <span className="font-bold text-indigo-600">{student.full_name?.charAt(0)?.toUpperCase()}</span>
+                              </div>
+                            )}
+                            <h3 className="font-medium text-gray-900">{student.full_name}</h3>
+                          </div>
                           <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
                             <div>Service: {studentService?.name || '-'}</div>
                             <div>Niveau {student.level}</div>
@@ -1733,11 +1743,12 @@ const baptises = studentsData.filter(s => s.baptized === true).length
                     })}
                   </div>
 
-                  {/* Version desktop */}
+                                   {/* Version desktop */}
                   <div className="hidden lg:block overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Photo</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
@@ -1754,6 +1765,15 @@ const baptises = studentsData.filter(s => s.baptized === true).length
                           const studentService = services.find(s => s.id === student.service_id)
                           return (
                             <tr key={student.id}>
+                              <td className="px-4 py-3">
+                                {(student as any).profile_image_url ? (
+                                  <img src={(student as any).profile_image_url} alt="Photo" className="w-8 h-8 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                    <span className="text-xs font-bold text-indigo-600">{student.full_name?.charAt(0)?.toUpperCase()}</span>
+                                  </div>
+                                )}
+                              </td>
                               <td className="px-4 py-3 text-sm font-medium text-gray-900">{student.full_name}</td>
                               <td className="px-4 py-3 text-xs text-gray-500">@{student.username}</td>
                               <td className="px-4 py-3 text-sm text-gray-500">{studentService?.name || '-'}</td>
@@ -1775,7 +1795,6 @@ const baptises = studentsData.filter(s => s.baptized === true).length
           </Card>
         </div>
       )}
-
       {/* Modal d'attribution de badge */}
       {showBadgeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

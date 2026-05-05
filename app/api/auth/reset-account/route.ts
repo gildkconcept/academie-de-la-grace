@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { hashPassword } from '@/lib/auth'
+import { resetAccountSchema } from '@/lib/validators'
 
 // Vérifier si un username existe
 async function usernameExists(username: string, excludeStudentId?: string): Promise<boolean> {
@@ -35,29 +36,18 @@ async function generateSuggestions(base: string): Promise<string[]> {
 
 export async function POST(request: Request) {
   try {
-    const { recoveryToken, newUsername, newPassword } = await request.json()
-
-    // Validation
-    if (!recoveryToken || !newUsername || !newPassword) {
+    const body = await request.json()
+    
+    // ✅ Valider les entrées avec Zod
+    const validation = resetAccountSchema.safeParse(body)
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Tous les champs sont requis' },
+        { error: validation.error.errors[0].message },
         { status: 400 }
       )
     }
-
-    if (newPassword.length < 6) {
-      return NextResponse.json(
-        { error: 'Le mot de passe doit contenir au moins 6 caractères' },
-        { status: 400 }
-      )
-    }
-
-    if (newUsername.length < 3) {
-      return NextResponse.json(
-        { error: 'Le nom d\'utilisateur doit contenir au moins 3 caractères' },
-        { status: 400 }
-      )
-    }
+    
+    const { recoveryToken, newUsername, newPassword } = validation.data
 
     // Décoder le token
     let decoded: any

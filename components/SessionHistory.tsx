@@ -30,7 +30,7 @@ export const SessionHistory = ({ userRole, serviceId }: SessionHistoryProps) => 
     try {
       const offset = page * limit
       const res = await fetch(`/api/service/session/history?limit=${limit}&offset=${offset}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include'  // ← MODIFIÉ
       })
       const data = await res.json()
       if (res.ok) {
@@ -50,7 +50,7 @@ export const SessionHistory = ({ userRole, serviceId }: SessionHistoryProps) => 
   const viewSessionDetails = async (sessionId: string) => {
     try {
       const res = await fetch(`/api/service/session/get?sessionId=${sessionId}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include'  // ← MODIFIÉ
       })
       const data = await res.json()
       if (res.ok) {
@@ -74,7 +74,7 @@ export const SessionHistory = ({ userRole, serviceId }: SessionHistoryProps) => 
   const exportSessionPDF = async (session: any) => {
     try {
       const res = await fetch(`/api/service/session/get?sessionId=${session.id}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include'  // ← MODIFIÉ
       })
       const data = await res.json()
       if (res.ok) {

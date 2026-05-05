@@ -94,6 +94,7 @@ function ResetAccountForm() {
       const res = await fetch('/api/auth/reset-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',  // ← AJOUTÉ
         body: JSON.stringify({
           recoveryToken: token,
           newUsername,

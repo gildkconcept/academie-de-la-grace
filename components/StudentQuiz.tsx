@@ -28,7 +28,7 @@ export const StudentQuiz = () => {
     setError(null)
     try {
       const res = await fetch('/api/quizzes', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include'
       })
       const data = await res.json()
       if (res.ok) {
@@ -49,7 +49,7 @@ export const StudentQuiz = () => {
   const fetchMyResults = async () => {
     try {
       const res = await fetch('/api/my-results', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include'
       })
       const data = await res.json()
       if (res.ok) {
@@ -63,7 +63,7 @@ export const StudentQuiz = () => {
   const startQuiz = async (quizId: string) => {
     try {
       const res = await fetch(`/api/quizzes?id=${quizId}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include'
       })
       const data = await res.json()
       if (res.ok) {
@@ -97,9 +97,9 @@ export const StudentQuiz = () => {
       const res = await fetch(`/api/quizzes/${selectedQuiz.id}/submit`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ answers })
       })
 
@@ -205,22 +205,85 @@ export const StudentQuiz = () => {
     )
   }
 
-  // Affichage du résultat
-  if (result) {
+  // Affichage du résultat AVEC le détail des réponses
+  if (result && selectedQuiz) {
     return (
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="text-center">📊 Résultat du quiz</CardTitle>
         </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <div className="text-5xl font-bold text-indigo-600">{result.score}/{result.total}</div>
-          <div className="text-lg">Soit {result.percentage.toFixed(0)}%</div>
-          {result.percentage === 100 && (
-            <div className="bg-yellow-100 text-yellow-800 p-3 rounded-lg">
-              🏆 Parfait ! Badge "Expert biblique" débloqué !
+        <CardContent className="space-y-6">
+          {/* Score global */}
+          <div className="text-center space-y-2">
+            <div className="text-5xl font-bold text-indigo-600">{result.score}/{result.total}</div>
+            <div className="text-lg">Soit {result.percentage.toFixed(0)}%</div>
+            {result.percentage === 100 && (
+              <div className="bg-yellow-100 text-yellow-800 p-3 rounded-lg">
+                🏆 Parfait ! Badge "Expert biblique" débloqué !
+              </div>
+            )}
+          </div>
+
+          {/* Détail des questions */}
+          <div className="border-t pt-4">
+            <h3 className="font-semibold text-lg mb-4">📋 Détail de vos réponses</h3>
+            <div className="space-y-4">
+              {selectedQuiz.questions?.map((question, index) => {
+                const userAnswer = answers[question.id]
+                const isCorrect = userAnswer === question.correct_answer
+                
+                return (
+                  <div 
+                    key={question.id} 
+                    className={`p-4 rounded-lg border ${
+                      isCorrect 
+                        ? 'bg-green-50 border-green-200' 
+                        : 'bg-red-50 border-red-200'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className={`text-lg ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                        {isCorrect ? '✅' : '❌'}
+                      </span>
+                      <div>
+                        <p className="font-medium text-sm">
+                          Question {index + 1} : {question.question}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="ml-7 space-y-1 text-sm">
+                      {['A', 'B', 'C', 'D'].map(letter => {
+                        const optionKey = `option_${letter.toLowerCase()}` as keyof typeof question
+                        const optionText = question[optionKey] as string
+                        const isUserChoice = userAnswer === letter
+                        const isCorrectAnswer = question.correct_answer === letter
+                        
+                        let bgColor = 'bg-white'
+                        if (isUserChoice && !isCorrect) bgColor = 'bg-red-100'
+                        if (isCorrectAnswer) bgColor = 'bg-green-100'
+                        if (isUserChoice && isCorrect) bgColor = 'bg-green-100'
+                        
+                        return (
+                          <div 
+                            key={letter}
+                            className={`p-2 rounded ${bgColor} flex items-center gap-2`}
+                          >
+                            <span className="font-medium">{letter}.</span>
+                            <span>{optionText}</span>
+                            {isUserChoice && <span className="text-xs ml-auto text-gray-500">← Votre réponse</span>}
+                            {isCorrectAnswer && <span className="text-xs ml-auto text-green-600 font-medium">← Bonne réponse</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          )}
-          <div className="flex justify-center gap-3">
+          </div>
+
+          <div className="flex justify-center gap-3 pt-4">
             <Button onClick={closeQuiz}>Fermer</Button>
             <Button variant="outline" onClick={() => window.location.reload()}>
               Voir les quiz disponibles

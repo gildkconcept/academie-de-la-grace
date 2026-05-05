@@ -86,6 +86,8 @@ export default function ManagerDashboard() {
   const [memberMaisonGraceFilter, setMemberMaisonGraceFilter] = useState<string>('all')
   const [memberMaisonGraceSearch, setMemberMaisonGraceSearch] = useState<string>('')
   const [maisonGraceList, setMaisonGraceList] = useState<string[]>([])
+  const [monthlyStats, setMonthlyStats] = useState<any[]>([])
+const [baptismStatsData, setBaptismStatsData] = useState<any[]>([])
   const [showMemberFilters, setShowMemberFilters] = useState(false)
 
   const toggleProfile = () => {
@@ -118,6 +120,7 @@ export default function ManagerDashboard() {
       fetchCurrentSession()
       fetchSessionTypes()
       fetchServiceStats()
+      fetchMonthlyStats()
     }
   }, [user, loading])
 
@@ -261,6 +264,18 @@ export default function ManagerDashboard() {
       console.error('Erreur chargement types:', error)
     }
   }
+  const fetchMonthlyStats = async () => {
+  try {
+    const res = await fetch('/api/stats/monthly', { credentials: 'include' })
+    const data = await res.json()
+    if (res.ok) {
+      setMonthlyStats(data.monthly || [])
+      setBaptismStatsData(data.baptism || [])
+    }
+  } catch (error) {
+    console.error('Erreur stats:', error)
+  }
+}
 
   const fetchServiceStats = async () => {
     if (!user?.serviceId) return
@@ -275,6 +290,7 @@ export default function ManagerDashboard() {
         setServiceStats(null)
         return
       }
+      
 
       const { data: sessionsData } = await supabase
         .from('sessions')
@@ -1129,10 +1145,24 @@ export default function ManagerDashboard() {
             </CardContent>
           </Card>
 
-          {/* Graphiques */}
+                    {/* Graphiques */}
           <div className="grid grid-cols-1 gap-6 mb-6">
-            <Card><CardHeader><CardTitle className="text-base">Présences par mois</CardTitle></CardHeader><CardContent><AttendanceChart data={[{ month: 'Jan', presents: 65 }, { month: 'Fév', presents: 59 }, { month: 'Mar', presents: 80 }, { month: 'Avr', presents: 81 }, { month: 'Mai', presents: 56 }, { month: 'Juin', presents: 55 }]} /></CardContent></Card>
-            <Card><CardHeader><CardTitle className="text-base">Répartition Baptême</CardTitle></CardHeader><CardContent><CustomPieChart data={[{ name: 'Baptisés', value: stats.baptized }, { name: 'Non baptisés', value: stats.totalStudents - stats.baptized }]} /></CardContent></Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Présences par mois</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AttendanceChart data={monthlyStats.length > 0 ? monthlyStats : [{ month: 'Chargement...', presents: 0 }]} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Répartition Baptême</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CustomPieChart data={baptismStatsData.length > 0 ? baptismStatsData : [{ name: 'Chargement...', value: 1 }]} />
+              </CardContent>
+            </Card>
           </div>
 
           {/* === LISTE DES MEMBRES AVEC RECHERCHE, FILTRES ET PDF === */}
@@ -1255,17 +1285,27 @@ export default function ManagerDashboard() {
                 </div>
               ) : (
                 <>
-                  {/* Version mobile */}
+                                  {/* Version mobile */}
                   <div className="block lg:hidden space-y-3">
                     {filteredMembers.map(s => {
                       const member = serviceStats?.members.find(m => m.id === s.id) || { attendanceRate: 0, isActive: false }
                       return (
                         <div key={s.id} className="border rounded-lg p-3">
-                          <div className="flex justify-between">
-                            <span className="font-medium">{s.full_name}</span>
-                            <span className={`px-2 py-0.5 rounded text-xs ${member.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                              {member.isActive ? 'Actif' : 'Inactif'}
-                            </span>
+                          {/* 📸 Photo + Nom + Statut */}
+                          <div className="flex items-center gap-3 mb-2">
+                            {(s as any).profile_image_url ? (
+                              <img src={(s as any).profile_image_url} alt="Photo" className="w-10 h-10 rounded-full object-cover border-2 border-indigo-200 shrink-0" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                                <span className="font-bold text-indigo-600">{s.full_name?.charAt(0)?.toUpperCase()}</span>
+                              </div>
+                            )}
+                            <div className="flex-1 flex justify-between items-center">
+                              <span className="font-medium">{s.full_name}</span>
+                              <span className={`px-2 py-0.5 rounded text-xs ${member.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                {member.isActive ? 'Actif' : 'Inactif'}
+                              </span>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2">
                             <div>Niveau {s.level}</div>
@@ -1287,11 +1327,12 @@ export default function ManagerDashboard() {
                     })}
                   </div>
 
-                  {/* Version desktop */}
+                                   {/* Version desktop */}
                   <div className="hidden lg:block overflow-x-auto">
                     <table className="min-w-full">
                       <thead>
                         <tr className="text-left text-xs text-gray-500 uppercase">
+                          <th className="py-2 px-2">Photo</th>
                           <th className="py-2 px-2">Nom</th>
                           <th className="py-2 px-2">Username</th>
                           <th className="py-2 px-2">Niv.</th>
@@ -1309,6 +1350,15 @@ export default function ManagerDashboard() {
                           const member = serviceStats?.members.find(m => m.id === s.id) || { attendanceRate: 0, isActive: false }
                           return (
                             <tr key={s.id} className="border-t hover:bg-gray-50">
+                              <td className="py-2 px-2">
+                                {(s as any).profile_image_url ? (
+                                  <img src={(s as any).profile_image_url} alt="Photo" className="w-8 h-8 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                    <span className="text-xs font-bold text-indigo-600">{s.full_name?.charAt(0)?.toUpperCase()}</span>
+                                  </div>
+                                )}
+                              </td>
                               <td className="py-2 px-2 text-sm font-medium">{s.full_name}</td>
                               <td className="py-2 px-2 text-xs text-gray-500">@{s.username}</td>
                               <td className="py-2 px-2 text-sm">{s.level}</td>
@@ -1344,7 +1394,6 @@ export default function ManagerDashboard() {
           </Card>
         </div>
       )}
-
       {/* Modal historique */}
       {showHistoryModal && selectedStudent && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

@@ -1,18 +1,21 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // ✅ Lire le token depuis le cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const currentUser = verifyToken(token)
     if (!currentUser) {
       return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
@@ -99,7 +102,6 @@ export async function PUT(
 
     if (historyError) {
       console.error('Erreur historique:', historyError)
-      // Ne pas bloquer la réponse, juste logger
     }
 
     return NextResponse.json({

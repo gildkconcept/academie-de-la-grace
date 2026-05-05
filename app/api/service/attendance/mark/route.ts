@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
     if (!user || (user.role !== 'service_manager' && user.role !== 'superadmin')) {
@@ -25,7 +27,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Vérifier la session
     const { data: session, error: sessionError } = await supabase
       .from('service_sessions')
       .select('*')
@@ -39,7 +40,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Vérifier que le manager a le droit sur cette session
     if (user.role === 'service_manager' && session.service_id !== user.serviceId) {
       return NextResponse.json(
         { error: 'Accès refusé à cette session' },
@@ -47,13 +47,12 @@ export async function POST(request: Request) {
       )
     }
 
-    // Enregistrer les présences avec la méthode 'manual'
     const records = attendances.map((a: any) => ({
       student_id: a.studentId,
       service_session_id: sessionId,
       status: a.status,
-      method: 'manual',  // ← AJOUT : indique que la présence a été marquée manuellement
-      marked_by: user.id  // ← AJOUT : trace qui a fait le marquage
+      method: 'manual',
+      marked_by: user.id
     }))
 
     const { error: insertError } = await supabase

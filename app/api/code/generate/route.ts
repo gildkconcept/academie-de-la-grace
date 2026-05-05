@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // ✅ Lire le token depuis le cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
     // Seul le superadmin peut générer des codes
@@ -22,14 +25,6 @@ export async function POST(request: Request) {
     // Récupérer la position et le rayon (optionnels)
     const { lat, lng, radius = 200 } = await request.json()
 
-    // La position GPS n'est plus obligatoire
-    // if (lat === undefined || lng === undefined) {
-    //   return NextResponse.json(
-    //     { error: 'Position GPS requise pour générer un code' },
-    //     { status: 400 }
-    //   )
-    // }
-
     // Validation des coordonnées si elles sont fournies
     if (lat !== undefined && (Math.abs(lat) > 90 || Math.abs(lng) > 180)) {
       return NextResponse.json(
@@ -41,7 +36,7 @@ export async function POST(request: Request) {
     // Générer un code aléatoire à 6 chiffres
     const code = Math.floor(100000 + Math.random() * 900000).toString()
     
-    // Calculer l'expiration (15 minutes au lieu de 5)
+    // Calculer l'expiration (15 minutes)
     const maintenant = new Date()
     const nowUTC = Date.UTC(
       maintenant.getUTCFullYear(),
@@ -53,7 +48,7 @@ export async function POST(request: Request) {
       maintenant.getUTCMilliseconds()
     )
     
-    const expiresAtUTC = new Date(nowUTC + 15 * 60 * 1000) // +15 minutes
+    const expiresAtUTC = new Date(nowUTC + 15 * 60 * 1000)
     const today = new Date(nowUTC).toISOString().split('T')[0]
 
     console.log('🔧 GÉNÉRATION CODE (15 min):')

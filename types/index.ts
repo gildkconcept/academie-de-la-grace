@@ -9,7 +9,8 @@ export interface User {
   email?: string
   phone?: string
   level?: 1 | 2 | 3
-  maisonGrace?: string  
+  maisonGrace?: string
+  profileImageUrl?: string  // ← AJOUT
 }
 
 export interface Student {
@@ -25,6 +26,7 @@ export interface Student {
   created_at: Date
   deleted_at?: string | null
   maison_grace?: string
+  profile_image_url?: string  // ← AJOUT
 }
 
 export interface Service {

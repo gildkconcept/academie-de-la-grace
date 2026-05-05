@@ -1,22 +1,25 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 export async function PUT(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // ✅ Lire le token depuis le cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
     if (!user) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const { name, username, email, phone, baptized, maisonGrace } = await request.json()  // ← AJOUT maisonGrace
+    const { name, username, email, phone, baptized, maisonGrace, profileImageUrl } = await request.json()
 
     // Validation
     if (!name || !username) {
@@ -84,11 +87,15 @@ export async function PUT(request: Request) {
       }
       // Ajouter la maison de grâce si fournie (uniquement pour les étudiants)
       if (maisonGrace !== undefined) {
-        updateData.maison_grace = maisonGrace || null  // ← AJOUT maison_grace
+        updateData.maison_grace = maisonGrace || null
+      }
+      // Ajouter la photo de profil si fournie (uniquement pour les étudiants)
+      if (profileImageUrl !== undefined) {
+        updateData.profile_image_url = profileImageUrl || null
       }
     }
 
-    console.log('Mise à jour profil:', { table, userId: user.id, updateData })
+    console.log('📝 Mise à jour profil:', { table, userId: user.id, updateData })
 
     // Mettre à jour le profil
     const { data, error } = await supabase
@@ -99,12 +106,14 @@ export async function PUT(request: Request) {
       .single()
 
     if (error) {
-      console.error('Erreur mise à jour:', error)
+      console.error('❌ Erreur mise à jour:', error)
       return NextResponse.json(
         { error: 'Erreur lors de la mise à jour du profil' },
         { status: 500 }
       )
     }
+
+    console.log('✅ Profil mis à jour avec succès:', { table, userId: user.id })
 
     return NextResponse.json({
       success: true,
@@ -113,7 +122,7 @@ export async function PUT(request: Request) {
     })
 
   } catch (error) {
-    console.error('Erreur globale:', error)
+    console.error('❌ Erreur globale:', error)
     return NextResponse.json(
       { error: 'Erreur serveur' },
       { status: 500 }

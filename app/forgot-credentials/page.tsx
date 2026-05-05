@@ -62,6 +62,7 @@ export default function ForgotCredentialsPage() {
       const res = await fetch('/api/auth/verify-recovery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',  // ← AJOUTÉ
         body: JSON.stringify(formData)
       })
 

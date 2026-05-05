@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // ✅ Lire le token depuis le cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
     if (!user || (user.role !== 'service_manager' && user.role !== 'superadmin')) {
@@ -42,10 +45,8 @@ export async function GET(request: Request) {
     let studentsList: any[] = []
 
     if (session) {
-      // Déterminer le service_id de la session
       const serviceId = session.service_id || user.serviceId
 
-      // Récupérer les présences avec la méthode
       const { data: attendances } = await supabase
         .from('service_attendance')
         .select('student_id, status, method')
@@ -53,14 +54,12 @@ export async function GET(request: Request) {
 
       const attendanceMap = new Map(attendances?.map(a => [a.student_id, { status: a.status, method: a.method }]))
 
-      // Récupérer tous les étudiants du service (avec has_phone)
       const { data: students } = await supabase
         .from('students')
         .select('id, full_name, phone, has_phone')
         .eq('service_id', serviceId)
         .is('deleted_at', null)
 
-      // Construire la liste des étudiants avec leur statut et méthode
       studentsList = (students || []).map(student => {
         const attendance = attendanceMap.get(student.id)
         return {

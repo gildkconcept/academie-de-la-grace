@@ -2,18 +2,22 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { checkRateLimit, recordAttempt, resetAttempts } from '@/lib/rate-limit'
+import { verifyRecoverySchema } from '@/lib/validators'
 
 export async function POST(request: Request) {
   try {
-    const { phone, fullName, branch, serviceId } = await request.json()
-
-    // Validation
-    if (!phone || !fullName || !branch || !serviceId) {
+    const body = await request.json()
+    
+    // ✅ Valider les entrées avec Zod
+    const validation = verifyRecoverySchema.safeParse(body)
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Tous les champs sont requis' },
+        { error: validation.error.errors[0].message },
         { status: 400 }
       )
     }
+    
+    const { phone, fullName, branch, serviceId } = validation.data
 
     // Rate limiting basé sur le téléphone
     const rateLimitKey = `recovery:${phone}`

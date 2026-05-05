@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 // GET - Récupérer les quizzes
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // ✅ Lire le token depuis le cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     if (!user) {
       return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
@@ -53,7 +56,6 @@ export async function GET(request: Request) {
 
     // FILTRAGE PAR NIVEAU POUR LES ÉTUDIANTS
     if (user.role === 'student') {
-      // Récupérer le niveau de l'étudiant depuis la base de données
       const { data: student } = await supabase
         .from('students')
         .select('level')
@@ -63,7 +65,6 @@ export async function GET(request: Request) {
       const studentLevel = student?.level || 1
       console.log('📚 ÉTUDIANT connecté - Niveau:', studentLevel)
       
-      // Filtrer les quizzes par le niveau de l'étudiant
       query = query.eq('level', studentLevel)
     }
 
@@ -101,12 +102,14 @@ export async function GET(request: Request) {
 // POST - Créer un nouveau quiz (superadmin uniquement)
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // ✅ Lire le token depuis le cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
     if (!user || user.role !== 'superadmin') {
@@ -115,12 +118,10 @@ export async function POST(request: Request) {
 
     const { title, description, level, start_date, end_date, questions } = await request.json()
 
-    // Validation
     if (!title || !level || !start_date || !end_date || !questions || questions.length === 0) {
       return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
     }
 
-    // Créer le quiz
     const { data: quiz, error: quizError } = await supabase
       .from('quizzes')
       .insert([{
@@ -140,7 +141,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erreur lors de la création du quiz' }, { status: 500 })
     }
 
-    // Ajouter les questions
     const questionsToInsert = questions.map((q: any, index: number) => ({
       quiz_id: quiz.id,
       question: q.question,
@@ -158,7 +158,6 @@ export async function POST(request: Request) {
 
     if (questionsError) {
       console.error('Erreur création questions:', questionsError)
-      // Supprimer le quiz si les questions échouent
       await supabase.from('quizzes').delete().eq('id', quiz.id)
       return NextResponse.json({ error: 'Erreur lors de la création des questions' }, { status: 500 })
     }

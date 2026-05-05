@@ -2,16 +2,19 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 // GET - Lister les notifications de l'utilisateur connecté
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    // ✅ Lire le token depuis le cookie avec next/headers
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
     if (!user) {
@@ -41,7 +44,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
     }
 
-    // Compter les non lues
     const { count: unreadCount } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
@@ -60,22 +62,23 @@ export async function GET(request: Request) {
   }
 }
 
-// POST - Créer une notification (admin/manager uniquement pour les annonces)
+// POST - Créer une notification
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    // ✅ Lire le token depuis le cookie avec next/headers
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
     if (!user) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    // Seuls superadmin et service_manager peuvent créer des annonces
     if (user.role !== 'superadmin' && user.role !== 'service_manager') {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
@@ -88,13 +91,11 @@ export async function POST(request: Request) {
 
     const userIdArray = Array.isArray(userIds) ? userIds : [userIds]
 
-    // Vérifier que le type est valide
     const validTypes = ['session', 'seance', 'quiz', 'result', 'promotion', 'absence', 'announcement']
     if (!validTypes.includes(type)) {
       return NextResponse.json({ error: 'Type invalide' }, { status: 400 })
     }
 
-    // Créer les notifications
     const notifications = userIdArray.map((userId: string) => ({
       user_id: userId,
       title,

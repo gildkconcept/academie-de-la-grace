@@ -15,13 +15,13 @@ export const AdminQuiz = () => {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ totalSubmissions: 0, totalStudents: 0, averageScore: 0, perfectScores: 0 })
 
-  // Formulaire création quiz
+  // Formulaire création quiz - avec dates par défaut
   const [newQuiz, setNewQuiz] = useState({
     title: '',
     description: '',
     level: '1',
-    start_date: '',
-    end_date: '',
+    start_date: new Date().toISOString().split('T')[0], // Aujourd'hui
+    end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +7 jours
     questions: [{ question: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: 'A' }]
   })
 
@@ -33,7 +33,7 @@ export const AdminQuiz = () => {
   const fetchQuizzes = async () => {
     try {
       const res = await fetch('/api/quizzes', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include'
       })
       const data = await res.json()
       if (res.ok) setQuizzes(data)
@@ -50,7 +50,7 @@ export const AdminQuiz = () => {
       if (selectedLevel !== 'all') url += `level=${selectedLevel}&`
       
       const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include'
       })
       const data = await res.json()
       if (res.ok) {
@@ -101,9 +101,9 @@ export const AdminQuiz = () => {
       const res = await fetch('/api/quizzes', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(newQuiz)
       })
       const data = await res.json()
@@ -114,8 +114,8 @@ export const AdminQuiz = () => {
           title: '',
           description: '',
           level: '1',
-          start_date: '',
-          end_date: '',
+          start_date: new Date().toISOString().split('T')[0],
+          end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           questions: [{ question: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: 'A' }]
         })
         fetchQuizzes()

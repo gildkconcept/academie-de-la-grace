@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // ✅ Lire le token depuis le cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
     if (!user || user.role !== 'student') {
@@ -72,7 +75,7 @@ export async function POST(request: Request) {
         status: 'present',
         date: today,
         scanned_at: new Date().toISOString(),
-        method: 'code'  // ← AJOUT : indique que la présence a été validée par code
+        method: 'code'
       }])
 
     if (attendanceError) {

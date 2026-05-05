@@ -1,13 +1,26 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { comparePassword, generateToken } from '@/lib/auth'
+import { loginSchema } from '@/lib/validators'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json()
+    const body = await request.json()
     
-    console.log('=== TENTATIVE DE CONNEXION ===')
-    console.log('Username:', username)
+    // ✅ Valider les entrées avec Zod
+    const validation = loginSchema.safeParse(body)
+    if (!validation.success) {
+      logger.fail('Validation des données de connexion', { errors: validation.error.errors })
+      return NextResponse.json(
+        { error: validation.error.errors[0].message },
+        { status: 400 }
+      )
+    }
+    
+    const { username, password } = validation.data
+    
+    logger.start('Tentative de connexion', { username })
 
     // Vérifier dans users (admins/managers)
     const { data: user } = await supabase
@@ -18,8 +31,9 @@ export async function POST(request: Request) {
 
     if (user && await comparePassword(password, user.password)) {
       const token = generateToken(user)
-      return NextResponse.json({
-        token,
+      
+      // Créer la réponse avec les données utilisateur
+      const response = NextResponse.json({
         user: {
           id: user.id,
           name: user.name,
@@ -29,6 +43,18 @@ export async function POST(request: Request) {
           level: null
         }
       })
+
+      // Stocker le token dans un cookie HttpOnly sécurisé
+      response.cookies.set('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60,
+        path: '/'
+      })
+
+      logger.success('Connexion admin réussie', { userId: user.id, username, role: user.role })
+      return response
     }
 
     // Vérifier dans students (uniquement ceux qui ne sont pas supprimés)
@@ -36,13 +62,15 @@ export async function POST(request: Request) {
       .from('students')
       .select('id, full_name, username, password, service_id, level, email, phone')
       .eq('username', username)
-      .is('deleted_at', null)   // ← Ignorer les comptes soft-deleted
+      .is('deleted_at', null)
       .maybeSingle()
 
     if (student && await comparePassword(password, student.password)) {
-      console.log('📊 Étudiant trouvé - ID:', student.id)
-      console.log('📊 Nom:', student.full_name)
-      console.log('📊 Niveau:', student.level)
+      logger.debug('Étudiant trouvé', { 
+        studentId: student.id, 
+        name: student.full_name, 
+        level: student.level 
+      })
       
       const token = generateToken({ 
         id: student.id,
@@ -53,8 +81,8 @@ export async function POST(request: Request) {
         level: student.level
       })
       
-      return NextResponse.json({
-        token,
+      // Créer la réponse avec les données utilisateur
+      const response = NextResponse.json({
         user: {
           id: student.id,
           name: student.full_name,
@@ -64,15 +92,31 @@ export async function POST(request: Request) {
           level: student.level
         }
       })
+
+      // Stocker le token dans un cookie HttpOnly sécurisé
+      response.cookies.set('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60,
+        path: '/'
+      })
+
+      logger.success('Connexion étudiant réussie', { 
+        studentId: student.id, 
+        username, 
+        level: student.level 
+      })
+      return response
     }
 
-    console.log('Échec de connexion pour:', username)
+    logger.fail('Connexion échouée', { username, reason: 'Identifiants incorrects' })
     return NextResponse.json(
       { error: 'Nom d\'utilisateur ou mot de passe incorrect' },
       { status: 401 }
     )
   } catch (error) {
-    console.error('Erreur login:', error)
+    logger.error('Erreur serveur lors du login', error)
     return NextResponse.json(
       { error: 'Erreur serveur' },
       { status: 500 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { hashPassword } from '@/lib/auth'
+import { registerSchema } from '@/lib/validators'
 
 // Fonction pour vérifier si un username existe déjà
 async function usernameExists(username: string): Promise<boolean> {
@@ -42,16 +43,30 @@ function extractFirstAndLastName(fullName: string): { prenom: string; nom: strin
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { fullName, branch, level, serviceId, baptized, phone, username: userProvidedUsername, password, maisonGrace } = body
-
-    // Validation du niveau (1, 2 ou 3)
-    const levelNumber = parseInt(level)
-    if (isNaN(levelNumber) || levelNumber < 1 || levelNumber > 3) {
+    
+    // ✅ Valider les entrées avec Zod
+    const validation = registerSchema.safeParse(body)
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Le niveau doit être 1, 2 ou 3' },
+        { error: validation.error.errors[0].message },
         { status: 400 }
       )
     }
+    
+    const { 
+      fullName, 
+      branch, 
+      level, 
+      serviceId, 
+      baptized, 
+      phone, 
+      username: userProvidedUsername, 
+      password, 
+      maisonGrace 
+    } = validation.data
+
+    // Validation du niveau (déjà fait par Zod, mais on garde pour la conversion)
+    const levelNumber = parseInt(level)
 
     // Extraire prénom et nom
     let prenom: string, nom: string
@@ -101,8 +116,8 @@ export async function POST(request: Request) {
     // Hasher le mot de passe
     const hashedPassword = await hashPassword(password)
 
-    // Convertir la valeur du baptême en booléen (gère string et boolean)
-    const baptizedBoolean = baptized === 'true' || baptized === true
+    // baptized est déjà un booléen grâce à Zod
+    const baptizedBoolean = baptized
 
     console.log('📝 Inscription - Baptême reçu:', baptized, 'converti en:', baptizedBoolean)
     console.log('📝 Maison de grâce:', maisonGrace || 'non spécifiée')
@@ -122,7 +137,7 @@ export async function POST(request: Request) {
           baptized: baptizedBoolean,
           phone,
           password: hashedPassword,
-          maison_grace: maisonGrace || null  // ← AJOUT : maison de grâce (optionnel)
+          maison_grace: maisonGrace || null
         }
       ])
       .select()

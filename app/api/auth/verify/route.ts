@@ -4,16 +4,20 @@ import { supabase } from '@/lib/supabase'
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Token manquant' }, { status: 401 })
+    // 🔄 Lire le token depuis le cookie (au lieu du header Authorization)
+    const token = request.cookies.get('token')?.value
+    
+    if (!token) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const decoded = verifyToken(token)
 
     if (!decoded) {
-      return NextResponse.json({ error: 'Token invalide' }, { status: 401 })
+      // Token invalide → supprimer le cookie
+      const response = NextResponse.json({ error: 'Token invalide' }, { status: 401 })
+      response.cookies.set('token', '', { maxAge: 0, path: '/' })
+      return response
     }
 
     console.log('🔍 Token décodé:', decoded)
@@ -29,10 +33,10 @@ export async function GET(request: Request) {
       userData = data
       console.log('👤 Utilisateur admin trouvé:', userData)
     } else if (decoded.role === 'student') {
-      // Tentative 1 : Recherche par ID (ajout de maison_grace)
+      // Tentative 1 : Recherche par ID (ajout de profile_image_url)
       let { data } = await supabase
         .from('students')
-        .select('id, full_name, username, service_id, level, email, phone, deleted_at, maison_grace')
+        .select('id, full_name, username, service_id, level, email, phone, deleted_at, maison_grace, profile_image_url')
         .eq('id', decoded.id)
         .is('deleted_at', null)
         .maybeSingle()
@@ -42,7 +46,7 @@ export async function GET(request: Request) {
         console.log('🔍 Étudiant non trouvé par ID, recherche par username:', decoded.username)
         const { data: byUsername } = await supabase
           .from('students')
-          .select('id, full_name, username, service_id, level, email, phone, deleted_at, maison_grace')
+          .select('id, full_name, username, service_id, level, email, phone, deleted_at, maison_grace, profile_image_url')
           .eq('username', decoded.username)
           .is('deleted_at', null)
           .maybeSingle()
@@ -86,7 +90,8 @@ export async function GET(request: Request) {
         email: userData?.email || '',
         phone: userData?.phone || '',
         level: userData?.level || (decoded.role === 'student' ? 1 : null),
-        maisonGrace: userData?.maison_grace || null  // ← AJOUT
+        maisonGrace: userData?.maison_grace || null,
+        profileImageUrl: userData?.profile_image_url || null  // ← AJOUT
       }
     })
   } catch (error) {

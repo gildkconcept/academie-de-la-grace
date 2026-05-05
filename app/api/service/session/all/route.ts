@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     if (!user || (user.role !== 'service_manager' && user.role !== 'superadmin')) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
@@ -37,7 +39,6 @@ export async function GET(request: Request) {
     const { data, error } = await query
     if (error) throw error
 
-    // Ajouter les statistiques
     const sessionsWithStats = await Promise.all((data || []).map(async (session) => {
       const { data: attendances } = await supabase
         .from('service_attendance')

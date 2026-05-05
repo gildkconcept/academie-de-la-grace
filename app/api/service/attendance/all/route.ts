@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
     if (!user || (user.role !== 'superadmin' && user.role !== 'service_manager')) {
@@ -19,7 +21,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')
     const serviceId = searchParams.get('serviceId')
-    const type = searchParams.get('type') // 👈 récupération du type
+    const type = searchParams.get('type')
 
     let query = supabase
       .from('service_sessions')
@@ -50,7 +52,7 @@ export async function GET(request: Request) {
     }
 
     if (type && type !== 'all') {
-      query = query.eq('type', type) // 👈 filtrage par type
+      query = query.eq('type', type)
     }
 
     const { data, error } = await query

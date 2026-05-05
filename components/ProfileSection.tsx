@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { UserCircleIcon, KeyIcon, ArrowLeftIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
+import { UserCircleIcon, KeyIcon, ArrowLeftIcon, EyeIcon, EyeSlashIcon, CameraIcon, TrashIcon } from '@heroicons/react/24/outline'
 
 interface ProfileSectionProps {
   user: any
@@ -14,18 +14,20 @@ interface ProfileSectionProps {
 export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
   const [activeTab, setActiveTab] = useState('profile')
   const [loadingUpdate, setLoadingUpdate] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
   // États pour le profil
   const [profileData, setProfileData] = useState({
-    name: user?.name || '',
+    name: user?.name || user?.full_name || '',
     username: user?.username || '',
     email: user?.email || '',
     phone: user?.phone || '',
     baptized: user?.baptized === true || user?.baptized === 'true' || false,
-    maisonGrace: user?.maisonGrace || ''  // ← AJOUT
+    maisonGrace: user?.maisonGrace || '',
+    profileImageUrl: user?.profileImageUrl || user?.profile_image_url || ''
   })
 
   // États pour le mot de passe
@@ -39,6 +41,77 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
     if (user?.role === 'superadmin') return 'Administrateur'
     if (user?.role === 'service_manager') return 'Responsable de service'
     return 'Étudiant'
+  }
+
+  // 📸 Upload photo avec rechargement automatique
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Format non autorisé (JPG, PNG, WebP)')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image trop volumineuse (max 5 MB)')
+      return
+    }
+
+    setUploadingPhoto(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/profile/upload-photo', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        setProfileData({ ...profileData, profileImageUrl: data.url })
+        toast.success('Photo mise à jour !')
+        
+        // ✅ Recharger la page automatiquement après l'upload
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
+      } else {
+        toast.error(data.error || 'Erreur upload')
+      }
+    } catch (error) {
+      toast.error('Erreur réseau')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  // 🗑️ Supprimer photo avec rechargement automatique
+  const handlePhotoDelete = async () => {
+    if (!confirm('Supprimer votre photo de profil ?')) return
+
+    setUploadingPhoto(true)
+    try {
+      const res = await fetch('/api/profile/delete-photo', {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+      if (res.ok) {
+        setProfileData({ ...profileData, profileImageUrl: '' })
+        toast.success('Photo supprimée')
+        
+        // ✅ Recharger la page automatiquement après la suppression
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
+      }
+    } catch (error) {
+      toast.error('Erreur réseau')
+    } finally {
+      setUploadingPhoto(false)
+    }
   }
 
   const handleProfileUpdate = async () => {
@@ -55,19 +128,19 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
         email: profileData.email
       }
 
-      // Ajouter le téléphone, baptême et maisonGrace seulement pour les étudiants
       if (user?.role === 'student') {
         body.phone = profileData.phone
         body.baptized = profileData.baptized
-        body.maisonGrace = profileData.maisonGrace  // ← AJOUT
+        body.maisonGrace = profileData.maisonGrace
+        body.profileImageUrl = profileData.profileImageUrl
       }
 
       const res = await fetch('/api/profile/update', {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(body)
       })
 
@@ -110,9 +183,9 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
       const res = await fetch('/api/profile/change-password', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           currentPassword: passwordData.currentPassword,
           newPassword: passwordData.newPassword
@@ -129,8 +202,15 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
           confirmPassword: ''
         })
         
-        setTimeout(() => {
-          localStorage.removeItem('token')
+        setTimeout(async () => {
+          try {
+            await fetch('/api/auth/logout', {
+              method: 'POST',
+              credentials: 'include'
+            })
+          } catch (error) {
+            console.error('Erreur logout:', error)
+          }
           window.location.href = '/login'
           toast.info('Veuillez vous reconnecter avec votre nouveau mot de passe')
         }, 2000)
@@ -159,16 +239,34 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
         <h1 className="text-2xl font-bold text-gray-900">Mon profil</h1>
       </div>
 
-      {/* Informations utilisateur */}
+      {/* Informations utilisateur avec photo */}
       <Card className="mb-6">
         <CardContent className="pt-6">
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center">
-              <span className="text-2xl font-bold text-indigo-600">
-                {profileData.name.charAt(0).toUpperCase()}
-              </span>
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            {/* Photo de profil */}
+            <div className="relative">
+              {profileData.profileImageUrl ? (
+                <img
+                  src={profileData.profileImageUrl}
+                  alt="Photo de profil"
+                  className="w-20 h-20 rounded-full object-cover border-4 border-indigo-200"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center border-4 border-indigo-200">
+                  <span className="text-3xl font-bold text-indigo-600">
+                    {profileData.name?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                </div>
+              )}
+              {uploadingPhoto && (
+                <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
             </div>
-            <div>
+
+            {/* Infos + boutons photo */}
+            <div className="flex-1 text-center sm:text-left">
               <h2 className="text-xl font-semibold text-gray-900">{profileData.name}</h2>
               <p className="text-sm text-gray-500 capitalize">{getRoleLabel()}</p>
               <p className="text-sm text-gray-500">@{profileData.username}</p>
@@ -180,6 +278,33 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                   )}
                 </>
               )}
+              
+              {/* Boutons photo */}
+              <div className="flex gap-2 mt-3 justify-center sm:justify-start">
+                <label className="cursor-pointer inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm hover:bg-indigo-100 transition-colors">
+                  <CameraIcon className="w-4 h-4" />
+                  {profileData.profileImageUrl ? 'Changer' : 'Ajouter photo'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                    disabled={uploadingPhoto}
+                  />
+                </label>
+                
+                {profileData.profileImageUrl && (
+                  <button
+                    onClick={handlePhotoDelete}
+                    disabled={uploadingPhoto}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-sm hover:bg-red-100 transition-colors"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                    Supprimer
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -295,7 +420,6 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                       </select>
                     </div>
 
-                    {/* Maison de grâce - champ modifiable */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Maison de grâce
@@ -338,7 +462,6 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
           </CardHeader>
           <CardContent>
             <div className="space-y-6 max-w-md">
-              {/* Mot de passe actuel */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mot de passe actuel
@@ -361,7 +484,6 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                 </div>
               </div>
 
-              {/* Nouveau mot de passe */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Nouveau mot de passe
@@ -385,7 +507,6 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                 <p className="text-xs text-gray-500 mt-1">Minimum 6 caractères</p>
               </div>
 
-              {/* Confirmation */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Confirmer le nouveau mot de passe
@@ -408,7 +529,6 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
                 </div>
               </div>
 
-              {/* Indicateur de correspondance */}
               {passwordData.newPassword && passwordData.confirmPassword && (
                 <div className="text-sm">
                   {passwordData.newPassword === passwordData.confirmPassword ? (

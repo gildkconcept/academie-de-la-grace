@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     if (!user || user.role !== 'service_manager') {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
@@ -20,7 +22,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Le type de session est obligatoire' }, { status: 400 })
     }
 
-    // Vérifier que le type existe
     const { data: typeExists } = await supabase
       .from('session_types')
       .select('code')

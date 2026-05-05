@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { Service } from '@/types'
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
+import { EyeIcon, EyeSlashIcon, CameraIcon, TrashIcon } from '@heroicons/react/24/outline'
 
 const branchesList = [
   'Katartizo',
@@ -23,10 +23,12 @@ const branchesList = [
 export default function RegisterPage() {
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [generatedUsername, setGeneratedUsername] = useState<string | null>(null)
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -38,7 +40,8 @@ export default function RegisterPage() {
     phone: '',
     username: '',
     password: '',
-    maisonGrace: ''
+    maisonGrace: '',
+    profileImageUrl: ''
   })
 
   useEffect(() => {
@@ -92,6 +95,56 @@ export default function RegisterPage() {
     toast.success('Nom d\'utilisateur copié !')
   }
 
+  // 📸 Gérer l'upload de photo avant l'inscription
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validation
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Format non autorisé (JPG, PNG, WebP)')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image trop volumineuse (max 5 MB)')
+      return
+    }
+
+    setUploadingPhoto(true)
+    try {
+      // Créer un nom temporaire avec timestamp
+      const fileName = `temp_${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+
+      const { data, error } = await supabase.storage
+        .from('student-profiles')
+        .upload(fileName, file)
+
+      if (error) {
+        toast.error('Erreur lors de l\'upload')
+        return
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('student-profiles')
+        .getPublicUrl(fileName)
+
+      setPreviewUrl(urlData.publicUrl)
+      setFormData({ ...formData, profileImageUrl: urlData.publicUrl })
+      toast.success('Photo prête !')
+    } catch (error) {
+      toast.error('Erreur réseau')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  const handlePhotoDelete = () => {
+    setPreviewUrl(null)
+    setFormData({ ...formData, profileImageUrl: '' })
+    toast.success('Photo retirée')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -121,7 +174,8 @@ export default function RegisterPage() {
           phone: formData.phone,
           username: formData.username,
           password: formData.password,
-          maisonGrace: formData.maisonGrace
+          maisonGrace: formData.maisonGrace,
+          profileImageUrl: formData.profileImageUrl  // ← AJOUT
         })
       })
 
@@ -162,6 +216,12 @@ export default function RegisterPage() {
               ✅ Compte créé avec succès !
             </h2>
             <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-6">
+              {/* Afficher la photo si elle existe */}
+              {previewUrl && (
+                <div className="flex justify-center mb-4">
+                  <img src={previewUrl} alt="Photo" className="w-24 h-24 rounded-full object-cover border-4 border-green-200" />
+                </div>
+              )}
               <p className="text-sm text-gray-600 text-center mb-2">
                 Votre nom d'utilisateur :
               </p>
@@ -212,6 +272,56 @@ export default function RegisterPage() {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
+            {/* 📸 Photo de profil */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Photo de profil <span className="text-xs text-gray-400">(optionnel)</span>
+              </label>
+              <div className="flex items-center gap-4">
+                {previewUrl ? (
+                  <div className="relative">
+                    <img
+                      src={previewUrl}
+                      alt="Aperçu"
+                      className="w-16 h-16 rounded-full object-cover border-2 border-indigo-200"
+                    />
+                    {uploadingPhoto && (
+                      <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300">
+                    <CameraIcon className="w-6 h-6 text-gray-400" />
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <label className="cursor-pointer inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm hover:bg-indigo-100 transition-colors">
+                    <CameraIcon className="w-4 h-4" />
+                    {previewUrl ? 'Changer' : 'Ajouter'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                      disabled={uploadingPhoto}
+                    />
+                  </label>
+                  {previewUrl && (
+                    <button
+                      type="button"
+                      onClick={handlePhotoDelete}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-sm hover:bg-red-100 transition-colors"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div>
               <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
                 Nom et prénom <span className="text-red-500">*</span>
@@ -226,6 +336,8 @@ export default function RegisterPage() {
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
               />
             </div>
+
+            {/* ... LE RESTE DU FORMULAIRE EST IDENTIQUE ... */}
 
             <div>
               <label htmlFor="branch" className="block text-sm font-medium text-gray-700">
@@ -313,7 +425,6 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Maison de grâce - champ texte libre */}
             <div>
               <label htmlFor="maisonGrace" className="block text-sm font-medium text-gray-700">
                 Maison de grâce
@@ -348,7 +459,6 @@ export default function RegisterPage() {
                 placeholder="ex: gildas.koudou"
               />
               
-              {/* Statut de disponibilité */}
               {usernameStatus === 'checking' && (
                 <p className="mt-1 text-sm text-gray-500">⏳ Vérification en cours...</p>
               )}
@@ -359,7 +469,6 @@ export default function RegisterPage() {
                 <p className="mt-1 text-sm text-red-600">❌ Déjà utilisé</p>
               )}
 
-              {/* Suggestions */}
               {suggestions.length > 0 && (
                 <div className="mt-2">
                   <p className="text-sm text-gray-500">Suggestions :</p>
