@@ -1,18 +1,21 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
+import { cookies } from 'next/headers'
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // ✅ Lire le token depuis le cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
+    
+    if (!token) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
     const user = verifyToken(token)
     
     if (!user || user.role !== 'student') {
@@ -20,7 +23,7 @@ export async function POST(
     }
 
     const { id: quizId } = await params
-    const { answers } = await request.json() // answers: { questionId: selectedAnswer }
+    const { answers } = await request.json()
 
     // Récupérer les questions du quiz
     const { data: questions, error: questionsError } = await supabase
@@ -91,7 +94,7 @@ export async function POST(
         .from('student_badges')
         .select('id')
         .eq('student_id', user.id)
-        .eq('badge_id', 'perfect_quiz_badge') // À créer en base
+        .eq('badge_id', 'perfect_quiz_badge')
         .single()
 
       if (!existingBadge) {
