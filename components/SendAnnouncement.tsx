@@ -1,8 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { XMarkIcon, MegaphoneIcon } from '@heroicons/react/24/outline'
 
@@ -12,11 +10,7 @@ interface SendAnnouncementProps {
 
 export const SendAnnouncement = ({ onClose }: SendAnnouncementProps) => {
   const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    title: '',
-    message: '',
-    target: 'all'
-  })
+  const [formData, setFormData] = useState({ title: '', message: '', target: 'all' })
   const [services, setServices] = useState<any[]>([])
   const [selectedService, setSelectedService] = useState<string>('')
   const [selectedLevel, setSelectedLevel] = useState<string>('1')
@@ -28,185 +22,101 @@ export const SendAnnouncement = ({ onClose }: SendAnnouncementProps) => {
       const res = await fetch('/api/services', { credentials: 'include' })
       const data = await res.json()
       if (Array.isArray(data)) setServices(data)
-    } catch (error) {
-      console.error('Erreur chargement services:', error)
-    } finally {
-      setLoadingServices(false)
-    }
+    } catch (error) { console.error('Erreur chargement services:', error) }
+    finally { setLoadingServices(false) }
   }
 
   const handleSend = async () => {
-    if (!formData.title || !formData.message) {
-      toast.error('Le titre et le message sont requis')
-      return
-    }
-
+    if (!formData.title || !formData.message) { toast.error('Le titre et le message sont requis'); return }
     setLoading(true)
     try {
       let userIds: string[] = []
       let targetLabel = ''
-
       if (formData.target === 'all') {
         const res = await fetch('/api/students/all-ids', { credentials: 'include' })
-        const data = await res.json()
-        userIds = data.studentIds || []
-        targetLabel = 'tous les étudiants'
+        const data = await res.json(); userIds = data.studentIds || []; targetLabel = 'tous les étudiants'
       } else if (formData.target === 'service') {
-        if (!selectedService) {
-          toast.error('Veuillez sélectionner un service')
-          setLoading(false)
-          return
-        }
+        if (!selectedService) { toast.error('Veuillez sélectionner un service'); setLoading(false); return }
         const res = await fetch(`/api/students/by-service?serviceId=${selectedService}`, { credentials: 'include' })
-        const data = await res.json()
-        userIds = data.studentIds || []
-        const serviceName = services.find(s => s.id === selectedService)?.name || 'ce service'
-        targetLabel = `le service ${serviceName}`
+        const data = await res.json(); userIds = data.studentIds || []
+        targetLabel = `le service ${services.find(s => s.id === selectedService)?.name || ''}`
       } else if (formData.target === 'level') {
         const res = await fetch(`/api/students/by-level?level=${selectedLevel}`, { credentials: 'include' })
-        const data = await res.json()
-        userIds = data.studentIds || []
-        targetLabel = `les étudiants de niveau ${selectedLevel}`
+        const data = await res.json(); userIds = data.studentIds || []; targetLabel = `les étudiants de niveau ${selectedLevel}`
       }
-
-      if (userIds.length === 0) {
-        toast.error('Aucun étudiant trouvé')
-        setLoading(false)
-        return
-      }
+      if (userIds.length === 0) { toast.error('Aucun étudiant trouvé'); setLoading(false); return }
 
       const res = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          userIds,
-          title: `📢 ${formData.title}`,
-          message: formData.message,
-          type: 'announcement',
-          link: '/dashboard/student'
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ userIds, title: `📢 ${formData.title}`, message: formData.message, type: 'announcement', link: '/dashboard/student' })
       })
-
       const data = await res.json()
-      if (res.ok) {
-        toast.success(`Annonce envoyée à ${userIds.length} étudiant(s) de ${targetLabel} !`)
-        onClose()
-      } else {
-        toast.error(data.error || 'Erreur lors de l\'envoi')
-      }
-    } catch (error) {
-      console.error('Erreur:', error)
-      toast.error('Erreur réseau')
-    } finally {
-      setLoading(false)
-    }
+      if (res.ok) { toast.success(`Annonce envoyée à ${userIds.length} étudiant(s) de ${targetLabel} !`); onClose() }
+      else toast.error(data.error || 'Erreur lors de l\'envoi')
+    } catch (error) { toast.error('Erreur réseau') }
+    finally { setLoading(false) }
   }
 
+  const inputClass = "w-full p-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-400"
+  const selectClass = "w-full p-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-indigo-400 [&>option]:bg-white [&>option]:text-gray-900"
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <MegaphoneIcon className="w-5 h-5 text-indigo-600" />
-            Nouvelle annonce
-          </CardTitle>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <XMarkIcon className="w-5 h-5" />
-          </button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Titre */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Titre <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Ex: Rappel important"
-              className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-              maxLength={200}
-            />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="w-full max-w-lg relative rounded-2xl" style={{ fontFamily: "'Crimson Text', Georgia, serif" }}>
+        <div className="absolute inset-0 bg-cover bg-center rounded-2xl" style={{ backgroundImage: "url('/ok.png')" }} />
+        <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(135deg, rgba(8,20,90,0.97) 0%, rgba(15,45,130,0.95) 40%, rgba(10,30,100,0.96) 70%, rgba(4,12,65,0.98) 100%)' }} />
+        <div className="relative z-10 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-normal text-white flex items-center gap-2" style={{ fontFamily: "'Playfair Display', serif" }}>
+              <MegaphoneIcon className="w-5 h-5 text-blue-300" /> Nouvelle annonce
+            </h2>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+              <XMarkIcon className="w-5 h-5 text-white/60" />
+            </button>
           </div>
 
-          {/* Message */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Message <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={formData.message}
-              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              placeholder="Votre message..."
-              className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-              rows={4}
-              maxLength={1000}
-            />
-            <p className="text-xs text-gray-400 mt-1">{formData.message.length}/1000</p>
-          </div>
-
-          {/* Cible */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Destinataires
-            </label>
-            <select
-              value={formData.target}
-              onChange={(e) => {
-                setFormData({ ...formData, target: e.target.value })
-                if (e.target.value === 'service') fetchServices()
-              }}
-              className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-            >
-              <option value="all">Tous les étudiants</option>
-              <option value="service">Un service spécifique</option>
-              <option value="level">Par niveau</option>
-            </select>
-          </div>
-
-          {/* Sélection du service */}
-          {formData.target === 'service' && (
+          <div className="space-y-4">
             <div>
-              <select
-                value={selectedService}
-                onChange={(e) => setSelectedService(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                disabled={loadingServices}
-              >
+              <label className="block text-sm text-white/70 mb-1">Titre <span className="text-red-400">*</span></label>
+              <input type="text" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Ex: Rappel important" className={inputClass} maxLength={200} />
+            </div>
+            <div>
+              <label className="block text-sm text-white/70 mb-1">Message <span className="text-red-400">*</span></label>
+              <textarea value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                placeholder="Votre message..." className={inputClass} rows={4} maxLength={1000} />
+              <p className="text-xs text-white/30 mt-1">{formData.message.length}/1000</p>
+            </div>
+            <div>
+              <label className="block text-sm text-white/70 mb-1">Destinataires</label>
+              <select value={formData.target} onChange={(e) => { setFormData({ ...formData, target: e.target.value }); if (e.target.value === 'service') fetchServices() }}
+                className={selectClass}>
+                <option value="all">Tous les étudiants</option>
+                <option value="service">Un service spécifique</option>
+                <option value="level">Par niveau</option>
+              </select>
+            </div>
+            {formData.target === 'service' && (
+              <select value={selectedService} onChange={(e) => setSelectedService(e.target.value)} className={selectClass} disabled={loadingServices}>
                 <option value="">Sélectionnez un service</option>
-                {services.map(service => (
-                  <option key={service.id} value={service.id}>{service.name}</option>
-                ))}
+                {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-            </div>
-          )}
-
-          {/* Sélection du niveau */}
-          {formData.target === 'level' && (
-            <div>
-              <select
-                value={selectedLevel}
-                onChange={(e) => setSelectedLevel(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-              >
-                <option value="1">Niveau 1</option>
-                <option value="2">Niveau 2</option>
-                <option value="3">Niveau 3</option>
+            )}
+            {formData.target === 'level' && (
+              <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className={selectClass}>
+                <option value="1">Niveau 1</option><option value="2">Niveau 2</option><option value="3">Niveau 3</option>
               </select>
+            )}
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/[0.08]">
+              <button onClick={onClose} className="px-4 py-2 bg-white/10 text-white/70 rounded-lg text-sm hover:bg-white/20 transition-colors">Annuler</button>
+              <button onClick={handleSend} disabled={loading}
+                className="px-6 py-2 bg-white text-[#1a3a8f] rounded-lg text-sm font-bold hover:shadow-lg transition-all disabled:opacity-50" style={{ fontFamily: "'Crimson Text', serif" }}>
+                {loading ? 'Envoi...' : "Envoyer l'annonce"}
+              </button>
             </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={onClose}>Annuler</Button>
-            <Button onClick={handleSend} disabled={loading}>
-              {loading ? 'Envoi...' : 'Envoyer l\'annonce'}
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

@@ -29,16 +29,10 @@ export default function LoginPage() {
 
       if (res.ok) {
         toast.success('Connexion réussie')
-        
         switch(data.user.role) {
-          case 'superadmin':
-            router.push('/dashboard/superadmin')
-            break
-          case 'service_manager':
-            router.push('/dashboard/manager')
-            break
-          default:
-            router.push('/dashboard/student')
+          case 'superadmin': router.push('/dashboard/superadmin'); break
+          case 'service_manager': router.push('/dashboard/manager'); break
+          default: router.push('/dashboard/student')
         }
       } else {
         toast.error(data.error || 'Erreur de connexion')
@@ -51,26 +45,44 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center" style={{ fontFamily: "'Crimson Text', Georgia, serif", color: 'white' }}>
+      
+      {/* Image de fond */}
+      <div className="fixed inset-0 bg-cover bg-center z-0" style={{ backgroundImage: "url('/ok.png')" }} />
+      
+      {/* Overlay gradient */}
+      <div className="fixed inset-0 z-10" style={{ 
+        background: 'linear-gradient(135deg, rgba(8,20,90,0.88) 0%, rgba(15,45,130,0.82) 40%, rgba(10,30,100,0.87) 70%, rgba(4,12,65,0.92) 100%)' 
+      }} />
+      
+      {/* Orbs */}
+      <div className="fixed w-[280px] h-[280px] rounded-full bg-blue-400/20 blur-[80px] -top-[40px] -right-[40px] z-20 pointer-events-none" />
+      <div className="fixed w-[250px] h-[250px] rounded-full bg-blue-600/15 blur-[80px] bottom-[10%] -left-[40px] z-20 pointer-events-none" />
+
+      <div className="relative z-30 w-full max-w-md px-4 py-12">
+        
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-sm font-bold text-[#1a3a8f] mx-auto mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
+            AG
+          </div>
+          <h1 className="text-3xl font-normal text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
             Académie de la Grâce
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Connectez-vous à votre compte
-          </p>
+          </h1>
+          <p className="text-blue-200/70 text-xs mt-2">Connectez-vous à votre compte</p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
+
+        {/* Carte glass */}
+        <div className="bg-white/[0.07] backdrop-blur-3xl border border-white/[0.18] rounded-3xl p-8 shadow-[0_32px_64px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.22)]">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Nom d'utilisateur"
+                className="w-full px-4 py-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 text-sm"
               />
             </div>
             <div className="relative">
@@ -79,49 +91,48 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm pr-10"
                 placeholder="Mot de passe"
+                className="w-full px-4 py-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 text-sm pr-10"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
               >
-                {showPassword ? (
-                  <EyeSlashIcon className="h-5 w-5" />
-                ) : (
-                  <EyeIcon className="h-5 w-5" />
-                )}
+                {showPassword ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
               </button>
             </div>
-          </div>
 
-          {/* Lien mot de passe oublié */}
-          <div className="flex justify-end">
-            <Link 
-              href="/forgot-credentials" 
-              className="text-sm text-indigo-600 hover:text-indigo-500"
-            >
-              Nom d'utilisateur ou mot de passe oublié ?
-            </Link>
-          </div>
+            <div className="text-right">
+              <Link href="/forgot-credentials" className="text-xs text-blue-300/70 hover:text-blue-200 transition-colors">
+                Nom d'utilisateur ou mot de passe oublié ?
+              </Link>
+            </div>
 
-          <div>
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              className="w-full bg-white text-[#1a3a8f] py-2.5 rounded-lg text-sm font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50"
+              style={{ fontFamily: "'Crimson Text', serif" }}
             >
               {loading ? 'Connexion...' : 'Se connecter'}
             </button>
-          </div>
+          </form>
 
-          <div className="text-center">
-            <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-              Pas encore inscrit ? Créer un compte
+          <p className="text-center text-xs text-blue-200/50 mt-6">
+            Pas encore inscrit ?{' '}
+            <Link href="/register" className="text-white hover:underline font-semibold">
+              Créer un compte
             </Link>
-          </div>
-        </form>
+          </p>
+        </div>
+
+        {/* Retour accueil */}
+        <div className="text-center mt-6">
+          <Link href="/" className="text-xs text-blue-200/40 hover:text-white/60 transition-colors">
+            ← Retour à l'accueil
+          </Link>
+        </div>
       </div>
     </div>
   )

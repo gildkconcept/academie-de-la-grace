@@ -14,6 +14,7 @@ import { NotificationBell } from '@/components/NotificationBell'
 import { 
   UserCircleIcon, 
   UserPlusIcon, 
+    ArrowLeftOnRectangleIcon,
   Bars3Icon, 
   XMarkIcon, 
   CalendarIcon, 
@@ -779,115 +780,91 @@ const [baptismStatsData, setBaptismStatsData] = useState<any[]>([])
   const currentLevel = user?.level || 1
 
   return (
-    <div className="min-h-screen bg-gray-100 pb-20">
-      {/* Barre de navigation responsive */}
-      <nav className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 lg:hidden"
-              >
-                {mobileMenuOpen ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
-              </button>
-              <h1 className="text-base sm:text-lg font-semibold truncate max-w-[180px] sm:max-w-none">
-                {showProfile ? 'Mon profil' : user.name}
-              </h1>
-              {!showProfile && serviceName && (
-                <span className="hidden lg:inline-block ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-xs">
-                  {serviceName}
-                </span>
-              )}
-            </div>
+      <div className="min-h-screen relative pb-20" style={{ fontFamily: "'Crimson Text', Georgia, serif" }}>
+      {/* Fond glassmorphism */}
+      <div className="fixed inset-0 bg-cover bg-center z-0" style={{ backgroundImage: "url('/ok.png')" }} />
+      <div className="fixed inset-0 z-10" style={{ background: 'linear-gradient(135deg, rgba(8,20,90,0.94) 0%, rgba(15,45,130,0.9) 40%, rgba(10,30,100,0.92) 70%, rgba(4,12,65,0.96) 100%)' }} />
+      <div className="fixed w-[300px] h-[300px] rounded-full bg-blue-400/10 blur-[100px] -top-[50px] -right-[50px] z-20 pointer-events-none" />
+      <div className="fixed w-[250px] h-[250px] rounded-full bg-blue-600/8 blur-[100px] bottom-[10%] -left-[50px] z-20 pointer-events-none" />
+      
+      <div className="relative z-30">
+        {/* Barre de navigation responsive */}
+        <nav className="bg-[rgba(5,15,70,0.6)] backdrop-blur-2xl border-b border-white/[0.08] sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-14">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="p-2 rounded-md text-white/60 hover:text-white hover:bg-white/10 focus:outline-none lg:hidden"
+                >
+                  {mobileMenuOpen ? <XMarkIcon className="h-5 w-5" /> : <Bars3Icon className="h-5 w-5" />}
+                </button>
+                <h1 className="text-base sm:text-lg font-normal text-white truncate max-w-[180px] sm:max-w-none" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  {showProfile ? 'Mon profil' : user.name}
+                </h1>
+                {!showProfile && serviceName && (
+                  <span className="hidden lg:inline-block ml-2 px-2 py-0.5 bg-white/10 text-white/80 rounded-full text-xs">
+                    {serviceName}
+                  </span>
+                )}
+              </div>
 
-            {/* Boutons desktop */}
-            <div className="hidden lg:flex items-center gap-3">
-              {!showProfile && (
-                <Button onClick={() => setShowAddStudentModal(true)} variant="outline" size="sm">
-                  <UserPlusIcon className="w-4 h-4 mr-1" />
-                  Ajouter
-                </Button>
-              )}
-              {/* 🔔 Cloche de notifications */}
-              <NotificationBell />
-              <Button
-                onClick={() => setShowHistory(!showHistory)}
-                variant="outline"
-                size="sm"
-              >
-                {showHistory ? 'Masquer' : 'Afficher'} l'historique
-              </Button>
-              <Button onClick={toggleProfile} variant="outline" size="sm">
-                <UserCircleIcon className="w-4 h-4 mr-1" />
-                {showProfile ? 'Tableau de bord' : 'Profil'}
-              </Button>
-              <Button onClick={logout} variant="destructive" size="sm">
-                Déconnexion
-              </Button>
-            </div>
-
-            {/* Boutons mobile */}
-            <div className="flex items-center gap-2 lg:hidden">
-              {/* 🔔 Cloche de notifications mobile */}
-              <NotificationBell />
-              <button onClick={logout} className="p-2 text-red-600 hover:bg-red-50 rounded-full">
-                <ArrowRightOnRectangleIcon className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Menu mobile */}
-          {mobileMenuOpen && (
-            <div className="lg:hidden border-t border-gray-200 bg-white">
-              <div className="px-4 py-3 space-y-2">
-                <p className="text-sm text-gray-600 pb-2 border-b">Connecté en tant que {user.name}</p>
-          
+              {/* Boutons desktop */}
+              <div className="hidden lg:flex items-center gap-3">
                 {!showProfile && (
-                  <button
-                    onClick={() => {
-                      setShowAddStudentModal(true)
-                      setMobileMenuOpen(false)
-                    }}
-                    className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
-                  >
-                    <UserPlusIcon className="w-5 h-5 mr-3" />
-                    Ajouter un étudiant
+                  <button onClick={() => setShowAddStudentModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
+                    <UserPlusIcon className="w-3.5 h-3.5" /> Ajouter
                   </button>
                 )}
-                <button
-                  onClick={() => {
-                    setShowHistory(!showHistory)
-                    setMobileMenuOpen(false)
-                  }}
-                  className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
-                >
-                  <CalendarIcon className="w-5 h-5 mr-3" />
+                <NotificationBell />
+                <button onClick={() => setShowHistory(!showHistory)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
                   {showHistory ? 'Masquer' : 'Afficher'} l'historique
                 </button>
-                <button
-                  onClick={() => {
-                    setShowProfile(!showProfile)
-                    setMobileMenuOpen(false)
-                  }}
-                  className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
-                >
-                  <UserCircleIcon className="w-5 h-5 mr-3" />
-                  {showProfile ? 'Tableau de bord' : 'Mon profil'}
+                <button onClick={toggleProfile} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
+                  <UserCircleIcon className="w-3.5 h-3.5" /> {showProfile ? 'Tableau de bord' : 'Profil'}
                 </button>
-                <button
-                  onClick={logout}
-                  className="w-full flex items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" />
+                <button onClick={logout} className="px-3 py-1.5 bg-red-500/20 text-red-300 rounded-lg text-xs hover:bg-red-500/30 transition-colors">
                   Déconnexion
                 </button>
               </div>
-            </div>
-          )}
-        </div>
-      </nav>
 
+              {/* Boutons mobile */}
+              <div className="flex items-center gap-2 lg:hidden">
+                <NotificationBell />
+                <button onClick={logout} className="p-2 text-red-400 hover:text-red-300">
+                  <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Menu mobile */}
+            {mobileMenuOpen && (
+              <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.8)] backdrop-blur-2xl">
+                <div className="px-4 py-3 space-y-2">
+                  <p className="text-sm text-white/70 pb-2 border-b border-white/[0.08]">Connecté en tant que {user.name}</p>
+                  {!showProfile && (
+                    <button onClick={() => { setShowAddStudentModal(true); setMobileMenuOpen(false) }}
+                      className="w-full flex items-center px-4 py-3 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                      <UserPlusIcon className="w-5 h-5 mr-3" /> Ajouter un étudiant
+                    </button>
+                  )}
+                  <button onClick={() => { setShowHistory(!showHistory); setMobileMenuOpen(false) }}
+                    className="w-full flex items-center px-4 py-3 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                    <CalendarIcon className="w-5 h-5 mr-3" /> {showHistory ? 'Masquer' : 'Afficher'} l'historique
+                  </button>
+                  <button onClick={() => { setShowProfile(!showProfile); setMobileMenuOpen(false) }}
+                    className="w-full flex items-center px-4 py-3 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                    <UserCircleIcon className="w-5 h-5 mr-3" /> {showProfile ? 'Tableau de bord' : 'Mon profil'}
+                  </button>
+                  <button onClick={logout}
+                    className="w-full flex items-center px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors">
+                    <ArrowLeftOnRectangleIcon className="w-5 h-5 mr-3" /> Déconnexion
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </nav>
       {/* ... LE RESTE DU CODE RESTE IDENTIQUE ... */}
       {/* (tout le contenu après la navbar jusqu'à la fin) */}
 
@@ -1409,6 +1386,7 @@ const [baptismStatsData, setBaptismStatsData] = useState<any[]>([])
       )}
 
       <AddStudentModal isOpen={showAddStudentModal} onClose={() => setShowAddStudentModal(false)} serviceId={user?.serviceId || ''} onStudentAdded={handleStudentAdded} />
-    </div>
+    </div> 
+  </div> 
   )
 }

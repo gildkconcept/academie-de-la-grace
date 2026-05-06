@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Quiz, QuizResult } from '@/types'
 
@@ -18,65 +17,34 @@ export const StudentQuiz = () => {
   const [activeTab, setActiveTab] = useState<'available' | 'history'>('available')
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchQuizzes()
-    fetchMyResults()
-  }, [])
+  useEffect(() => { fetchQuizzes(); fetchMyResults() }, [])
 
   const fetchQuizzes = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
-      const res = await fetch('/api/quizzes', {
-        credentials: 'include'
-      })
+      const res = await fetch('/api/quizzes', { credentials: 'include' })
       const data = await res.json()
-      if (res.ok) {
-        console.log('📚 Quiz reçus:', data)
-        setQuizzes(Array.isArray(data) ? data : [])
-      } else {
-        console.error('Erreur API:', data)
-        setError(data.error || 'Erreur chargement quiz')
-      }
-    } catch (error) {
-      console.error('Erreur:', error)
-      setError('Erreur de connexion')
-    } finally {
-      setLoading(false)
-    }
+      if (res.ok) setQuizzes(Array.isArray(data) ? data : [])
+      else setError(data.error || 'Erreur chargement quiz')
+    } catch (error) { setError('Erreur de connexion') }
+    finally { setLoading(false) }
   }
 
   const fetchMyResults = async () => {
     try {
-      const res = await fetch('/api/my-results', {
-        credentials: 'include'
-      })
+      const res = await fetch('/api/my-results', { credentials: 'include' })
       const data = await res.json()
-      if (res.ok) {
-        setMyResults(data.results || [])
-      }
-    } catch (error) {
-      console.error('Erreur:', error)
-    }
+      if (res.ok) setMyResults(data.results || [])
+    } catch (error) { console.error('Erreur:', error) }
   }
 
   const startQuiz = async (quizId: string) => {
     try {
-      const res = await fetch(`/api/quizzes?id=${quizId}`, {
-        credentials: 'include'
-      })
+      const res = await fetch(`/api/quizzes?id=${quizId}`, { credentials: 'include' })
       const data = await res.json()
-      if (res.ok) {
-        setSelectedQuiz(data)
-        setCurrentQuestionIndex(0)
-        setAnswers({})
-        setResult(null)
-      } else {
-        toast.error(data.error || 'Erreur chargement quiz')
-      }
-    } catch (error) {
-      toast.error('Erreur réseau')
-    }
+      if (res.ok) { setSelectedQuiz(data); setCurrentQuestionIndex(0); setAnswers({}); setResult(null) }
+      else toast.error(data.error || 'Erreur chargement quiz')
+    } catch (error) { toast.error('Erreur réseau') }
   }
 
   const handleAnswer = (questionId: string, answer: string) => {
@@ -85,194 +53,119 @@ export const StudentQuiz = () => {
 
   const handleSubmit = async () => {
     if (!selectedQuiz?.questions) return
-
     const allAnswered = selectedQuiz.questions.every(q => answers[q.id])
-    if (!allAnswered) {
-      toast.error('Veuillez répondre à toutes les questions')
-      return
-    }
-
+    if (!allAnswered) { toast.error('Veuillez répondre à toutes les questions'); return }
     setSubmitting(true)
     try {
       const res = await fetch(`/api/quizzes/${selectedQuiz.id}/submit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ answers })
       })
-
       const data = await res.json()
       if (res.ok) {
-        setResult({
-          score: data.score,
-          total: data.totalQuestions,
-          percentage: data.percentage
-        })
+        setResult({ score: data.score, total: data.totalQuestions, percentage: data.percentage })
         toast.success(`Score: ${data.score}/${data.totalQuestions}`)
-        fetchQuizzes()
-        fetchMyResults()
-      } else {
-        toast.error(data.error || 'Erreur soumission')
-      }
-    } catch (error) {
-      toast.error('Erreur réseau')
-    } finally {
-      setSubmitting(false)
-    }
+        fetchQuizzes(); fetchMyResults()
+      } else toast.error(data.error || 'Erreur soumission')
+    } catch (error) { toast.error('Erreur réseau') }
+    finally { setSubmitting(false) }
   }
 
-  const closeQuiz = () => {
-    setSelectedQuiz(null)
-    setResult(null)
-  }
+  const closeQuiz = () => { setSelectedQuiz(null); setResult(null) }
 
-  if (loading) {
-    return <div className="text-center py-8">Chargement des quiz...</div>
-  }
+  if (loading) return <div className="text-center py-8 text-white/60">Chargement des quiz...</div>
+  if (error) return <div className="text-center py-8 text-red-400">Erreur: {error}</div>
 
-  if (error) {
-    return <div className="text-center py-8 text-red-500">Erreur: {error}</div>
-  }
-
-  // Affichage du quiz en cours
+  // Quiz en cours
   if (selectedQuiz && !result) {
     const currentQuestion = selectedQuiz.questions?.[currentQuestionIndex]
     const isLastQuestion = currentQuestionIndex === (selectedQuiz.questions?.length || 0) - 1
-
-    if (!currentQuestion) {
-      return <div className="text-center py-8">Question non trouvée</div>
-    }
+    if (!currentQuestion) return <div className="text-center py-8 text-white/60">Question non trouvée</div>
 
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle>{selectedQuiz.title}</CardTitle>
-          <div className="text-sm text-gray-500">
-            Question {currentQuestionIndex + 1} / {selectedQuiz.questions?.length}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="text-lg font-medium">{currentQuestion.question}</div>
-          <div className="space-y-3">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl p-6">
+          <h3 className="text-lg font-normal text-white mb-1" style={{ fontFamily: "'Playfair Display', serif" }}>{selectedQuiz.title}</h3>
+          <div className="text-sm text-white/50 mb-6">Question {currentQuestionIndex + 1} / {selectedQuiz.questions?.length}</div>
+          <div className="text-base text-white/90 mb-6">{currentQuestion.question}</div>
+          <div className="space-y-3 mb-6">
             {['A', 'B', 'C', 'D'].map(letter => {
               const optionKey = `option_${letter.toLowerCase()}` as keyof typeof currentQuestion
               const optionText = currentQuestion[optionKey] as string
               return (
-                <label
-                  key={letter}
+                <label key={letter}
                   className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                    answers[currentQuestion.id] === letter
-                      ? 'bg-indigo-50 border-indigo-500'
-                      : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`question-${currentQuestion.id}`}
-                    value={letter}
+                    answers[currentQuestion.id] === letter ? 'bg-indigo-500/20 border-indigo-400/50 text-white' : 'bg-white/[0.04] border-white/[0.1] text-white/70 hover:bg-white/[0.08]'
+                  }`}>
+                  <input type="radio" name={`q-${currentQuestion.id}`} value={letter}
                     checked={answers[currentQuestion.id] === letter}
-                    onChange={() => handleAnswer(currentQuestion.id, letter)}
-                    className="w-4 h-4 text-indigo-600 mr-3"
-                  />
-                  <span className="font-medium mr-2">{letter}.</span>
+                    onChange={() => handleAnswer(currentQuestion.id, letter)} className="w-4 h-4 text-indigo-400 mr-3" />
+                  <span className="font-medium mr-2 text-white/60">{letter}.</span>
                   <span>{optionText}</span>
                 </label>
               )
             })}
           </div>
-          <div className="flex justify-between pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-              disabled={currentQuestionIndex === 0}
-            >
-              ← Précédent
-            </Button>
+          <div className="flex justify-between">
+            <button onClick={() => setCurrentQuestionIndex(prev => prev - 1)} disabled={currentQuestionIndex === 0}
+              className="px-4 py-2 bg-white/10 text-white/70 rounded-lg text-sm hover:bg-white/20 transition-colors disabled:opacity-30">← Précédent</button>
             {isLastQuestion ? (
-              <Button onClick={handleSubmit} disabled={submitting}>
-                {submitting ? 'Soumission...' : 'Terminer'}
-              </Button>
+              <button onClick={handleSubmit} disabled={submitting}
+                className="px-6 py-2 bg-white text-[#1a3a8f] rounded-lg text-sm font-bold hover:shadow-lg transition-all disabled:opacity-50">{submitting ? 'Soumission...' : 'Terminer'}</button>
             ) : (
-              <Button onClick={() => setCurrentQuestionIndex(prev => prev + 1)}>
-                Suivant →
-              </Button>
+              <button onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
+                className="px-4 py-2 bg-white/10 text-white/70 rounded-lg text-sm hover:bg-white/20 transition-colors">Suivant →</button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
-  // Affichage du résultat AVEC le détail des réponses
+  // Résultat
   if (result && selectedQuiz) {
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-center">📊 Résultat du quiz</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Score global */}
-          <div className="text-center space-y-2">
-            <div className="text-5xl font-bold text-indigo-600">{result.score}/{result.total}</div>
-            <div className="text-lg">Soit {result.percentage.toFixed(0)}%</div>
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl p-6">
+          <h3 className="text-lg font-normal text-white text-center mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>📊 Résultat du quiz</h3>
+          <div className="text-center space-y-2 mb-6">
+            <div className="text-5xl font-bold text-white">{result.score}/{result.total}</div>
+            <div className="text-white/60">Soit {result.percentage.toFixed(0)}%</div>
             {result.percentage === 100 && (
-              <div className="bg-yellow-100 text-yellow-800 p-3 rounded-lg">
-                🏆 Parfait ! Badge "Expert biblique" débloqué !
-              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 p-3 rounded-lg text-sm">🏆 Parfait ! Badge &quot;Expert biblique&quot; débloqué !</div>
             )}
           </div>
 
-          {/* Détail des questions */}
-          <div className="border-t pt-4">
-            <h3 className="font-semibold text-lg mb-4">📋 Détail de vos réponses</h3>
+          <div className="border-t border-white/[0.08] pt-4 mb-6">
+            <h4 className="font-semibold text-white text-sm mb-4">📋 Détail de vos réponses</h4>
             <div className="space-y-4">
               {selectedQuiz.questions?.map((question, index) => {
                 const userAnswer = answers[question.id]
                 const isCorrect = userAnswer === question.correct_answer
-                
                 return (
-                  <div 
-                    key={question.id} 
-                    className={`p-4 rounded-lg border ${
-                      isCorrect 
-                        ? 'bg-green-50 border-green-200' 
-                        : 'bg-red-50 border-red-200'
-                    }`}
-                  >
+                  <div key={question.id} className={`p-4 rounded-lg border ${isCorrect ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
                     <div className="flex items-start gap-2 mb-2">
-                      <span className={`text-lg ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
-                        {isCorrect ? '✅' : '❌'}
-                      </span>
-                      <div>
-                        <p className="font-medium text-sm">
-                          Question {index + 1} : {question.question}
-                        </p>
-                      </div>
+                      <span className={`text-lg ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>{isCorrect ? '✅' : '❌'}</span>
+                      <p className="font-medium text-sm text-white/90">Question {index + 1} : {question.question}</p>
                     </div>
-                    
                     <div className="ml-7 space-y-1 text-sm">
                       {['A', 'B', 'C', 'D'].map(letter => {
                         const optionKey = `option_${letter.toLowerCase()}` as keyof typeof question
                         const optionText = question[optionKey] as string
                         const isUserChoice = userAnswer === letter
                         const isCorrectAnswer = question.correct_answer === letter
-                        
-                        let bgColor = 'bg-white'
-                        if (isUserChoice && !isCorrect) bgColor = 'bg-red-100'
-                        if (isCorrectAnswer) bgColor = 'bg-green-100'
-                        if (isUserChoice && isCorrect) bgColor = 'bg-green-100'
-                        
+                        let bgColor = 'bg-white/[0.02]'
+                        if (isUserChoice && !isCorrect) bgColor = 'bg-red-500/10'
+                        if (isCorrectAnswer) bgColor = 'bg-green-500/10'
+                        if (isUserChoice && isCorrect) bgColor = 'bg-green-500/10'
                         return (
-                          <div 
-                            key={letter}
-                            className={`p-2 rounded ${bgColor} flex items-center gap-2`}
-                          >
-                            <span className="font-medium">{letter}.</span>
-                            <span>{optionText}</span>
-                            {isUserChoice && <span className="text-xs ml-auto text-gray-500">← Votre réponse</span>}
-                            {isCorrectAnswer && <span className="text-xs ml-auto text-green-600 font-medium">← Bonne réponse</span>}
+                          <div key={letter} className={`p-2 rounded ${bgColor} flex items-center gap-2`}>
+                            <span className="font-medium text-white/60">{letter}.</span>
+                            <span className="text-white/80">{optionText}</span>
+                            {isUserChoice && <span className="text-xs ml-auto text-white/40">← Votre réponse</span>}
+                            {isCorrectAnswer && <span className="text-xs ml-auto text-green-400 font-medium">← Bonne réponse</span>}
                           </div>
                         )
                       })}
@@ -283,104 +176,72 @@ export const StudentQuiz = () => {
             </div>
           </div>
 
-          <div className="flex justify-center gap-3 pt-4">
-            <Button onClick={closeQuiz}>Fermer</Button>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Voir les quiz disponibles
-            </Button>
+          <div className="flex justify-center gap-3">
+            <button onClick={closeQuiz} className="px-4 py-2 bg-white/10 text-white/70 rounded-lg text-sm hover:bg-white/20 transition-colors">Fermer</button>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-white/10 text-white/70 rounded-lg text-sm hover:bg-white/20 transition-colors">Voir les quiz disponibles</button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
-  // Affichage de la liste des quiz
+  // Liste des quiz
   const availableQuizzes = quizzes.filter(q => !q.completed)
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-4 border-b">
-        <button
-          onClick={() => setActiveTab('available')}
-          className={`pb-2 px-4 ${activeTab === 'available' ? 'border-b-2 border-indigo-600 text-indigo-600 font-medium' : 'text-gray-500'}`}
-        >
-          Quiz disponibles ({availableQuizzes.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`pb-2 px-4 ${activeTab === 'history' ? 'border-b-2 border-indigo-600 text-indigo-600 font-medium' : 'text-gray-500'}`}
-        >
-          Mon historique ({myResults.length})
-        </button>
+      <div className="flex gap-4 border-b border-white/[0.08]">
+        {[
+          { key: 'available', label: `Quiz disponibles (${availableQuizzes.length})` },
+          { key: 'history', label: `Mon historique (${myResults.length})` }
+        ].map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+            className={`pb-2 px-4 text-sm transition-colors ${activeTab === tab.key ? 'border-b-2 border-white text-white font-medium' : 'text-white/50 hover:text-white/80'}`}>
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {activeTab === 'available' && (
-        <>
-          {availableQuizzes.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8 text-gray-500">
-                Aucun quiz disponible pour le moment.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {availableQuizzes.map(quiz => (
-                <Card key={quiz.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{quiz.title}</CardTitle>
-                    {quiz.description && <p className="text-sm text-gray-500">{quiz.description}</p>}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Niveau</span>
-                        <span className="font-medium">Niveau {quiz.level}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Date limite</span>
-                        <span className="font-medium">{new Date(quiz.end_date).toLocaleDateString('fr-FR')}</span>
-                      </div>
-                      <Button onClick={() => startQuiz(quiz.id)} className="w-full mt-4">
-                        Commencer le quiz
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </>
+        availableQuizzes.length === 0 ? (
+          <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-8 text-center text-white/40 text-sm">Aucun quiz disponible pour le moment.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {availableQuizzes.map(quiz => (
+              <div key={quiz.id} className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-5 hover:bg-white/[0.06] transition-colors">
+                <h4 className="text-white font-medium mb-1">{quiz.title}</h4>
+                {quiz.description && <p className="text-white/50 text-sm mb-3">{quiz.description}</p>}
+                <div className="flex justify-between text-xs mb-4">
+                  <span className="text-white/40">Niveau {quiz.level}</span>
+                  <span className="text-white/40">Limite: {new Date(quiz.end_date).toLocaleDateString('fr-FR')}</span>
+                </div>
+                <button onClick={() => startQuiz(quiz.id)}
+                  className="w-full py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/20 transition-colors">Commencer le quiz</button>
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       {activeTab === 'history' && (
-        <>
-          {myResults.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8 text-gray-500">
-                Vous n'avez pas encore participé à des quiz.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {myResults.map(result => (
-                <Card key={result.id}>
-                  <CardContent className="p-4 flex justify-between items-center">
-                    <div>
-                      <h3 className="font-semibold">{result.quiz?.title}</h3>
-                      <p className="text-sm text-gray-500">
-                        Niveau {result.quiz?.level} - {new Date(result.submitted_at).toLocaleDateString('fr-FR')}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xl font-bold text-indigo-600">{result.score}/{result.total_questions}</div>
-                      <div className="text-sm text-gray-500">{result.percentage}%</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </>
+        myResults.length === 0 ? (
+          <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-8 text-center text-white/40 text-sm">Vous n&apos;avez pas encore participé à des quiz.</div>
+        ) : (
+          <div className="space-y-3">
+            {myResults.map(result => (
+              <div key={result.id} className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4 flex justify-between items-center">
+                <div>
+                  <h4 className="text-white font-medium text-sm">{result.quiz?.title}</h4>
+                  <p className="text-white/40 text-xs">Niveau {result.quiz?.level} - {new Date(result.submitted_at).toLocaleDateString('fr-FR')}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-white">{result.score}/{result.total_questions}</div>
+                  <div className="text-white/40 text-xs">{result.percentage}%</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   )

@@ -16,7 +16,7 @@ import {
   Line
 } from 'recharts'
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B']
+const COLORS = ['#a8caff', '#67e8f9', '#fde68a', '#c4b5fd', '#6ee7b7', '#fca5a5']
 
 interface AttendanceChartProps {
   data: Array<{ month: string; presents: number }>
@@ -26,12 +26,20 @@ export const AttendanceChart = ({ data }: AttendanceChartProps) => {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="month" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="presents" fill="#8884d8" name="Présents" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+        <XAxis dataKey="month" stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.6)' }} />
+        <YAxis stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.6)' }} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'rgba(8,20,90,0.95)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '12px',
+            color: 'white',
+            fontFamily: "'Crimson Text', Georgia, serif"
+          }}
+        />
+        <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.7)' }} />
+        <Bar dataKey="presents" fill="#a8caff" name="Présents" radius={[6, 6, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -59,7 +67,15 @@ export const CustomPieChart = ({ data }: CustomPieChartProps) => {
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
         </Pie>
-        <Tooltip />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'rgba(8,20,90,0.95)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '12px',
+            color: 'white',
+            fontFamily: "'Crimson Text', Georgia, serif"
+          }}
+        />
       </PieChart>
     </ResponsiveContainer>
   )
@@ -73,18 +89,25 @@ export const ProgressChart = ({ data }: ProgressChartProps) => {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Line type="monotone" dataKey="progress" stroke="#8884d8" name="Progression %" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+        <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.6)' }} />
+        <YAxis stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.6)' }} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'rgba(8,20,90,0.95)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '12px',
+            color: 'white',
+            fontFamily: "'Crimson Text', Georgia, serif"
+          }}
+        />
+        <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.7)' }} />
+        <Line type="monotone" dataKey="progress" stroke="#a8caff" name="Progression %" strokeWidth={2} dot={{ fill: '#a8caff', r: 4 }} />
       </LineChart>
     </ResponsiveContainer>
   )
 }
 
-// Exporter aussi les composants de base pour une utilisation directe
 export {
   BarChart,
   Bar,
