@@ -7,7 +7,7 @@ export const loginSchema = z.object({
   username: z.string()
     .min(3, 'Le nom d\'utilisateur doit contenir au moins 3 caractères')
     .max(50, 'Le nom d\'utilisateur est trop long')
-    .regex(/^[a-zA-Z0-9._-]+$/, 'Le nom d\'utilisateur contient des caractères invalides'),
+    .regex(/^[a-zA-Z0-9À-ÿ ._'-]+$/, 'Le nom d\'utilisateur contient des caractères invalides'),
   password: z.string()
     .min(6, 'Le mot de passe doit contenir au moins 6 caractères')
     .max(100, 'Le mot de passe est trop long')
