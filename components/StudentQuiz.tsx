@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { Quiz, QuizResult } from '@/types'
@@ -17,7 +17,40 @@ export const StudentQuiz = () => {
   const [activeTab, setActiveTab] = useState<'available' | 'history'>('available')
   const [error, setError] = useState<string | null>(null)
 
+  // 🕐 États du minuteur
+  const [timeLeft, setTimeLeft] = useState<number>(600) // 10 minutes en secondes
+  const [timerActive, setTimerActive] = useState(false)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+
   useEffect(() => { fetchQuizzes(); fetchMyResults() }, [])
+
+  // 🕐 Gestion du minuteur
+  useEffect(() => {
+    if (selectedQuiz && !result && timerActive && timeLeft > 0) {
+      timerRef.current = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current!)
+            // Temps écoulé → soumettre automatiquement
+            toast.warning('⏰ Temps écoulé ! Soumission automatique...')
+            handleSubmit()
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [selectedQuiz, timerActive, result, timeLeft])
+
+  // Nettoyer le minuteur à la fermeture
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [])
 
   const fetchQuizzes = async () => {
     setLoading(true); setError(null)
@@ -38,11 +71,19 @@ export const StudentQuiz = () => {
     } catch (error) { console.error('Erreur:', error) }
   }
 
+  // 🕐 Démarrer le quiz avec le minuteur
   const startQuiz = async (quizId: string) => {
     try {
       const res = await fetch(`/api/quizzes?id=${quizId}`, { credentials: 'include' })
       const data = await res.json()
-      if (res.ok) { setSelectedQuiz(data); setCurrentQuestionIndex(0); setAnswers({}); setResult(null) }
+      if (res.ok) {
+        setSelectedQuiz(data)
+        setCurrentQuestionIndex(0)
+        setAnswers({})
+        setResult(null)
+        setTimeLeft(600) // Réinitialiser à 10 minutes
+        setTimerActive(true) // Démarrer le minuteur
+      }
       else toast.error(data.error || 'Erreur chargement quiz')
     } catch (error) { toast.error('Erreur réseau') }
   }
@@ -53,9 +94,10 @@ export const StudentQuiz = () => {
 
   const handleSubmit = async () => {
     if (!selectedQuiz?.questions) return
-    const allAnswered = selectedQuiz.questions.every(q => answers[q.id])
-    if (!allAnswered) { toast.error('Veuillez répondre à toutes les questions'); return }
     setSubmitting(true)
+    setTimerActive(false) // Arrêter le minuteur
+    if (timerRef.current) clearInterval(timerRef.current)
+    
     try {
       const res = await fetch(`/api/quizzes/${selectedQuiz.id}/submit`, {
         method: 'POST',
@@ -73,7 +115,27 @@ export const StudentQuiz = () => {
     finally { setSubmitting(false) }
   }
 
-  const closeQuiz = () => { setSelectedQuiz(null); setResult(null) }
+  // 🕐 Nettoyer le minuteur à la fermeture
+  const closeQuiz = () => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    setTimerActive(false)
+    setSelectedQuiz(null)
+    setResult(null)
+  }
+
+  // 🕐 Formater le temps
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // 🕐 Couleur du minuteur selon le temps restant
+  const getTimerColor = () => {
+    if (timeLeft < 60) return 'text-red-400 animate-pulse'
+    if (timeLeft < 180) return 'text-yellow-300'
+    return 'text-white/70'
+  }
 
   if (loading) return <div className="text-center py-8 text-white/60">Chargement des quiz...</div>
   if (error) return <div className="text-center py-8 text-red-400">Erreur: {error}</div>
@@ -87,8 +149,20 @@ export const StudentQuiz = () => {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl p-6">
-          <h3 className="text-lg font-normal text-white mb-1" style={{ fontFamily: "'Playfair Display', serif" }}>{selectedQuiz.title}</h3>
-          <div className="text-sm text-white/50 mb-6">Question {currentQuestionIndex + 1} / {selectedQuiz.questions?.length}</div>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="text-lg font-normal text-white mb-1" style={{ fontFamily: "'Playfair Display', serif" }}>{selectedQuiz.title}</h3>
+              <div className="text-sm text-white/50">Question {currentQuestionIndex + 1} / {selectedQuiz.questions?.length}</div>
+            </div>
+            {/* 🕐 Minuteur */}
+            <div className="flex items-center gap-2 bg-white/[0.04] border border-white/[0.1] rounded-lg px-3 py-1.5">
+              <span className="text-sm">⏱️</span>
+              <span className={`text-sm font-mono font-bold ${getTimerColor()}`}>
+                {formatTime(timeLeft)}
+              </span>
+            </div>
+          </div>
+
           <div className="text-base text-white/90 mb-6">{currentQuestion.question}</div>
           <div className="space-y-3 mb-6">
             {['A', 'B', 'C', 'D'].map(letter => {
@@ -216,7 +290,7 @@ export const StudentQuiz = () => {
                   <span className="text-white/40">Limite: {new Date(quiz.end_date).toLocaleDateString('fr-FR')}</span>
                 </div>
                 <button onClick={() => startQuiz(quiz.id)}
-                  className="w-full py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/20 transition-colors">Commencer le quiz</button>
+                  className="w-full py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/20 transition-colors">⏱️ Commencer le quiz (10 min)</button>
               </div>
             ))}
           </div>

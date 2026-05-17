@@ -42,7 +42,7 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       
       {/* Panneau */}
-      <div className="absolute right-0 top-0 md:right-4 md:top-16 w-full md:w-96 h-full md:h-[600px] md:max-h-[80vh] flex flex-col"
+<div className="fixed inset-0 md:absolute md:right-4 md:top-16 md:inset-auto md:w-96 md:h-[600px] md:max-h-[80vh] flex flex-col"
         style={{ fontFamily: "'Crimson Text', Georgia, serif" }}>
         
         {/* Fond du panneau */}
@@ -79,7 +79,7 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
           </div>
 
           {/* Liste */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto" style={{ minHeight: '200px' }}>
             {loading ? (
               <div className="flex justify-center py-12">
                 <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
