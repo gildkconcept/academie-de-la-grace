@@ -65,7 +65,7 @@ export async function GET(request: Request) {
         totalSessions: allSessions?.length || 0,
         totalAttendance: allAttendances?.length || 0,
         totalPresent,
-        globalRate: allAttendances?.length > 0 ? Math.round((totalPresent / allAttendances.length) * 100) : 0
+globalRate: (allAttendances?.length || 0) > 0 ? Math.round((totalPresent / (allAttendances?.length || 1)) * 100) : 0
       }
     })
   } catch (error) {
