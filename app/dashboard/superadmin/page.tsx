@@ -25,6 +25,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Service, Student, GlobalStats, Badge } from '@/types'
 import { generateAttendancePDF } from '@/lib/pdf-generator'
+import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
+import { ChatGroups } from '@/components/ChatGroups'
+import { ChatMessages } from '@/components/ChatMessages'
+import { AdminQuizHistory } from '@/components/AdminQuizHistory'
+import { ServiceHistoryDetail } from '@/components/ServiceHistoryDetail'
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -77,6 +82,7 @@ export default function SuperAdminDashboard() {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [selectedCultType, setSelectedCultType] = useState<string>('all')
   const [cultTypes, setCultTypes] = useState<any[]>([])
+ const [showQuizSection, setShowQuizSection] = useState<string | false>(false)
 
   // Données pour les graphiques
   const [presenceByService, setPresenceByService] = useState<any[]>([])
@@ -90,8 +96,10 @@ export default function SuperAdminDashboard() {
   const [showBadgeModal, setShowBadgeModal] = useState(false)
   const [selectedStudentForBadge, setSelectedStudentForBadge] = useState<string>('')
   const [selectedBadgeId, setSelectedBadgeId] = useState<string>('')
-  const [showQuizSection, setShowQuizSection] = useState(false)
+ 
   const [showAnnouncement, setShowAnnouncement] = useState(false)
+  const [showChat, setShowChat] = useState(false)
+const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: string } | null>(null)
 
     // === ÉTATS POUR LA LISTE DES ÉTUDIANTS (RECHERCHE + FILTRES + PDF) ===
   const [studentSearchTerm, setStudentSearchTerm] = useState<string>('')
@@ -1154,6 +1162,9 @@ const baptises = studentsData.filter(s => s.baptized === true).length
             <div className="hidden lg:flex items-center space-x-4">
               {/* 🔔 Cloche de notifications */}
               <NotificationBell />
+              <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
+  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
+</button>
               <Button
                 onClick={toggleProfile}
                 variant="outline"
@@ -1172,6 +1183,9 @@ const baptises = studentsData.filter(s => s.baptized === true).length
             <div className="flex items-center gap-2 lg:hidden">
               {/* 🔔 Cloche de notifications mobile */}
               <NotificationBell />
+              <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
+  <ChatBubbleLeftRightIcon className="w-5 h-5" />
+</button>
               
               <button
                 onClick={logout}
@@ -1392,7 +1406,11 @@ const baptises = studentsData.filter(s => s.baptized === true).length
               )}
             </CardContent>
           </Card>
-
+                   {/* Historique détaillé des séances */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-white mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>📋 Historique des séances</h2>
+            <ServiceHistoryDetail />
+          </div>
           {/* Génération de code académique avec géolocalisation */}
           <Card className="mb-8">
             <CardHeader className="px-4 sm:px-6 py-4">
@@ -1656,18 +1674,30 @@ const baptises = studentsData.filter(s => s.baptized === true).length
             </Card>
           </div>
            
-          {/* Section Quiz pour superadmin */}
-          <div className="mb-8">
+                   <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">📝 Quiz bibliques</h2>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowQuizSection(!showQuizSection)}
-              >
-                {showQuizSection ? 'Masquer' : 'Afficher'} la gestion des quiz
-              </Button>
+              <h2 className="text-xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>📝 Quiz bibliques</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowQuizSection(showQuizSection === 'create' ? false : 'create')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    showQuizSection === 'create' ? 'bg-white text-[#1a3a8f]' : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  }`}
+                >
+                  {showQuizSection === 'create' ? 'Masquer création' : 'Créer quiz'}
+                </button>
+                <button
+                  onClick={() => setShowQuizSection(showQuizSection === 'history' ? false : 'history')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    showQuizSection === 'history' ? 'bg-white text-[#1a3a8f]' : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  }`}
+                >
+                  {showQuizSection === 'history' ? 'Masquer historique' : 'Historique quiz'}
+                </button>
+              </div>
             </div>
-            {showQuizSection && <AdminQuiz />}
+            {showQuizSection === 'create' && <AdminQuiz />}
+            {showQuizSection === 'history' && <AdminQuizHistory />}
           </div>
                     {/* Section Annonces */}
           <div className="mb-8">
@@ -1815,13 +1845,21 @@ const baptises = studentsData.filter(s => s.baptized === true).length
             </div>
           </div>
         </div>
+        
             )}
+            
             {/* Modal d'annonce */}
       {showAnnouncement && (
         <SendAnnouncement onClose={() => setShowAnnouncement(false)} />
       )}
+     {/* Chat */}
+      {showChat && !selectedChatGroup && (
+        <ChatGroups onSelectGroup={(id, name) => setSelectedChatGroup({ id, name })} onClose={() => setShowChat(false)} />
+      )}
+      {showChat && selectedChatGroup && (
+        <ChatMessages groupId={selectedChatGroup.id} groupName={selectedChatGroup.name} currentUserId={user?.id || ''} currentUserName={user?.name || ''} onBack={() => setSelectedChatGroup(null)} />
+      )}
 
-     
       {/* Modal d'attribution de badge */}
       {showBadgeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1850,6 +1888,7 @@ const baptises = studentsData.filter(s => s.baptized === true).length
           </div>
         </div>
       )}
+      
     </div>
   )
 }

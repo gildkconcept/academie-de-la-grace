@@ -11,6 +11,9 @@ import { toast } from 'sonner'
 import { Student, Attendance, ServiceSession } from '@/types'
 import { generateAttendancePDF } from '@/lib/pdf-generator'
 import { NotificationBell } from '@/components/NotificationBell'
+import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
+import { ChatGroups } from '@/components/ChatGroups'
+import { ChatMessages } from '@/components/ChatMessages'
 import { 
   UserCircleIcon, 
   UserPlusIcon, 
@@ -30,6 +33,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { SessionHistory } from '@/components/SessionHistory'
+
 
 export default function ManagerDashboard() {
   const { user, loading, logout } = useAuth()
@@ -90,6 +94,8 @@ export default function ManagerDashboard() {
   const [monthlyStats, setMonthlyStats] = useState<any[]>([])
 const [baptismStatsData, setBaptismStatsData] = useState<any[]>([])
   const [showMemberFilters, setShowMemberFilters] = useState(false)
+  const [showChat, setShowChat] = useState(false)
+const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: string } | null>(null)
 
   const toggleProfile = () => {
     setShowProfile(!showProfile)
@@ -279,62 +285,73 @@ const [baptismStatsData, setBaptismStatsData] = useState<any[]>([])
 }
 
   const fetchServiceStats = async () => {
-    if (!user?.serviceId) return
-    try {
-      const { data: studentsData } = await supabase
-        .from('students')
-        .select('*')
-        .eq('service_id', user.serviceId)
-        .is('deleted_at', null)
-      
-      if (!studentsData || studentsData.length === 0) {
-        setServiceStats(null)
-        return
-      }
-      
-
-      const { data: sessionsData } = await supabase
-        .from('sessions')
-        .select('id')
-        .eq('service_id', user.serviceId)
-      
-      const totalSessions = sessionsData?.length || 0
-
-      const studentAttendanceRates = await Promise.all(studentsData.map(async (student) => {
-        const { data: attendances } = await supabase
-          .from('attendance')
-          .select('status')
-          .eq('student_id', student.id)
-          .eq('status', 'present')
-        const presentCount = attendances?.length || 0
-        const rate = totalSessions > 0 ? (presentCount / totalSessions) * 100 : 0
-        return { ...student, attendanceRate: rate, isActive: rate >= 70 }
-      }))
-
-      const averageRate = studentAttendanceRates.reduce((acc, s) => acc + s.attendanceRate, 0) / studentAttendanceRates.length
-      const activeCount = studentAttendanceRates.filter(s => s.isActive).length
-      const inactiveCount = studentAttendanceRates.length - activeCount
-
-      setServiceStats({
-        totalMembers: studentAttendanceRates.length,
-        averageAttendanceRate: Math.round(averageRate),
-        activeMembers: activeCount,
-        inactiveMembers: inactiveCount,
-        members: studentAttendanceRates.map(s => ({
-          ...s,
-          attendanceRate: Math.round(s.attendanceRate),
-          isActive: s.isActive
-        }))
-      })
-
-      setActiveInactiveData([
-        { name: 'Actifs (≥70%)', value: activeCount },
-        { name: 'Inactifs (<70%)', value: inactiveCount }
-      ])
-    } catch (error) {
-      console.error('Erreur calcul stats service:', error)
+  if (!user?.serviceId) return
+  try {
+    const { data: studentsData } = await supabase
+      .from('students')
+      .select('*')
+      .eq('service_id', user.serviceId)
+      .is('deleted_at', null)
+    
+    if (!studentsData || studentsData.length === 0) {
+      setServiceStats(null)
+      return
     }
+
+    // Compter le total des sessions (académiques + service)
+    const { data: academicSessions } = await supabase
+      .from('sessions')
+      .select('id')
+    
+    const { data: serviceSessions } = await supabase
+      .from('service_sessions')
+      .select('id')
+      .eq('service_id', user.serviceId)
+
+    const totalAcademicSessions = academicSessions?.length || 0
+    const totalServiceSessions = serviceSessions?.length || 0
+    const totalSessions = totalAcademicSessions + totalServiceSessions
+
+    const studentStats = await Promise.all(studentsData.map(async (student) => {
+      // Présences académiques
+      const { data: academicAttendances } = await supabase
+        .from('attendance')
+        .select('status')
+        .eq('student_id', student.id)
+        .eq('status', 'present')
+      
+      // Présences service
+      const { data: serviceAttendances } = await supabase
+        .from('service_attendance')
+        .select('status')
+        .eq('student_id', student.id)
+        .eq('status', 'present')
+
+      const totalPresent = (academicAttendances?.length || 0) + (serviceAttendances?.length || 0)
+      const rate = totalSessions > 0 ? Math.round((totalPresent / totalSessions) * 100) : 0
+      
+      return { ...student, attendanceRate: rate, isActive: rate >= 50 }
+    }))
+
+    const averageRate = Math.round(studentStats.reduce((acc, s) => acc + s.attendanceRate, 0) / studentStats.length)
+    const activeCount = studentStats.filter(s => s.isActive).length
+
+    setServiceStats({
+      totalMembers: studentStats.length,
+      averageAttendanceRate: averageRate,
+      activeMembers: activeCount,
+      inactiveMembers: studentStats.length - activeCount,
+      members: studentStats
+    })
+
+    setActiveInactiveData([
+      { name: 'Actifs (≥50%)', value: activeCount },
+      { name: 'Inactifs (<50%)', value: studentStats.length - activeCount }
+    ])
+  } catch (error) {
+    console.error('Erreur calcul stats service:', error)
   }
+}
 
   const startServiceSession = async () => {
     if (!selectedType) {
@@ -817,6 +834,9 @@ const [baptismStatsData, setBaptismStatsData] = useState<any[]>([])
                   </button>
                 )}
                 <NotificationBell />
+                <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
+  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
+</button>
                 <button onClick={() => setShowHistory(!showHistory)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
                   {showHistory ? 'Masquer' : 'Afficher'} l'historique
                 </button>
@@ -831,6 +851,9 @@ const [baptismStatsData, setBaptismStatsData] = useState<any[]>([])
               {/* Boutons mobile */}
               <div className="flex items-center gap-2 lg:hidden">
                 <NotificationBell />
+                <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
+  <ChatBubbleLeftRightIcon className="w-5 h-5" />
+</button>
                 <button onClick={logout} className="p-2 text-red-400 hover:text-red-300">
                   <ArrowLeftOnRectangleIcon className="w-5 h-5" />
                 </button>
@@ -1387,6 +1410,15 @@ const [baptismStatsData, setBaptismStatsData] = useState<any[]>([])
 
       <AddStudentModal isOpen={showAddStudentModal} onClose={() => setShowAddStudentModal(false)} serviceId={user?.serviceId || ''} onStudentAdded={handleStudentAdded} />
     </div> 
-  </div> 
+       <AddStudentModal isOpen={showAddStudentModal} onClose={() => setShowAddStudentModal(false)} serviceId={user?.serviceId || ''} onStudentAdded={handleStudentAdded} />
+
+      {/* Chat */}
+      {showChat && !selectedChatGroup && (
+        <ChatGroups onSelectGroup={(id, name) => setSelectedChatGroup({ id, name })} onClose={() => setShowChat(false)} />
+      )}
+      {showChat && selectedChatGroup && (
+        <ChatMessages groupId={selectedChatGroup.id} groupName={selectedChatGroup.name} currentUserId={user?.id || ''} currentUserName={user?.name || ''} onBack={() => setSelectedChatGroup(null)} />
+      )}
+    </div>
   )
 }

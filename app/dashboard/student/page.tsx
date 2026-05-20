@@ -12,6 +12,9 @@ import { Attendance, Progress, Badge } from '@/types'
 import { StudentQuiz } from '@/components/StudentQuiz'
 import { ProfileSection } from '@/components/ProfileSection'
 import { NotificationBell } from '@/components/NotificationBell'
+import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
+import { ChatGroups } from '@/components/ChatGroups'
+import { ChatMessages } from '@/components/ChatMessages'
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -34,6 +37,8 @@ export default function StudentDashboard() {
   const [loadingData, setLoadingData] = useState(true)
   const [userLevel, setUserLevel] = useState<number>(1)
   const [badges, setBadges] = useState<(Badge & { awarded_at?: string })[]>([])
+  const [showChat, setShowChat] = useState(false)
+const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: string } | null>(null)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -130,6 +135,10 @@ export default function StudentDashboard() {
                   <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 text-white/80 rounded-full text-xs">🏠 {user.maisonGrace}</div>
                 )}
                 <NotificationBell />
+                <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
+  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
+</button>
+                
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
                   <UserCircleIcon className="w-3.5 h-3.5" /> {showProfile ? 'Tableau de bord' : 'Mon profil'}
                 </button>
@@ -147,6 +156,9 @@ export default function StudentDashboard() {
                   </div>
                 )}
                 <NotificationBell />
+                <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
+  <ChatBubbleLeftRightIcon className="w-5 h-5" />
+</button>
                 <button onClick={logout} className="p-2 text-red-400 hover:text-red-300">
                   <ArrowLeftOnRectangleIcon className="w-5 h-5" />
                 </button>
@@ -272,6 +284,24 @@ export default function StudentDashboard() {
             <p className="text-white/40 text-xs text-center mt-4">⏰ Le code expire après 15 minutes.</p>
           </div>
         </div>
+      )}
+        {/* Modal Chat - Liste des groupes */}
+      {showChat && !selectedChatGroup && (
+        <ChatGroups
+          onSelectGroup={(id, name) => setSelectedChatGroup({ id, name })}
+          onClose={() => setShowChat(false)}
+        />
+      )}
+
+      {/* Modal Chat - Messages */}
+      {showChat && selectedChatGroup && (
+        <ChatMessages
+          groupId={selectedChatGroup.id}
+          groupName={selectedChatGroup.name}
+          currentUserId={user?.id || ''}
+          currentUserName={user?.name || ''}
+          onBack={() => setSelectedChatGroup(null)}
+        />
       )}
     </div>
   )
