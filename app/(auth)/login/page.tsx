@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
+import { LoginIntro } from '@/components/auth/LoginIntro'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
+  const [showIntro, setShowIntro] = useState(false)
+  const [userData, setUserData] = useState<{ name: string; role: string; level?: number } | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,40 +30,43 @@ export default function LoginPage() {
       const data = await res.json()
 
       if (res.ok) {
-        toast.success('Connexion réussie')
-        switch(data.user.role) {
-          case 'superadmin': router.push('/dashboard/superadmin'); break
-          case 'service_manager': router.push('/dashboard/manager'); break
-          default: router.push('/dashboard/student')
-        }
+        console.log('Données utilisateur reçues:', data.user) // Vérification
+        // Stocker les données utilisateur
+        setUserData({
+          name: data.user.name || data.user.username,
+          role: data.user.role,
+          level: data.user.level
+        })
+        setShowIntro(true)
       } else {
         toast.error(data.error || 'Erreur de connexion')
+        setLoading(false)
       }
     } catch (error) {
+      console.error('Erreur de connexion:', error)
       toast.error('Une erreur est survenue')
-    } finally {
       setLoading(false)
     }
+  }
+
+  // Afficher l'intro seulement si showIntro est true ET userData existe
+  if (showIntro && userData) {
+    return <LoginIntro userData={userData} />
   }
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center" style={{ fontFamily: "'Crimson Text', Georgia, serif", color: 'white' }}>
       
-      {/* Image de fond */}
       <div className="fixed inset-0 bg-cover bg-center z-0" style={{ backgroundImage: "url('/ok.png')" }} />
-      
-      {/* Overlay gradient */}
       <div className="fixed inset-0 z-10" style={{ 
         background: 'linear-gradient(135deg, rgba(8,20,90,0.88) 0%, rgba(15,45,130,0.82) 40%, rgba(10,30,100,0.87) 70%, rgba(4,12,65,0.92) 100%)' 
       }} />
       
-      {/* Orbs */}
       <div className="fixed w-[280px] h-[280px] rounded-full bg-blue-400/20 blur-[80px] -top-[40px] -right-[40px] z-20 pointer-events-none" />
       <div className="fixed w-[250px] h-[250px] rounded-full bg-blue-600/15 blur-[80px] bottom-[10%] -left-[40px] z-20 pointer-events-none" />
 
       <div className="relative z-30 w-full max-w-md px-4 py-12">
         
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-sm font-bold text-[#1a3a8f] mx-auto mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
             AG
@@ -72,7 +77,6 @@ export default function LoginPage() {
           <p className="text-blue-200/70 text-xs mt-2">Connectez-vous à votre compte</p>
         </div>
 
-        {/* Carte glass */}
         <div className="bg-white/[0.07] backdrop-blur-3xl border border-white/[0.18] rounded-3xl p-8 shadow-[0_32px_64px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.22)]">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -127,7 +131,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Retour accueil */}
         <div className="text-center mt-6">
           <Link href="/" className="text-xs text-blue-200/40 hover:text-white/60 transition-colors">
             ← Retour à l'accueil
