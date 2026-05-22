@@ -20,14 +20,14 @@ export const ProfileSection = ({ user, onClose }: ProfileSectionProps) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
   const [profileData, setProfileData] = useState({
-    name: user?.name || user?.full_name || '',
-    username: user?.username || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    baptized: user?.baptized === true || user?.baptized === 'true' || false,
-    maisonGrace: user?.maisonGrace || '',
-    profileImageUrl: user?.profileImageUrl || user?.profile_image_url || ''
-  })
+  name: user?.name || user?.full_name || '',
+  username: user?.username || '',
+  email: user?.email || '',
+  phone: user?.phone || '',
+  baptized: user?.baptized === true || user?.baptized === 'true',  // ← CORRIGÉ
+  maisonGrace: user?.maisonGrace || '',
+  profileImageUrl: user?.profileImageUrl || user?.profile_image_url || ''
+})
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',

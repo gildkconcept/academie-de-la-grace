@@ -15,6 +15,7 @@ import { NotificationBell } from '@/components/NotificationBell'
 import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
 import { ChatGroups } from '@/components/ChatGroups'
 import { ChatMessages } from '@/components/ChatMessages'
+import { DailyVerseCard } from '@/components/DailyVerseCard'
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -38,7 +39,7 @@ export default function StudentDashboard() {
   const [userLevel, setUserLevel] = useState<number>(1)
   const [badges, setBadges] = useState<(Badge & { awarded_at?: string })[]>([])
   const [showChat, setShowChat] = useState(false)
-const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: string } | null>(null)
+  const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: string } | null>(null)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -136,8 +137,8 @@ const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: s
                 )}
                 <NotificationBell />
                 <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
-  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
-</button>
+                  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
+                </button>
                 
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
                   <UserCircleIcon className="w-3.5 h-3.5" /> {showProfile ? 'Tableau de bord' : 'Mon profil'}
@@ -157,8 +158,8 @@ const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: s
                 )}
                 <NotificationBell />
                 <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
-  <ChatBubbleLeftRightIcon className="w-5 h-5" />
-</button>
+                  <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                </button>
                 <button onClick={logout} className="p-2 text-red-400 hover:text-red-300">
                   <ArrowLeftOnRectangleIcon className="w-5 h-5" />
                 </button>
@@ -201,6 +202,9 @@ const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: s
           <ProfileSection user={user} onClose={() => setShowProfile(false)} />
         ) : (
           <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
+            {/* ✨ Verset du jour */}
+            <DailyVerseCard />
+            
             {/* Statistiques */}
             <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
               {[
@@ -254,55 +258,56 @@ const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: s
             </div>
           </div>
         )}
-      </div>
 
-      {/* Bouton flottant code */}
-      {!showProfile && !showCodeInput && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md px-4 z-40">
-          <button onClick={() => setShowCodeInput(true)}
-            className="w-full bg-white text-[#1a3a8f] py-4 px-6 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-base font-semibold flex items-center justify-center gap-2">
-            <QrCodeIcon className="w-5 h-5" /> Entrer le code de présence
-          </button>
-        </div>
-      )}
-
-      {/* Modal Code */}
-      {showCodeInput && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white/[0.08] backdrop-blur-3xl border border-white/[0.15] rounded-2xl p-6 max-w-md w-full shadow-[0_32px_64px_rgba(0,0,0,0.5)]">
-            <h3 className="text-lg font-normal text-white mb-4 text-center" style={{ fontFamily: "'Playfair Display', serif" }}>🔑 Code de présence</h3>
-            <input type="text" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="123456"
-              className="w-full text-center text-3xl sm:text-4xl font-bold p-3 sm:p-4 bg-white/90 border-2 border-white/30 rounded-xl mb-4 tracking-widest text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-400" autoFocus />
-            <div className="flex gap-2">
-              <button onClick={verifyCode} disabled={verifying || code.length !== 6}
-                className="flex-1 bg-white text-[#1a3a8f] py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all disabled:opacity-50">
-                {verifying ? 'Vérification...' : 'Valider ma présence'}
-              </button>
-              <button onClick={() => { setShowCodeInput(false); setCode('') }}
-                className="flex-1 bg-white/10 text-white py-3 rounded-lg text-sm hover:bg-white/20 transition-colors">Annuler</button>
-            </div>
-            <p className="text-white/40 text-xs text-center mt-4">⏰ Le code expire après 15 minutes.</p>
+        {/* Bouton flottant code */}
+        {!showProfile && !showCodeInput && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md px-4 z-40">
+            <button onClick={() => setShowCodeInput(true)}
+              className="w-full bg-white text-[#1a3a8f] py-4 px-6 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-base font-semibold flex items-center justify-center gap-2">
+              <QrCodeIcon className="w-5 h-5" /> Entrer le code de présence
+            </button>
           </div>
-        </div>
-      )}
-        {/* Modal Chat - Liste des groupes */}
-      {showChat && !selectedChatGroup && (
-        <ChatGroups
-          onSelectGroup={(id, name) => setSelectedChatGroup({ id, name })}
-          onClose={() => setShowChat(false)}
-        />
-      )}
+        )}
 
-      {/* Modal Chat - Messages */}
-      {showChat && selectedChatGroup && (
-        <ChatMessages
-          groupId={selectedChatGroup.id}
-          groupName={selectedChatGroup.name}
-          currentUserId={user?.id || ''}
-          currentUserName={user?.name || ''}
-          onBack={() => setSelectedChatGroup(null)}
-        />
-      )}
+        {/* Modal Code */}
+        {showCodeInput && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white/[0.08] backdrop-blur-3xl border border-white/[0.15] rounded-2xl p-6 max-w-md w-full shadow-[0_32px_64px_rgba(0,0,0,0.5)]">
+              <h3 className="text-lg font-normal text-white mb-4 text-center" style={{ fontFamily: "'Playfair Display', serif" }}>🔑 Code de présence</h3>
+              <input type="text" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="123456"
+                className="w-full text-center text-3xl sm:text-4xl font-bold p-3 sm:p-4 bg-white/90 border-2 border-white/30 rounded-xl mb-4 tracking-widest text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-400" autoFocus />
+              <div className="flex gap-2">
+                <button onClick={verifyCode} disabled={verifying || code.length !== 6}
+                  className="flex-1 bg-white text-[#1a3a8f] py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all disabled:opacity-50">
+                  {verifying ? 'Vérification...' : 'Valider ma présence'}
+                </button>
+                <button onClick={() => { setShowCodeInput(false); setCode('') }}
+                  className="flex-1 bg-white/10 text-white py-3 rounded-lg text-sm hover:bg-white/20 transition-colors">Annuler</button>
+              </div>
+              <p className="text-white/40 text-xs text-center mt-4">⏰ Le code expire après 15 minutes.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Chat - Liste des groupes */}
+        {showChat && !selectedChatGroup && (
+          <ChatGroups
+            onSelectGroup={(id, name) => setSelectedChatGroup({ id, name })}
+            onClose={() => setShowChat(false)}
+          />
+        )}
+
+        {/* Modal Chat - Messages */}
+        {showChat && selectedChatGroup && (
+          <ChatMessages
+            groupId={selectedChatGroup.id}
+            groupName={selectedChatGroup.name}
+            currentUserId={user?.id || ''}
+            currentUserName={user?.name || ''}
+            onBack={() => setSelectedChatGroup(null)}
+          />
+        )}
+      </div>
     </div>
   )
 }

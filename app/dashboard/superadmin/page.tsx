@@ -30,6 +30,7 @@ import { ChatGroups } from '@/components/ChatGroups'
 import { ChatMessages } from '@/components/ChatMessages'
 import { AdminQuizHistory } from '@/components/AdminQuizHistory'
 import { ServiceHistoryDetail } from '@/components/ServiceHistoryDetail'
+import { AdminVerses } from '@/components/AdminVerses'
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -1699,6 +1700,9 @@ const baptises = studentsData.filter(s => s.baptized === true).length
             {showQuizSection === 'create' && <AdminQuiz />}
             {showQuizSection === 'history' && <AdminQuizHistory />}
           </div>
+          <div className="mb-8">
+  <AdminVerses />
+</div>
                     {/* Section Annonces */}
           <div className="mb-8">
             <div className="flex justify-between items-center mb-4">

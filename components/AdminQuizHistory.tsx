@@ -95,27 +95,37 @@ export const AdminQuizHistory = () => {
         </div>
       )}
 
-      {/* Filtres */}
+      {/* Historique - Version responsive */}
       {activeTab === 'history' && (
         <>
-          <div className="flex flex-wrap gap-3 items-center">
+          {/* Barre de recherche et filtres */}
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" placeholder="Rechercher un étudiant..." value={searchTerm}
+              <input
+                type="text"
+                placeholder="Rechercher un étudiant..."
+                value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 p-2 bg-white/90 border border-white/30 rounded-lg text-gray-900 text-sm" />
+                className="w-full pl-10 p-2 bg-white/90 border border-white/30 rounded-lg text-gray-900 text-sm"
+              />
             </div>
-            <button onClick={() => setShowFilters(!showFilters)}
-              className="px-3 py-2 bg-white/10 text-white/70 rounded-lg text-xs hover:bg-white/20 flex items-center gap-1">
-              <FunnelIcon className="w-3.5 h-3.5" /> Filtres
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="px-3 py-2 bg-white/10 text-white/70 rounded-lg text-sm hover:bg-white/20 flex items-center justify-center gap-1"
+            >
+              <FunnelIcon className="w-4 h-4" /> Filtres
             </button>
           </div>
 
+          {/* Filtres déroulants */}
           {showFilters && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className={selectClass}>
                 <option value="all">Tous niveaux</option>
-                <option value="1">Niveau 1</option><option value="2">Niveau 2</option><option value="3">Niveau 3</option>
+                <option value="1">Niveau 1</option>
+                <option value="2">Niveau 2</option>
+                <option value="3">Niveau 3</option>
               </select>
               <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className={selectClass}>
                 <option value="all">Toutes branches</option>
@@ -128,8 +138,45 @@ export const AdminQuizHistory = () => {
             </div>
           )}
 
-          {/* Tableau */}
-          <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl overflow-hidden">
+          {/* Version mobile : Cartes */}
+          <div className="lg:hidden space-y-3">
+            {loading ? (
+              <div className="text-center py-8 text-white/50">Chargement...</div>
+            ) : results.length === 0 ? (
+              <div className="text-center py-8 text-white/40 text-sm">Aucun résultat</div>
+            ) : (
+              results.map((r) => (
+                <div key={r.id} className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-white font-medium text-sm">{r.student?.full_name}</p>
+                      <p className="text-white/40 text-xs">{r.quiz?.title}</p>
+                      <p className="text-white/40 text-xs">Niveau {r.quiz?.level}</p>
+                    </div>
+                    <button
+                      onClick={() => viewDetail(r.id)}
+                      className="p-2 text-blue-300 hover:text-blue-200 bg-blue-500/10 rounded-lg"
+                    >
+                      <EyeIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/[0.06]">
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                      r.percentage >= 70 ? 'bg-green-500/20 text-green-300' : 
+                      r.percentage >= 50 ? 'bg-yellow-500/20 text-yellow-300' : 
+                      'bg-red-500/20 text-red-300'
+                    }`}>
+                      {r.score}/{r.total_questions} ({r.percentage}%)
+                    </span>
+                    <span className="text-xs text-white/40">{new Date(r.submitted_at).toLocaleDateString('fr-FR')}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Version desktop : Tableau */}
+          <div className="hidden lg:block bg-white/[0.04] border border-white/[0.08] rounded-xl overflow-hidden">
             <table className="min-w-full">
               <thead>
                 <tr>
@@ -145,14 +192,18 @@ export const AdminQuizHistory = () => {
                     <td className="px-4 py-2 text-sm text-white/60">{r.quiz?.title}</td>
                     <td className="px-4 py-2 text-sm text-white/60">{r.quiz?.level}</td>
                     <td className="px-4 py-2">
-                      <span className={`px-2 py-0.5 text-xs rounded-full ${r.percentage >= 70 ? 'bg-green-500/20 text-green-300' : r.percentage >= 50 ? 'bg-yellow-500/20 text-yellow-300' : 'bg-red-500/20 text-red-300'}`}>
+                      <span className={`px-2 py-0.5 text-xs rounded-full ${
+                        r.percentage >= 70 ? 'bg-green-500/20 text-green-300' : 
+                        r.percentage >= 50 ? 'bg-yellow-500/20 text-yellow-300' : 
+                        'bg-red-500/20 text-red-300'
+                      }`}>
                         {r.score}/{r.total_questions} ({r.percentage}%)
                       </span>
                     </td>
                     <td className="px-4 py-2 text-xs text-white/40">{new Date(r.submitted_at).toLocaleDateString('fr-FR')}</td>
                     <td className="px-4 py-2">
-                      <button onClick={() => viewDetail(r.id)} className="text-blue-300 hover:text-blue-200 text-xs">
-                        <EyeIcon className="w-4 h-4" />
+                      <button onClick={() => viewDetail(r.id)} className="text-blue-300 hover:text-blue-200">
+                        <EyeIcon className="w-5 h-5" />
                       </button>
                     </td>
                   </tr>
@@ -164,26 +215,38 @@ export const AdminQuizHistory = () => {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex justify-center gap-2">
-              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                className="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs disabled:opacity-30">← Précédent</button>
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs disabled:opacity-30"
+              >
+                ← Précédent
+              </button>
               <span className="px-3 py-1.5 text-white/50 text-xs">Page {page + 1}/{totalPages}</span>
-              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-                className="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs disabled:opacity-30">Suivant →</button>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs disabled:opacity-30"
+              >
+                Suivant →
+              </button>
             </div>
           )}
         </>
       )}
 
-      {/* Modal détail */}
+      {/* Modal détail - Version responsive */}
       {showDetail && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[rgba(8,20,90,0.97)] backdrop-blur-2xl border border-white/[0.15] rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-auto">
+          <div className="bg-[rgba(8,20,90,0.97)] backdrop-blur-2xl border border-white/[0.15] rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-auto">
             <div className="sticky top-0 bg-[rgba(5,15,70,0.9)] backdrop-blur-2xl p-4 border-b border-white/[0.08] flex justify-between items-center">
               <div>
                 <h3 className="text-white font-medium">{showDetail.result?.student?.full_name}</h3>
                 <p className="text-white/50 text-xs">{showDetail.result?.quiz?.title} - {showDetail.result?.percentage}%</p>
               </div>
-              <button onClick={() => setShowDetail(null)} className="text-white/50 hover:text-white"><XMarkIcon className="w-5 h-5" /></button>
+              <button onClick={() => setShowDetail(null)} className="text-white/50 hover:text-white">
+                <XMarkIcon className="w-5 h-5" />
+              </button>
             </div>
             <div className="p-4 space-y-3">
               {showDetail.answers?.map((a: any, i: number) => (
@@ -191,7 +254,11 @@ export const AdminQuizHistory = () => {
                   <p className="text-white/80 text-sm mb-2">Q{i + 1}: {a.question?.question}</p>
                   <div className="text-xs space-y-1">
                     {['a','b','c','d'].map(l => (
-                      <div key={l} className={`p-1.5 rounded ${l.toUpperCase() === a.selected_answer ? (a.is_correct ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300') : l.toUpperCase() === a.question?.correct_answer ? 'bg-green-500/10 text-green-300' : 'text-white/50'}`}>
+                      <div key={l} className={`p-1.5 rounded ${
+                        l.toUpperCase() === a.selected_answer ? 
+                          (a.is_correct ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300') : 
+                          l.toUpperCase() === a.question?.correct_answer ? 'bg-green-500/10 text-green-300' : 'text-white/50'
+                      }`}>
                         {l.toUpperCase()}. {a.question?.[`option_${l}`]}
                         {l.toUpperCase() === a.selected_answer && ' ←'}
                         {l.toUpperCase() === a.question?.correct_answer && ' ✓'}

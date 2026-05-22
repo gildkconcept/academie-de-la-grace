@@ -147,8 +147,8 @@ export const StudentQuiz = () => {
     if (!currentQuestion) return <div className="text-center py-8 text-white/60">Question non trouvée</div>
 
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl p-6">
+<div className="max-w-2xl mx-auto px-2 sm:px-0">
+  <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-lg font-normal text-white mb-1" style={{ fontFamily: "'Playfair Display', serif" }}>{selectedQuiz.title}</h3>
