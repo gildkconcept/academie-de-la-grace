@@ -555,6 +555,15 @@ const baptises = studentsData.filter(s => s.baptized === true).length
       console.error('Erreur chargement badges:', error)
     }
   }
+  const fetchNoPhoneStats = async () => {
+  try {
+    const res = await fetch('/api/students/no-phone-stats', { credentials: 'include' })
+    const data = await res.json()
+    if (res.ok) setStatsNoPhone(data)
+  } catch (error) {
+    console.error('Erreur stats no phone:', error)
+  }
+}
 
   const assignBadge = async () => {
     if (!selectedStudentForBadge || !selectedBadgeId) {
