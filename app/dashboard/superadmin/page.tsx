@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { AssistedAttendanceModal } from '../../../components/AssistedAttendanceModal'
+import { CreateNoPhoneStudent } from '@/components/CreateNoPhoneStudent'
+import { PhoneXMarkIcon } from '@heroicons/react/24/outline'
 import { 
   AttendanceChart, 
   CustomPieChart,
@@ -31,6 +34,7 @@ import { ChatMessages } from '@/components/ChatMessages'
 import { AdminQuizHistory } from '@/components/AdminQuizHistory'
 import { ServiceHistoryDetail } from '@/components/ServiceHistoryDetail'
 import { AdminVerses } from '@/components/AdminVerses'
+
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -51,68 +55,71 @@ import { MegaphoneIcon } from '@heroicons/react/24/outline'
 
 export default function SuperAdminDashboard() {
   const { user, loading, logout } = useAuth()
-  const router = useRouter()
-  const [showProfile, setShowProfile] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
-  const [services, setServices] = useState<Service[]>([])
-  const [students, setStudents] = useState<Student[]>([])
-  const [filteredStudents, setFilteredStudents] = useState<Student[]>([])
-  const [sessions, setSessions] = useState<any[]>([])
-  const [selectedSession, setSelectedSession] = useState<string>('all')
-  const [selectedService, setSelectedService] = useState<string>('all')
-  const [selectedBranch, setSelectedBranch] = useState<string>('all')
-  const [selectedLevel, setSelectedLevel] = useState<string>('all')
-  const [selectedBaptism, setSelectedBaptism] = useState<string>('all')
-  const [branches, setBranches] = useState<string[]>([])
-  const [attendanceBySession, setAttendanceBySession] = useState<any[]>([])
-  const [sessionStudents, setSessionStudents] = useState<Student[]>([])
-  const [branchStats, setBranchStats] = useState<any[]>([])
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    totalServices: 0,
-    presentToday: 0,
-    baptized: 0,
-    averageProgress: 0
-  })
-  const [loadingData, setLoadingData] = useState(true)
+const router = useRouter()
+const [showProfile, setShowProfile] = useState(false)
+const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+const [showFilters, setShowFilters] = useState(false)
+const [services, setServices] = useState<Service[]>([])
+const [students, setStudents] = useState<Student[]>([])
+const [filteredStudents, setFilteredStudents] = useState<Student[]>([])
+const [sessions, setSessions] = useState<any[]>([])
+const [selectedSession, setSelectedSession] = useState<string>('all')
+const [selectedService, setSelectedService] = useState<string>('all')
+const [selectedBranch, setSelectedBranch] = useState<string>('all')
+const [selectedLevel, setSelectedLevel] = useState<string>('all')
+const [selectedBaptism, setSelectedBaptism] = useState<string>('all')
+const [branches, setBranches] = useState<string[]>([])
+const [attendanceBySession, setAttendanceBySession] = useState<any[]>([])
+const [sessionStudents, setSessionStudents] = useState<Student[]>([])
+const [branchStats, setBranchStats] = useState<any[]>([])
+const [stats, setStats] = useState({
+  totalStudents: 0,
+  totalServices: 0,
+  presentToday: 0,
+  baptized: 0,
+  averageProgress: 0
+})
+const [loadingData, setLoadingData] = useState(true)
 
-  // États pour la présence service
-  const [serviceAttendances, setServiceAttendances] = useState<any[]>([])
-  const [selectedServiceForAttendance, setSelectedServiceForAttendance] = useState<string>('all')
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0])
-  const [selectedCultType, setSelectedCultType] = useState<string>('all')
-  const [cultTypes, setCultTypes] = useState<any[]>([])
- const [showQuizSection, setShowQuizSection] = useState<string | false>(false)
+// États pour la présence service
+const [showCreateNoPhoneModal, setShowCreateNoPhoneModal] = useState(false)
+const [showAssistedAttendanceModal, setShowAssistedAttendanceModal] = useState(false)
+const [statsNoPhone, setStatsNoPhone] = useState({ total: 0, present: 0 })
+const [serviceAttendances, setServiceAttendances] = useState<any[]>([])
+const [selectedServiceForAttendance, setSelectedServiceForAttendance] = useState<string>('all')
+const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0])
+const [selectedCultType, setSelectedCultType] = useState<string>('all')
+const [cultTypes, setCultTypes] = useState<any[]>([])
 
-  // Données pour les graphiques
-  const [presenceByService, setPresenceByService] = useState<any[]>([])
-  const [presenceByLevel, setPresenceByLevel] = useState<any[]>([])
-  const [presenceByBranch, setPresenceByBranch] = useState<any[]>([])
-  const [baptismStats, setBaptismStats] = useState<any[]>([])
+const [showQuizSection, setShowQuizSection] = useState<string | false>(false)
 
-  // === NOUVEAUX ÉTATS ===
-  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null)
-  const [badgesList, setBadgesList] = useState<Badge[]>([])
-  const [showBadgeModal, setShowBadgeModal] = useState(false)
-  const [selectedStudentForBadge, setSelectedStudentForBadge] = useState<string>('')
-  const [selectedBadgeId, setSelectedBadgeId] = useState<string>('')
- 
-  const [showAnnouncement, setShowAnnouncement] = useState(false)
-  const [showChat, setShowChat] = useState(false)
+// Données pour les graphiques
+const [presenceByService, setPresenceByService] = useState<any[]>([])
+const [presenceByLevel, setPresenceByLevel] = useState<any[]>([])
+const [presenceByBranch, setPresenceByBranch] = useState<any[]>([])
+const [baptismStats, setBaptismStats] = useState<any[]>([])
+
+// === NOUVEAUX ÉTATS ===
+const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null)
+const [badgesList, setBadgesList] = useState<Badge[]>([])
+const [showBadgeModal, setShowBadgeModal] = useState(false)
+const [selectedStudentForBadge, setSelectedStudentForBadge] = useState<string>('')
+const [selectedBadgeId, setSelectedBadgeId] = useState<string>('')
+
+const [showAnnouncement, setShowAnnouncement] = useState(false)
+const [showChat, setShowChat] = useState(false)
 const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: string } | null>(null)
 
-    // === ÉTATS POUR LA LISTE DES ÉTUDIANTS (RECHERCHE + FILTRES + PDF) ===
-  const [studentSearchTerm, setStudentSearchTerm] = useState<string>('')
-  const [studentServiceFilter, setStudentServiceFilter] = useState<string>('all')
-  const [studentLevelFilter, setStudentLevelFilter] = useState<string>('all')
-  const [studentBranchFilter, setStudentBranchFilter] = useState<string>('all')
-  const [studentBaptismFilter, setStudentBaptismFilter] = useState<string>('all')
-  const [studentMaisonGraceFilter, setStudentMaisonGraceFilter] = useState<string>('all')
-  const [studentMaisonGraceSearch, setStudentMaisonGraceSearch] = useState<string>('')
-  const [studentMaisonGraceList, setStudentMaisonGraceList] = useState<string[]>([])
-  const [showStudentFilters, setShowStudentFilters] = useState(false)
-
+// === ÉTATS POUR LA LISTE DES ÉTUDIANTS (RECHERCHE + FILTRES + PDF) ===
+const [studentSearchTerm, setStudentSearchTerm] = useState<string>('')
+const [studentServiceFilter, setStudentServiceFilter] = useState<string>('all')
+const [studentLevelFilter, setStudentLevelFilter] = useState<string>('all')
+const [studentBranchFilter, setStudentBranchFilter] = useState<string>('all')
+const [studentBaptismFilter, setStudentBaptismFilter] = useState<string>('all')
+const [studentMaisonGraceFilter, setStudentMaisonGraceFilter] = useState<string>('all')
+const [studentMaisonGraceSearch, setStudentMaisonGraceSearch] = useState<string>('')
+const [studentMaisonGraceList, setStudentMaisonGraceList] = useState<string[]>([])
+const [showStudentFilters, setShowStudentFilters] = useState(false)
   const toggleProfile = () => {
     setShowProfile(!showProfile)
     setMobileMenuOpen(false)
@@ -1140,81 +1147,94 @@ const baptises = studentsData.filter(s => s.baptized === true).length
   return (
     <div className="min-h-screen bg-[#0a1020]">
       {/* Navigation */}
-      <nav className="bg-[rgba(5,15,70,0.6)] backdrop-blur-2xl border-b border-white/[0.08] sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center flex-1 lg:flex-none">
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
-              >
-                {mobileMenuOpen ? (
-                  <XMarkIcon className="h-6 w-6" />
-                ) : (
-                  <Bars3Icon className="h-6 w-6" />
-                )}
-              </button>
-              <h1 className="text-lg sm:text-xl font-semibold ml-2 lg:ml-0 truncate">
-                {showProfile ? 'Mon profil' : 'Super Admin'}
-              </h1>
-            </div>
+<nav className="bg-[rgba(5,15,70,0.6)] backdrop-blur-2xl border-b border-white/[0.08] sticky top-0 z-40">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="flex justify-between h-16">
+      <div className="flex items-center flex-1 lg:flex-none">
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+        >
+          {mobileMenuOpen ? (
+            <XMarkIcon className="h-6 w-6" />
+          ) : (
+            <Bars3Icon className="h-6 w-6" />
+          )}
+        </button>
+        <h1 className="text-lg sm:text-xl font-semibold ml-2 lg:ml-0 truncate">
+          {showProfile ? 'Mon profil' : 'Super Admin'}
+        </h1>
+      </div>
 
-                        {/* Boutons desktop */}
-            <div className="hidden lg:flex items-center space-x-4">
-              {/* 🔔 Cloche de notifications */}
-              <NotificationBell />
-              <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
-  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
-</button>
-              <Button
-                onClick={toggleProfile}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <UserCircleIcon className="w-4 h-4" />
-                {showProfile ? 'Tableau de bord' : 'Mon profil'}
-              </Button>
-              <Button onClick={logout} variant="destructive" size="sm">
-                Déconnexion
-              </Button>
-            </div>
+      {/* Boutons desktop */}
+      <div className="hidden lg:flex items-center space-x-4">
+        <NotificationBell />
+        
+        <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
+          <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
+        </button>
+        
+        {/* Bouton Sans téléphone */}
+        <button
+          onClick={() => setShowCreateNoPhoneModal(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-lg text-xs hover:bg-purple-500/30 transition-colors"
+        >
+          <PhoneXMarkIcon className="w-3.5 h-3.5" />
+          Sans téléphone
+        </button>
+        
+        {/* Bouton Présence assistée */}
+        <button
+          onClick={() => setShowAssistedAttendanceModal(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-lg text-xs hover:bg-indigo-500/30 transition-colors"
+        >
+          <PhoneXMarkIcon className="w-3.5 h-3.5" />
+          Présence assistée
+        </button>
+        
+        <Button onClick={toggleProfile} variant="outline" size="sm" className="flex items-center gap-2">
+          <UserCircleIcon className="w-4 h-4" />
+          {showProfile ? 'Tableau de bord' : 'Mon profil'}
+        </Button>
+        
+        <Button onClick={logout} variant="destructive" size="sm">
+          Déconnexion
+        </Button>
+      </div>
 
-                       {/* Boutons mobile */}
-            <div className="flex items-center gap-2 lg:hidden">
-              {/* 🔔 Cloche de notifications mobile */}
-              <NotificationBell />
-              <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
-  <ChatBubbleLeftRightIcon className="w-5 h-5" />
-</button>
-              
-              <button
-                onClick={logout}
-                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                title="Déconnexion"
-              >
-                <ArrowLeftOnRectangleIcon className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Boutons mobile */}
+      <div className="flex items-center gap-2 lg:hidden">
+        <NotificationBell />
+        <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
+          <ChatBubbleLeftRightIcon className="w-5 h-5" />
+        </button>
+        <button
+          onClick={logout}
+          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+          title="Déconnexion"
+        >
+          <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  </div>
 
-        {/* Menu mobile */}
-        {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-200 bg-white">
-            <div className="px-4 py-3 space-y-2">
-              <p className="text-sm text-gray-600 pb-2 border-b">Connecté en tant que ${user?.name}</p>
-              <button
-                onClick={toggleProfile}
-                className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
-              >
-                <UserCircleIcon className="w-5 h-5 mr-3" />
-                {showProfile ? 'Tableau de bord' : 'Mon profil'}
-              </button>
-            </div>
-          </div>
-        )}
-      </nav>
+  {/* Menu mobile */}
+  {mobileMenuOpen && (
+    <div className="lg:hidden border-t border-gray-200 bg-white">
+      <div className="px-4 py-3 space-y-2">
+        <p className="text-sm text-gray-600 pb-2 border-b">Connecté en tant que {user?.name}</p>
+        <button
+          onClick={toggleProfile}
+          className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
+        >
+          <UserCircleIcon className="w-5 h-5 mr-3" />
+          {showProfile ? 'Tableau de bord' : 'Mon profil'}
+        </button>
+      </div>
+    </div>
+  )}
+</nav>
 
       {/* Contenu principal */}
       {showProfile ? (
@@ -1892,7 +1912,23 @@ const baptises = studentsData.filter(s => s.baptized === true).length
           </div>
         </div>
       )}
-      
+      {/* Modal Présence Assistée */}
+<CreateNoPhoneStudent
+  isOpen={showCreateNoPhoneModal}
+  onClose={() => setShowCreateNoPhoneModal(false)}
+  onSuccess={() => {
+    fetchData()
+    fetchNoPhoneStats()
+  }}
+/>
+
+<AssistedAttendanceModal
+  isOpen={showAssistedAttendanceModal}
+  onClose={() => setShowAssistedAttendanceModal(false)}
+  onComplete={() => {
+    fetchData()
+  }}
+/>
     </div>
   )
 }

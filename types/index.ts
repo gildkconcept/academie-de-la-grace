@@ -26,7 +26,8 @@ export interface Student {
   created_at: Date
   deleted_at?: string | null
   maison_grace?: string
-  profile_image_url?: string  // ← AJOUT
+  profile_image_url?: string 
+  has_phone?: boolean
 }
 
 export interface Service {
