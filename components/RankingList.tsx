@@ -21,6 +21,7 @@ interface RankingStudent {
     profile_image_url: string | null
     branch: string
     level: number
+    service_id: string | null
     service_name: string
     baptized: boolean
   }
