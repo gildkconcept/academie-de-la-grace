@@ -1,4 +1,4 @@
-// app/api/live/heartbeat/route.ts
+// app/api/live/heartbeat/route.ts - Version corrigée
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
@@ -20,65 +20,48 @@ export async function POST(request: Request) {
 
     const { currentPage } = await request.json()
 
-    // Récupérer les infos supplémentaires selon le rôle
-    let profileImageUrl = null
-    let serviceName = null
-    let level = null
-    let branch = null
-
-    if (user.role === 'student') {
-      const { data: student } = await supabase
-        .from('students')
-        .select('profile_image_url, level, branch, services(name)')
-        .eq('id', user.id)
-        .single()
-      
-      if (student) {
-        profileImageUrl = student.profile_image_url
-        level = student.level
-        branch = student.branch
-        serviceName = (student.services as any)?.name
-      }
-    } else {
-      const { data: userData } = await supabase
-        .from('users')
-        .select('profile_image_url, services(name)')
-        .eq('id', user.id)
-        .single()
-      
-      if (userData) {
-        profileImageUrl = userData.profile_image_url
-        serviceName = (userData.services as any)?.name
-      }
-    }
-
-    // Upsert dans online_users
-    const { data, error } = await supabase
+    // Vérifier si l'utilisateur existe déjà
+    const { data: existing } = await supabase
       .from('online_users')
-      .upsert({
-        user_id: user.id,
-        user_name: user.name,
-        user_role: user.role,
-        profile_image_url: profileImageUrl,
-        service_id: user.serviceId || null,
-        service_name: serviceName,
-        level: level,
-        branch: branch,
-        is_online: true,
-        last_seen: new Date().toISOString(),
-        current_page: currentPage || null
-      }, {
-        onConflict: 'user_id'
-      })
-      .select()
-      .single()
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
 
-    if (error) {
-      console.error('Erreur heartbeat:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    // Préparer les données
+    const upsertData = {
+      user_id: user.id,
+      user_name: user.name,
+      user_role: user.role,
+      last_seen: new Date().toISOString(),
+      is_online: true,
+      current_page: currentPage || null
     }
 
-    return NextResponse.json({ success: true, data })
+    let result
+    if (existing) {
+      // Update si existe
+      result = await supabase
+        .from('online_users')
+        .update(upsertData)
+        .eq('user_id', user.id)
+        .select()
+        .single()
+    } else {
+      // Insert si n'existe pas
+      result = await supabase
+        .from('online_users')
+        .insert(upsertData)
+        .select()
+        .single()
+    }
+
+    if (result.error) {
+      console.error('Erreur heartbeat:', result.error)
+      return NextResponse.json({ error: result.error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, data: result.data })
+    
   } catch (error) {
     console.error('Erreur heartbeat:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })

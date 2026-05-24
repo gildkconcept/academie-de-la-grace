@@ -16,6 +16,7 @@ import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
 import { ChatGroups } from '@/components/ChatGroups'
 import { ChatMessages } from '@/components/ChatMessages'
 import { DailyVerseCard } from '@/components/DailyVerseCard'
+// import { MyRanking } from '@/components/MyRanking'  // ← COMMENTÉ
 import { LiveStatus } from '@/components/LiveStatus'
 import { 
   UserCircleIcon, 
@@ -233,6 +234,11 @@ export default function StudentDashboard() {
           <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
             {/* ✨ Verset du jour */}
             <DailyVerseCard />
+            
+            {/* 🏆 Mon classement - TEMPORAIREMENT DÉSACTIVÉ */}
+            {/* <div className="mb-6">
+              <MyRanking />
+            </div> */}
             
             {/* Statistiques */}
             <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
