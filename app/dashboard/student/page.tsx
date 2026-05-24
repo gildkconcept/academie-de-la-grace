@@ -16,6 +16,7 @@ import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
 import { ChatGroups } from '@/components/ChatGroups'
 import { ChatMessages } from '@/components/ChatMessages'
 import { DailyVerseCard } from '@/components/DailyVerseCard'
+import { LiveStatus } from '@/components/LiveStatus'
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -121,6 +122,7 @@ export default function StudentDashboard() {
                 </h1>
               </div>
 
+              {/* Desktop */}
               <div className="hidden lg:flex items-center gap-3">
                 {user?.profileImageUrl ? (
                   <img src={user.profileImageUrl} alt="Photo" className="w-10 h-10 rounded-full object-cover border-2 border-white/20" />
@@ -136,10 +138,10 @@ export default function StudentDashboard() {
                   <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 text-white/80 rounded-full text-xs">🏠 {user.maisonGrace}</div>
                 )}
                 <NotificationBell />
+                <LiveStatus />
                 <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
                   <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
                 </button>
-                
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
                   <UserCircleIcon className="w-3.5 h-3.5" /> {showProfile ? 'Tableau de bord' : 'Mon profil'}
                 </button>
@@ -148,6 +150,7 @@ export default function StudentDashboard() {
                 </button>
               </div>
 
+              {/* Mobile */}
               <div className="flex items-center gap-2 lg:hidden">
                 {user?.profileImageUrl ? (
                   <img src={user.profileImageUrl} alt="Photo" className="w-10 h-10 rounded-full object-cover border-2 border-white/20" />
@@ -157,6 +160,7 @@ export default function StudentDashboard() {
                   </div>
                 )}
                 <NotificationBell />
+                <LiveStatus />
                 <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
                   <ChatBubbleLeftRightIcon className="w-5 h-5" />
                 </button>
@@ -167,6 +171,7 @@ export default function StudentDashboard() {
             </div>
           </div>
 
+          {/* Mobile menu */}
           {mobileMenuOpen && (
             <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.8)] backdrop-blur-2xl">
               <div className="px-4 py-3 space-y-2">
