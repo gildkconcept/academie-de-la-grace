@@ -1,3 +1,4 @@
+// app/api/quizzes/route.ts
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
@@ -45,13 +46,13 @@ export async function GET(request: Request) {
 
     // Récupérer la liste des quizzes
     const today = new Date().toISOString().split('T')[0]
+    console.log('📅 Aujourd\'hui (UTC):', today)
     
+    // Requête de base : tous les quiz actifs
     let query = supabase
       .from('quizzes')
       .select('*')
       .eq('is_active', true)
-      .lte('start_date', today)
-      .gte('end_date', today)
       .order('created_at', { ascending: false })
 
     // FILTRAGE PAR NIVEAU POUR LES ÉTUDIANTS
@@ -71,28 +72,59 @@ export async function GET(request: Request) {
     const { data: quizzes, error } = await query
 
     if (error) {
+      console.error('Erreur requête quizzes:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Pour les étudiants, vérifier s'ils ont déjà répondu
+    // Pour les étudiants, vérifier s'ils ont déjà répondu et gérer les dates
     if (user.role === 'student') {
+      // Récupérer les résultats déjà soumis par l'étudiant
       const { data: results } = await supabase
         .from('quiz_results')
-        .select('quiz_id, score, total_questions, percentage')
+        .select('quiz_id, score, total_questions, percentage, submitted_at')
         .eq('student_id', user.id)
 
       const resultsMap = new Map(results?.map(r => [r.quiz_id, r]))
 
-      const quizzesWithStatus = quizzes?.map(quiz => ({
-        ...quiz,
-        completed: resultsMap.has(quiz.id),
-        result: resultsMap.get(quiz.id) || null
-      }))
+      // Ajouter le statut à chaque quiz
+      const quizzesWithStatus = quizzes?.map(quiz => {
+        const isCompleted = resultsMap.has(quiz.id)
+        const isActivePeriod = quiz.start_date <= today && quiz.end_date >= today
+        const isUpcoming = quiz.start_date > today
+        
+        return {
+          ...quiz,
+          completed: isCompleted,
+          is_active_period: isActivePeriod,
+          is_upcoming: isUpcoming,
+          // Un quiz expiré non complété ne doit plus être accessible
+          can_take: !isCompleted && isActivePeriod,
+          result: resultsMap.get(quiz.id) || null
+        }
+      }) || []
 
-      return NextResponse.json(quizzesWithStatus)
+      // Filtrer : on garde les quiz actifs (non expirés) + les quiz complétés (pour l'historique)
+      // Mais on ne montre pas les quiz expirés non complétés
+      const filteredQuizzes = quizzesWithStatus.filter(quiz => {
+        // Garder tous les quiz complétés (pour l'historique)
+        if (quiz.completed) return true
+        // Garder les quiz actifs
+        if (quiz.is_active_period) return true
+        // Exclure les quiz expirés non complétés
+        return false
+      })
+
+      console.log('📊 Quiz retournés:', filteredQuizzes.map(q => ({ 
+        title: q.title, 
+        completed: q.completed, 
+        is_active_period: q.is_active_period 
+      })))
+
+      return NextResponse.json(filteredQuizzes)
     }
 
-    return NextResponse.json(quizzes)
+    // Pour les admins, retourner tous les quiz
+    return NextResponse.json(quizzes || [])
   } catch (error) {
     console.error('Erreur GET quizzes:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
@@ -120,6 +152,11 @@ export async function POST(request: Request) {
 
     if (!title || !level || !start_date || !end_date || !questions || questions.length === 0) {
       return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
+    }
+
+    // Vérifier que la date de fin est postérieure à la date de début
+    if (end_date < start_date) {
+      return NextResponse.json({ error: 'La date de fin doit être postérieure à la date de début' }, { status: 400 })
     }
 
     const { data: quiz, error: quizError } = await supabase

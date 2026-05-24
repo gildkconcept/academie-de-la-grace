@@ -73,15 +73,53 @@ export default function StudentDashboard() {
   }
 
   const verifyCode = async () => {
-    if (code.length !== 6) { toast.error('Le code doit faire 6 chiffres'); return }
+    console.log('🔵 Bouton VALIDER cliqué')
+    console.log('🔵 Code actuel:', code)
+    console.log('🔵 Longueur du code:', code.length)
+    
+    if (code.length !== 6) {
+      console.log('🔴 Code invalide - longueur:', code.length)
+      toast.error('Le code doit faire 6 chiffres')
+      return
+    }
+    
     setVerifying(true)
+    console.log('🟢 Envoi de la requête à /api/code/verify...')
+    
     try {
-      const res = await fetch('/api/code/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ code }) })
+      const res = await fetch('/api/code/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code })
+      })
+      
+      console.log('🟢 Réponse reçue, status:', res.status)
       const data = await res.json()
-      if (res.ok) { toast.success('✅ Présence enregistrée !'); setShowCodeInput(false); setCode(''); fetchData(); fetchBadges() }
-      else { toast.error(data.error || 'Code invalide') }
-    } catch (error) { toast.error('Erreur lors de la vérification') }
-    finally { setVerifying(false) }
+      console.log('🟢 Données de réponse:', data)
+      
+      if (res.ok) {
+        console.log('✅ Présence enregistrée avec succès !')
+        toast.success('✅ Présence enregistrée !')
+        setShowCodeInput(false)
+        setCode('')
+        fetchData()
+        fetchBadges()
+        // Recharger la page pour voir la présence
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
+      } else {
+        console.log('🔴 Erreur retournée par l\'API:', data.error)
+        toast.error(data.error || 'Code invalide')
+      }
+    } catch (error) {
+      console.error('🔴 Erreur lors de la requête:', error)
+      toast.error('Erreur lors de la vérification')
+    } finally {
+      setVerifying(false)
+      console.log('🟢 Fin de la vérification, verifying = false')
+    }
   }
 
   const calculateProgress = () => {
@@ -235,11 +273,6 @@ export default function StudentDashboard() {
             {/* ✨ Verset du jour */}
             <DailyVerseCard />
             
-            {/* 🏆 Mon classement - TEMPORAIREMENT DÉSACTIVÉ */}
-            {/* <div className="mb-6">
-              <MyRanking />
-            </div> */}
-            
             {/* Statistiques */}
             <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
               {[
@@ -297,8 +330,13 @@ export default function StudentDashboard() {
         {/* Bouton flottant code */}
         {!showProfile && !showCodeInput && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md px-4 z-40">
-            <button onClick={() => setShowCodeInput(true)}
-              className="w-full bg-white text-[#1a3a8f] py-4 px-6 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-base font-semibold flex items-center justify-center gap-2">
+            <button 
+              onClick={() => {
+                console.log('🟢 Bouton "Entrer le code de présence" cliqué')
+                setShowCodeInput(true)
+              }}
+              className="w-full bg-white text-[#1a3a8f] py-4 px-6 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-base font-semibold flex items-center justify-center gap-2"
+            >
               <QrCodeIcon className="w-5 h-5" /> Entrer le code de présence
             </button>
           </div>
@@ -309,15 +347,35 @@ export default function StudentDashboard() {
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white/[0.08] backdrop-blur-3xl border border-white/[0.15] rounded-2xl p-6 max-w-md w-full shadow-[0_32px_64px_rgba(0,0,0,0.5)]">
               <h3 className="text-lg font-normal text-white mb-4 text-center" style={{ fontFamily: "'Playfair Display', serif" }}>🔑 Code de présence</h3>
-              <input type="text" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="123456"
-                className="w-full text-center text-3xl sm:text-4xl font-bold p-3 sm:p-4 bg-white/90 border-2 border-white/30 rounded-xl mb-4 tracking-widest text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-400" autoFocus />
+              <input 
+                type="text" 
+                value={code} 
+                onChange={(e) => {
+                  console.log('🟢 Input changé:', e.target.value)
+                  setCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                }} 
+                placeholder="123456"
+                className="w-full text-center text-3xl sm:text-4xl font-bold p-3 sm:p-4 bg-white/90 border-2 border-white/30 rounded-xl mb-4 tracking-widest text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-400" 
+                autoFocus 
+              />
               <div className="flex gap-2">
-                <button onClick={verifyCode} disabled={verifying || code.length !== 6}
-                  className="flex-1 bg-white text-[#1a3a8f] py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all disabled:opacity-50">
+                <button 
+                  onClick={verifyCode} 
+                  disabled={verifying || code.length !== 6}
+                  className="flex-1 bg-white text-[#1a3a8f] py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all disabled:opacity-50"
+                >
                   {verifying ? 'Vérification...' : 'Valider ma présence'}
                 </button>
-                <button onClick={() => { setShowCodeInput(false); setCode('') }}
-                  className="flex-1 bg-white/10 text-white py-3 rounded-lg text-sm hover:bg-white/20 transition-colors">Annuler</button>
+                <button 
+                  onClick={() => { 
+                    console.log('🟢 Bouton Annuler cliqué')
+                    setShowCodeInput(false); 
+                    setCode(''); 
+                  }}
+                  className="flex-1 bg-white/10 text-white py-3 rounded-lg text-sm hover:bg-white/20 transition-colors"
+                >
+                  Annuler
+                </button>
               </div>
               <p className="text-white/40 text-xs text-center mt-4">⏰ Le code expire après 15 minutes.</p>
             </div>
