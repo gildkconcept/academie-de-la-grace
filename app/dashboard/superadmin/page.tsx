@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { AssistedAttendanceModal } from '../../../components/AssistedAttendanceModal'
 import { CreateNoPhoneStudent } from '@/components/CreateNoPhoneStudent'
 import { PhoneXMarkIcon } from '@heroicons/react/24/outline'
+
 import { 
   AttendanceChart, 
   CustomPieChart,
@@ -1183,7 +1184,6 @@ const baptises = studentsData.filter(s => s.baptized === true).length
           <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
         </button>
         
-        {/* Bouton Sans téléphone */}
         <button
           onClick={() => setShowCreateNoPhoneModal(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-lg text-xs hover:bg-purple-500/30 transition-colors"
@@ -1192,7 +1192,6 @@ const baptises = studentsData.filter(s => s.baptized === true).length
           Sans téléphone
         </button>
         
-        {/* Bouton Présence assistée */}
         <button
           onClick={() => setShowAssistedAttendanceModal(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-lg text-xs hover:bg-indigo-500/30 transition-colors"
@@ -1210,54 +1209,73 @@ const baptises = studentsData.filter(s => s.baptized === true).length
           Déconnexion
         </Button>
       </div>
-{/* Boutons mobile */}
-<div className="flex items-center gap-2 lg:hidden">
-  <NotificationBell />
-  
-  <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
-    <ChatBubbleLeftRightIcon className="w-5 h-5" />
-  </button>
-  
-  {/* Bouton Sans téléphone mobile */}
-  <button
-    onClick={() => setShowCreateNoPhoneModal(true)}
-    className="p-2 text-purple-300/80 hover:text-purple-100"
-    title="Sans téléphone"
-  >
-    <PhoneXMarkIcon className="w-5 h-5" />
-  </button>
-  
-  {/* Bouton Présence assistée mobile */}
-  <button
-    onClick={() => setShowAssistedAttendanceModal(true)}
-    className="p-2 text-indigo-300/80 hover:text-indigo-300"
-    title="Présence assistée"
-  >
-    <PhoneXMarkIcon className="w-5 h-5" />
-  </button>
-  
-  <button
-    onClick={logout}
-    className="p-2 text-red-400 hover:text-red-300"
-    title="Déconnexion"
-  >
-    <ArrowLeftOnRectangleIcon className="w-5 h-5" />
-  </button>
-</div>
+
+      {/* Boutons mobile */}
+      <div className="flex items-center gap-2 lg:hidden">
+        <NotificationBell />
+        
+        <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
+          <ChatBubbleLeftRightIcon className="w-5 h-5" />
+        </button>
+        
+        {/* Menu burger */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="p-2 text-white/60 hover:text-white"
+        >
+          {mobileMenuOpen ? <XMarkIcon className="w-5 h-5" /> : <Bars3Icon className="w-5 h-5" />}
+        </button>
+        
+        <button
+          onClick={logout}
+          className="p-2 text-red-400 hover:text-red-300"
+          title="Déconnexion"
+        >
+          <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+        </button>
+      </div>
     </div>
   </div>
 
-  {/* Menu mobile */}
+  {/* Menu mobile déroulant */}
   {mobileMenuOpen && (
-    <div className="lg:hidden border-t border-gray-200 bg-white">
+    <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.95)] backdrop-blur-2xl">
       <div className="px-4 py-3 space-y-2">
-        <p className="text-sm text-gray-600 pb-2 border-b">Connecté en tant que {user?.name}</p>
+        <div className="pb-2 mb-2 border-b border-white/[0.08]">
+          <p className="text-xs text-white/50">Connecté en tant que</p>
+          <p className="text-sm text-white font-medium">{user?.name}</p>
+        </div>
+        
         <button
-          onClick={toggleProfile}
-          className="w-full flex items-center px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
+          onClick={() => { setShowCreateNoPhoneModal(true); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <PhoneXMarkIcon className="w-5 h-5 mr-3 text-purple-300" />
+          <span>Sans téléphone</span>
+        </button>
+        
+        <button
+          onClick={() => { setShowAssistedAttendanceModal(true); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <PhoneXMarkIcon className="w-5 h-5 mr-3 text-indigo-300" />
+          <span>Présence assistée</span>
+        </button>
+        
+        <button
+          onClick={() => { toggleProfile(); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
         >
           <UserCircleIcon className="w-5 h-5 mr-3" />
-          {showProfile ? 'Tableau de bord' : 'Mon profil'}
+          <span>{showProfile ? 'Tableau de bord' : 'Mon profil'}</span>
+        </button>
+        
+        <button
+          onClick={logout}
+          className="w-full flex items-center px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors mt-2 border-t border-white/[0.08] pt-3"
+        >
+          <ArrowLeftOnRectangleIcon className="w-5 h-5 mr-3" />
+          <span>Déconnexion</span>
         </button>
       </div>
     </div>
