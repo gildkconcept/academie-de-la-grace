@@ -114,7 +114,7 @@ export default function StudentDashboard() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-14">
               <div className="flex items-center flex-1">
-                <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 text-white/70 hover:text-white">
+                <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 text-white/70 hover:text-white rounded-lg transition-colors">
                   {mobileMenuOpen ? <XMarkIcon className="h-5 w-5" /> : <Bars3Icon className="h-5 w-5" />}
                 </button>
                 <h1 className="text-base sm:text-lg font-normal text-white ml-2 lg:ml-0 truncate" style={{ fontFamily: "'Playfair Display', serif" }}>
@@ -151,20 +151,23 @@ export default function StudentDashboard() {
               </div>
 
               {/* Mobile */}
-              <div className="flex items-center gap-2 lg:hidden">
+              <div className="flex items-center gap-1 lg:hidden">
                 {user?.profileImageUrl ? (
-                  <img src={user.profileImageUrl} alt="Photo" className="w-10 h-10 rounded-full object-cover border-2 border-white/20" />
+                  <img src={user.profileImageUrl} alt="Photo" className="w-8 h-8 rounded-full object-cover border border-white/20" />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border-2 border-white/20">
-                    <span className="text-sm font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                    <span className="text-xs font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
                   </div>
                 )}
+                <div className="flex items-center gap-1 px-2 py-0.5 bg-white/10 text-white/80 rounded-full text-[10px]">
+                  <AcademicCapIcon className="w-3 h-3" /> Niv.{currentLevel}
+                </div>
                 <NotificationBell />
                 <LiveStatus />
-                <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
+                <button onClick={() => setShowChat(true)} className="p-1.5 text-white/60 hover:text-white">
                   <ChatBubbleLeftRightIcon className="w-5 h-5" />
                 </button>
-                <button onClick={logout} className="p-2 text-red-400 hover:text-red-300">
+                <button onClick={logout} className="p-1.5 text-red-400 hover:text-red-300">
                   <ArrowLeftOnRectangleIcon className="w-5 h-5" />
                 </button>
               </div>
@@ -173,30 +176,51 @@ export default function StudentDashboard() {
 
           {/* Mobile menu */}
           {mobileMenuOpen && (
-            <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.8)] backdrop-blur-2xl">
+            <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.95)] backdrop-blur-2xl">
               <div className="px-4 py-3 space-y-2">
                 <div className="flex items-center gap-3 pb-3 border-b border-white/[0.08]">
                   {user?.profileImageUrl ? (
-                    <img src={user.profileImageUrl} alt="Photo" className="w-14 h-14 rounded-full object-cover border-2 border-white/20" />
+                    <img src={user.profileImageUrl} alt="Photo" className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
                   ) : (
-                    <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center">
-                      <span className="text-lg font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                    <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
+                      <span className="text-base font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
                     </div>
                   )}
-                  <span className="text-sm text-white/70">Connecté en tant que {user.name}</span>
+                  <div>
+                    <p className="text-white font-medium text-sm">{user?.name}</p>
+                    <p className="text-xs text-white/40">Niveau {currentLevel}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg">
-                  <AcademicCapIcon className="w-4 h-4 text-white/60" />
-                  <span className="text-sm text-white/70">Niveau {currentLevel}</span>
-                </div>
+                
+                <button 
+                  onClick={() => { setShowChat(true); setMobileMenuOpen(false) }} 
+                  className="w-full flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                  <span>Chat</span>
+                </button>
+                
+                <button 
+                  onClick={() => { setShowProfile(true); setMobileMenuOpen(false) }} 
+                  className="w-full flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <UserCircleIcon className="w-5 h-5" />
+                  <span>Mon profil</span>
+                </button>
+                
                 {user?.maisonGrace && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg">
-                    <span className="text-sm text-white/70">🏠 {user.maisonGrace}</span>
+                  <div className="flex items-center gap-3 px-4 py-2 text-white/50 text-sm">
+                    <span>🏠</span>
+                    <span>{user.maisonGrace}</span>
                   </div>
                 )}
-                <button onClick={() => { setShowProfile(!showProfile); setMobileMenuOpen(false) }}
-                  className="w-full flex items-center px-4 py-3 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-                  <UserCircleIcon className="w-5 h-5 mr-3" /> {showProfile ? 'Tableau de bord' : 'Mon profil'}
+                
+                <button 
+                  onClick={logout} 
+                  className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors mt-2 border-t border-white/[0.08] pt-3"
+                >
+                  <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+                  <span>Déconnexion</span>
                 </button>
               </div>
             </div>
