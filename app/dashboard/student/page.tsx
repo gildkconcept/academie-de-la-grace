@@ -16,7 +16,6 @@ import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
 import { ChatGroups } from '@/components/ChatGroups'
 import { ChatMessages } from '@/components/ChatMessages'
 import { DailyVerseCard } from '@/components/DailyVerseCard'
-// import { MyRanking } from '@/components/MyRanking'  // ← COMMENTÉ
 import { LiveStatus } from '@/components/LiveStatus'
 import { 
   UserCircleIcon, 
@@ -73,53 +72,15 @@ export default function StudentDashboard() {
   }
 
   const verifyCode = async () => {
-    console.log('🔵 Bouton VALIDER cliqué')
-    console.log('🔵 Code actuel:', code)
-    console.log('🔵 Longueur du code:', code.length)
-    
-    if (code.length !== 6) {
-      console.log('🔴 Code invalide - longueur:', code.length)
-      toast.error('Le code doit faire 6 chiffres')
-      return
-    }
-    
+    if (code.length !== 6) { toast.error('Le code doit faire 6 chiffres'); return }
     setVerifying(true)
-    console.log('🟢 Envoi de la requête à /api/code/verify...')
-    
     try {
-      const res = await fetch('/api/code/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ code })
-      })
-      
-      console.log('🟢 Réponse reçue, status:', res.status)
+      const res = await fetch('/api/code/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ code }) })
       const data = await res.json()
-      console.log('🟢 Données de réponse:', data)
-      
-      if (res.ok) {
-        console.log('✅ Présence enregistrée avec succès !')
-        toast.success('✅ Présence enregistrée !')
-        setShowCodeInput(false)
-        setCode('')
-        fetchData()
-        fetchBadges()
-        // Recharger la page pour voir la présence
-        setTimeout(() => {
-          window.location.reload()
-        }, 1500)
-      } else {
-        console.log('🔴 Erreur retournée par l\'API:', data.error)
-        toast.error(data.error || 'Code invalide')
-      }
-    } catch (error) {
-      console.error('🔴 Erreur lors de la requête:', error)
-      toast.error('Erreur lors de la vérification')
-    } finally {
-      setVerifying(false)
-      console.log('🟢 Fin de la vérification, verifying = false')
-    }
+      if (res.ok) { toast.success('✅ Présence enregistrée !'); setShowCodeInput(false); setCode(''); fetchData(); fetchBadges() }
+      else { toast.error(data.error || 'Code invalide') }
+    } catch (error) { toast.error('Erreur lors de la vérification') }
+    finally { setVerifying(false) }
   }
 
   const calculateProgress = () => {
@@ -130,7 +91,7 @@ export default function StudentDashboard() {
   if (loading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0a1a5a 0%, #0f2d82 50%, #0a1e64 100%)' }}>
-        <div className="w-10 h-10 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 sm:w-10 sm:h-10 border-2 border-white border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -147,118 +108,120 @@ export default function StudentDashboard() {
       <div className="fixed w-[300px] h-[300px] rounded-full bg-blue-400/10 blur-[100px] -top-[50px] -right-[50px] z-20 pointer-events-none" />
       <div className="fixed w-[250px] h-[250px] rounded-full bg-blue-600/8 blur-[100px] bottom-[10%] -left-[50px] z-20 pointer-events-none" />
 
-      <div className="relative z-30 pb-24">
-        {/* Navigation */}
+      <div className="relative z-30 pb-20 sm:pb-24">
+        {/* Navigation - Universelle */}
         <nav className="sticky top-0 z-40 bg-[rgba(5,15,70,0.6)] backdrop-blur-2xl border-b border-white/[0.08]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-14">
-              <div className="flex items-center flex-1">
-                <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 text-white/70 hover:text-white rounded-lg transition-colors">
-                  {mobileMenuOpen ? <XMarkIcon className="h-5 w-5" /> : <Bars3Icon className="h-5 w-5" />}
+          <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
+            <div className="flex justify-between items-center h-12 sm:h-14 md:h-16">
+              {/* Logo et titre */}
+              <div className="flex items-center flex-1 min-w-0">
+                <button 
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+                  className="lg:hidden p-1.5 sm:p-2 text-white/70 hover:text-white rounded-lg transition-colors"
+                  aria-label="Menu"
+                >
+                  {mobileMenuOpen ? <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <Bars3Icon className="w-4 h-4 sm:w-5 sm:h-5" />}
                 </button>
-                <h1 className="text-base sm:text-lg font-normal text-white ml-2 lg:ml-0 truncate" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  {showProfile ? 'Mon profil' : 'Mon Espace Étudiant'}
+                <h1 className="text-xs sm:text-sm md:text-base lg:text-lg font-normal text-white ml-1 sm:ml-2 lg:ml-0 truncate" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  {showProfile ? 'Mon profil' : 'Mon Espace'}
                 </h1>
               </div>
 
-              {/* Desktop */}
-              <div className="hidden lg:flex items-center gap-3">
+              {/* Desktop - caché sur mobile/tablette */}
+              <div className="hidden lg:flex items-center gap-2 xl:gap-3">
                 {user?.profileImageUrl ? (
-                  <img src={user.profileImageUrl} alt="Photo" className="w-10 h-10 rounded-full object-cover border-2 border-white/20" />
+                  <img src={user.profileImageUrl} alt="Photo" className="w-8 h-8 xl:w-10 xl:h-10 rounded-full object-cover border-2 border-white/20" />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border-2 border-white/20">
-                    <span className="text-sm font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                  <div className="w-8 h-8 xl:w-10 xl:h-10 rounded-full bg-white/10 flex items-center justify-center border-2 border-white/20">
+                    <span className="text-xs xl:text-sm font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 text-white/80 rounded-full text-xs">
-                  <AcademicCapIcon className="w-3.5 h-3.5" /> Niveau {currentLevel}
+                <div className="flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 py-0.5 xl:py-1 bg-white/10 text-white/80 rounded-full text-[10px] xl:text-xs">
+                  <AcademicCapIcon className="w-3 h-3 xl:w-3.5 xl:h-3.5" /> Niv.{currentLevel}
                 </div>
                 {user?.maisonGrace && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 text-white/80 rounded-full text-xs">🏠 {user.maisonGrace}</div>
+                  <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 bg-white/10 text-white/80 rounded-full text-xs">🏠 {user.maisonGrace}</div>
                 )}
                 <NotificationBell />
                 <LiveStatus />
-                <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
-                  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
+                <button onClick={() => setShowChat(true)} className="flex items-center gap-1 xl:gap-1.5 px-2 xl:px-3 py-1 xl:py-1.5 bg-white/10 text-white/80 rounded-lg text-[10px] xl:text-xs hover:bg-white/20 transition-colors">
+                  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 xl:w-4 xl:h-4" /> Chat
                 </button>
-                <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
-                  <UserCircleIcon className="w-3.5 h-3.5" /> {showProfile ? 'Tableau de bord' : 'Mon profil'}
+                <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 xl:gap-1.5 px-2 xl:px-3 py-1 xl:py-1.5 bg-white/10 text-white/80 rounded-lg text-[10px] xl:text-xs hover:bg-white/20 transition-colors">
+                  <UserCircleIcon className="w-3.5 h-3.5 xl:w-4 xl:h-4" /> Profil
                 </button>
-                <button onClick={logout} className="px-3 py-1.5 bg-red-500/20 text-red-300 rounded-lg text-xs hover:bg-red-500/30 transition-colors">
-                  Déconnexion
+                <button onClick={logout} className="px-2 xl:px-3 py-1 xl:py-1.5 bg-red-500/20 text-red-300 rounded-lg text-[10px] xl:text-xs hover:bg-red-500/30 transition-colors">
+                  Déco
                 </button>
               </div>
 
-              {/* Mobile */}
-              <div className="flex items-center gap-1 lg:hidden">
+              {/* Mobile/Tablette */}
+              <div className="flex items-center gap-1 sm:gap-2 lg:hidden">
                 {user?.profileImageUrl ? (
-                  <img src={user.profileImageUrl} alt="Photo" className="w-8 h-8 rounded-full object-cover border border-white/20" />
+                  <img src={user.profileImageUrl} alt="Photo" className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover border border-white/20" />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-                    <span className="text-xs font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                    <span className="text-[10px] sm:text-xs font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-1 px-2 py-0.5 bg-white/10 text-white/80 rounded-full text-[10px]">
-                  <AcademicCapIcon className="w-3 h-3" /> Niv.{currentLevel}
+                <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/10 text-white/80 rounded-full text-[9px] sm:text-[10px]">
+                  <AcademicCapIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> {currentLevel}
                 </div>
                 <NotificationBell />
                 <LiveStatus />
-                <button onClick={() => setShowChat(true)} className="p-1.5 text-white/60 hover:text-white">
-                  <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                </button>
-                <button onClick={logout} className="p-1.5 text-red-400 hover:text-red-300">
-                  <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+                <button onClick={logout} className="p-1 sm:p-1.5 text-red-400 hover:text-red-300" aria-label="Déconnexion">
+                  <ArrowLeftOnRectangleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Mobile menu */}
+          {/* Menu mobile déroulant */}
           {mobileMenuOpen && (
-            <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.95)] backdrop-blur-2xl">
-              <div className="px-4 py-3 space-y-2">
-                <div className="flex items-center gap-3 pb-3 border-b border-white/[0.08]">
+            <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.98)] backdrop-blur-2xl">
+              <div className="px-3 py-2 space-y-1">
+                <div className="flex items-center gap-2 pb-2 mb-1 border-b border-white/[0.08]">
                   {user?.profileImageUrl ? (
-                    <img src={user.profileImageUrl} alt="Photo" className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
+                    <img src={user.profileImageUrl} alt="Photo" className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-white/20" />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
-                      <span className="text-base font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 flex items-center justify-center">
+                      <span className="text-sm font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
                     </div>
                   )}
-                  <div>
-                    <p className="text-white font-medium text-sm">{user?.name}</p>
+                  <div className="flex-1">
+                    <p className="text-white font-medium text-sm truncate">{user?.name}</p>
                     <p className="text-xs text-white/40">Niveau {currentLevel}</p>
                   </div>
                 </div>
                 
                 <button 
                   onClick={() => { setShowChat(true); setMobileMenuOpen(false) }} 
-                  className="w-full flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                 >
-                  <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                  <ChatBubbleLeftRightIcon className="w-4 h-4" />
                   <span>Chat</span>
                 </button>
                 
                 <button 
                   onClick={() => { setShowProfile(true); setMobileMenuOpen(false) }} 
-                  className="w-full flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                 >
-                  <UserCircleIcon className="w-5 h-5" />
+                  <UserCircleIcon className="w-4 h-4" />
                   <span>Mon profil</span>
                 </button>
                 
                 {user?.maisonGrace && (
-                  <div className="flex items-center gap-3 px-4 py-2 text-white/50 text-sm">
+                  <div className="flex items-center gap-3 px-3 py-2 text-white/50 text-xs">
                     <span>🏠</span>
-                    <span>{user.maisonGrace}</span>
+                    <span className="truncate">{user.maisonGrace}</span>
                   </div>
                 )}
                 
                 <button 
                   onClick={logout} 
-                  className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors mt-2 border-t border-white/[0.08] pt-3"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors mt-1 border-t border-white/[0.08] pt-2"
                 >
-                  <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+                  <ArrowLeftOnRectangleIcon className="w-4 h-4" />
                   <span>Déconnexion</span>
                 </button>
               </div>
@@ -269,58 +232,60 @@ export default function StudentDashboard() {
         {showProfile ? (
           <ProfileSection user={user} onClose={() => setShowProfile(false)} />
         ) : (
-          <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto py-2 sm:py-4 md:py-6 px-2 sm:px-4 lg:px-8">
             {/* ✨ Verset du jour */}
             <DailyVerseCard />
             
-            {/* Statistiques */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+            {/* Statistiques - 3 colonnes responsives */}
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-3 md:gap-4 mb-3 sm:mb-4 md:mb-6">
               {[
                 { label: 'Présences', value: attendance.filter(a => a.status === 'present').length, color: 'text-green-300' },
-                { label: 'Progression', value: `${calculateProgress()}%`, color: 'text-blue-300' },
+                { label: 'Prog.', value: `${calculateProgress()}%`, color: 'text-blue-300' },
                 { label: 'Modules', value: progress.filter(p => p.completed).length, color: 'text-purple-300' }
               ].map((stat, i) => (
-                <div key={i} className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl p-4 sm:p-5 text-center">
-                  <div className={`text-xl sm:text-2xl font-bold ${stat.color}`} style={{ fontFamily: "'Playfair Display', serif" }}>{stat.value}</div>
-                  <div className="text-white/50 text-xs mt-1">{stat.label}</div>
+                <div key={i} className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-lg sm:rounded-xl p-1.5 sm:p-3 md:p-5 text-center">
+                  <div className={`text-sm sm:text-lg md:text-2xl font-bold ${stat.color}`} style={{ fontFamily: "'Playfair Display', serif" }}>{stat.value}</div>
+                  <div className="text-white/50 text-[8px] sm:text-xs mt-0.5 sm:mt-1">{stat.label}</div>
                 </div>
               ))}
             </div>
 
             {/* Progression */}
-            <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl p-4 sm:p-6 mb-6">
-              <h3 className="text-base sm:text-lg font-normal text-white mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Ma progression académique</h3>
+            <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-lg sm:rounded-xl p-2 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6">
+              <h3 className="text-sm sm:text-base md:text-lg font-normal text-white mb-2 sm:mb-3 md:mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Ma progression</h3>
               <ProgressChart data={progress.map(p => ({ name: p.module, progress: p.score }))} />
             </div>
 
             {/* Quiz */}
-            <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl p-4 sm:p-6 mb-6">
-              <h3 className="text-base sm:text-lg font-normal text-white mb-4 flex items-center gap-2" style={{ fontFamily: "'Playfair Display', serif" }}>
-                <span>📝</span> Quiz bibliques hebdomadaires
+            <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-lg sm:rounded-xl p-2 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6">
+              <h3 className="text-sm sm:text-base md:text-lg font-normal text-white mb-2 sm:mb-3 md:mb-4 flex items-center gap-2" style={{ fontFamily: "'Playfair Display', serif" }}>
+                <span>📝</span> Quiz
               </h3>
               <StudentQuiz />
             </div>
 
             {/* Historique */}
-            <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl p-4 sm:p-6">
-              <h3 className="text-base sm:text-lg font-normal text-white mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Historique des présences</h3>
+            <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-lg sm:rounded-xl p-2 sm:p-4 md:p-6">
+              <h3 className="text-sm sm:text-base md:text-lg font-normal text-white mb-2 sm:mb-3 md:mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Historique</h3>
               {attendance.length === 0 ? (
-                <p className="text-white/40 text-center py-8 text-sm">Aucune présence enregistrée</p>
+                <p className="text-white/40 text-center py-4 sm:py-6 md:py-8 text-xs sm:text-sm">Aucune présence enregistrée</p>
               ) : (
-                <div className="space-y-2">
-                  {attendance.map((a) => (
-                    <div key={a.id} className="flex justify-between items-center p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                      <span className="text-white/80 text-sm">{new Date(a.date).toLocaleDateString('fr-FR')}</span>
-                      <div className="flex items-center gap-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                <div className="space-y-1.5 sm:space-y-2">
+                  {attendance.slice(0, 5).map((a) => (
+                    <div key={a.id} className="flex justify-between items-center p-1.5 sm:p-2 md:p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                      <span className="text-white/80 text-[10px] sm:text-xs md:text-sm">{new Date(a.date).toLocaleDateString('fr-FR')}</span>
+                      <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
+                        <span className={`px-1 sm:px-1.5 md:px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] md:text-xs font-semibold ${
                           a.status === 'present' ? 'bg-green-500/20 text-green-300' : a.status === 'late' ? 'bg-yellow-500/20 text-yellow-300' : 'bg-red-500/20 text-red-300'
                         }`}>
                           {a.status === 'present' ? 'Présent' : a.status === 'late' ? 'Retard' : 'Absent'}
                         </span>
-                        <span className="text-white/30 text-xs">{a.scanned_at ? new Date(a.scanned_at).toLocaleTimeString('fr-FR') : '-'}</span>
                       </div>
                     </div>
                   ))}
+                  {attendance.length > 5 && (
+                    <p className="text-center text-white/30 text-[10px] sm:text-xs pt-1">+{attendance.length - 5} autres</p>
+                  )}
                 </div>
               )}
             </div>
@@ -329,68 +294,53 @@ export default function StudentDashboard() {
 
         {/* Bouton flottant code */}
         {!showProfile && !showCodeInput && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md px-4 z-40">
+          <div className="fixed bottom-3 sm:bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] sm:w-[calc(100%-2rem)] max-w-md px-2 sm:px-3 z-40">
             <button 
-              onClick={() => {
-                console.log('🟢 Bouton "Entrer le code de présence" cliqué')
-                setShowCodeInput(true)
-              }}
-              className="w-full bg-white text-[#1a3a8f] py-4 px-6 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-base font-semibold flex items-center justify-center gap-2"
+              onClick={() => setShowCodeInput(true)}
+              className="w-full bg-white text-[#1a3a8f] py-2 sm:py-3 md:py-4 px-3 sm:px-4 rounded-full shadow-lg hover:shadow-xl transition-all text-xs sm:text-sm md:text-base font-semibold flex items-center justify-center gap-1.5 sm:gap-2 active:scale-95 transition-transform"
             >
-              <QrCodeIcon className="w-5 h-5" /> Entrer le code de présence
+              <QrCodeIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" /> Code de présence
             </button>
           </div>
         )}
 
         {/* Modal Code */}
         {showCodeInput && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white/[0.08] backdrop-blur-3xl border border-white/[0.15] rounded-2xl p-6 max-w-md w-full shadow-[0_32px_64px_rgba(0,0,0,0.5)]">
-              <h3 className="text-lg font-normal text-white mb-4 text-center" style={{ fontFamily: "'Playfair Display', serif" }}>🔑 Code de présence</h3>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-3 md:p-4">
+            <div className="bg-white/[0.08] backdrop-blur-3xl border border-white/[0.15] rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 max-w-md w-full shadow-[0_32px_64px_rgba(0,0,0,0.5)]">
+              <h3 className="text-base sm:text-lg md:text-xl font-normal text-white mb-2 sm:mb-3 md:mb-4 text-center" style={{ fontFamily: "'Playfair Display', serif" }}>🔑 Code</h3>
               <input 
                 type="text" 
                 value={code} 
-                onChange={(e) => {
-                  console.log('🟢 Input changé:', e.target.value)
-                  setCode(e.target.value.replace(/\D/g, '').slice(0, 6))
-                }} 
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} 
                 placeholder="123456"
-                className="w-full text-center text-3xl sm:text-4xl font-bold p-3 sm:p-4 bg-white/90 border-2 border-white/30 rounded-xl mb-4 tracking-widest text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-400" 
+                className="w-full text-center text-2xl sm:text-3xl md:text-4xl font-bold p-2 sm:p-3 md:p-4 bg-white/90 border-2 border-white/30 rounded-lg sm:rounded-xl mb-3 sm:mb-4 tracking-widest text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-400" 
                 autoFocus 
               />
               <div className="flex gap-2">
                 <button 
                   onClick={verifyCode} 
                   disabled={verifying || code.length !== 6}
-                  className="flex-1 bg-white text-[#1a3a8f] py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all disabled:opacity-50"
+                  className="flex-1 bg-white text-[#1a3a8f] py-2 sm:py-2.5 md:py-3 rounded-lg font-bold text-xs sm:text-sm md:text-base hover:shadow-lg transition-all disabled:opacity-50 active:scale-95"
                 >
-                  {verifying ? 'Vérification...' : 'Valider ma présence'}
+                  {verifying ? 'Vérif...' : 'Valider'}
                 </button>
                 <button 
-                  onClick={() => { 
-                    console.log('🟢 Bouton Annuler cliqué')
-                    setShowCodeInput(false); 
-                    setCode(''); 
-                  }}
-                  className="flex-1 bg-white/10 text-white py-3 rounded-lg text-sm hover:bg-white/20 transition-colors"
+                  onClick={() => { setShowCodeInput(false); setCode(''); }}
+                  className="flex-1 bg-white/10 text-white py-2 sm:py-2.5 md:py-3 rounded-lg text-xs sm:text-sm md:text-base hover:bg-white/20 transition-colors"
                 >
                   Annuler
                 </button>
               </div>
-              <p className="text-white/40 text-xs text-center mt-4">⏰ Le code expire après 15 minutes.</p>
+              <p className="text-white/40 text-[9px] sm:text-[10px] md:text-xs text-center mt-2 sm:mt-3 md:mt-4">⏰ Code expire après 15 min</p>
             </div>
           </div>
         )}
 
-        {/* Modal Chat - Liste des groupes */}
+        {/* Modal Chat */}
         {showChat && !selectedChatGroup && (
-          <ChatGroups
-            onSelectGroup={(id, name) => setSelectedChatGroup({ id, name })}
-            onClose={() => setShowChat(false)}
-          />
+          <ChatGroups onSelectGroup={(id, name) => setSelectedChatGroup({ id, name })} onClose={() => setShowChat(false)} />
         )}
-
-        {/* Modal Chat - Messages */}
         {showChat && selectedChatGroup && (
           <ChatMessages
             groupId={selectedChatGroup.id}
