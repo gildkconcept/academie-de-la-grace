@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { XMarkIcon, ChatBubbleLeftRightIcon, UserGroupIcon } from '@heroicons/react/24/outline'
+import { supabase } from '../lib/supabase'
 
 interface ChatGroup {
   id: string
@@ -15,6 +16,9 @@ interface ChatGroup {
   lastMessage?: {
     content: string
     senderName: string
+    senderId: string
+    senderType: string
+    senderAvatar?: string
     time: string
   }
   unreadCount: number
@@ -25,20 +29,113 @@ interface ChatGroupsProps {
   onClose: () => void
 }
 
+// Fonction pour obtenir les initiales
+const getInitials = (name: string) => {
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
+
+// Couleurs de fallback basées sur le nom
+const getAvatarColor = (name: string) => {
+  const colors = [
+    'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+    'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
+    'bg-orange-500', 'bg-cyan-500'
+  ]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i)
+    hash |= 0
+  }
+  return colors[Math.abs(hash) % colors.length]
+}
+
+// Badge rôle
+const getRoleBadge = (senderType: string) => {
+  if (senderType === 'user' || senderType === 'superadmin') {
+    return { label: 'Admin', color: 'bg-red-500/20 text-red-300' }
+  }
+  if (senderType === 'service_manager') {
+    return { label: 'Manager', color: 'bg-blue-500/20 text-blue-300' }
+  }
+  return { label: 'Étudiant', color: 'bg-green-500/20 text-green-300' }
+}
+
 export const ChatGroups = ({ onSelectGroup, onClose }: ChatGroupsProps) => {
   const [groups, setGroups] = useState<ChatGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
-  useEffect(() => { fetchGroups() }, [])
+  useEffect(() => { 
+    fetchGroups() 
+  }, [])
 
   const fetchGroups = async () => {
     try {
       const res = await fetch('/api/chat/groups', { credentials: 'include' })
       const data = await res.json()
-      if (res.ok) setGroups(data.groups || [])
-    } catch (error) { console.error('Erreur:', error) }
-    finally { setLoading(false) }
+      if (res.ok) {
+        const groupsData = data.groups || []
+        
+        // Enrichir les groupes avec les avatars des derniers messages
+        const enrichedGroups = await Promise.all(groupsData.map(async (group: ChatGroup) => {
+          if (group.lastMessage && group.lastMessage.senderId) {
+            const avatar = await getSenderAvatar(group.lastMessage.senderId, group.lastMessage.senderType)
+            return {
+              ...group,
+              lastMessage: {
+                ...group.lastMessage,
+                senderAvatar: avatar
+              }
+            }
+          }
+          return group
+        }))
+        
+        setGroups(enrichedGroups)
+      }
+    } catch (error) { 
+      console.error('Erreur fetchGroups:', error) 
+    } finally { 
+      setLoading(false) 
+    }
+  }
+
+  const getSenderAvatar = async (senderId: string, senderType: string): Promise<string | undefined> => {
+    const table = senderType === 'student' ? 'students' : 'users'
+    
+    const { data } = await supabase
+      .from(table)
+      .select('profile_image_url')
+      .eq('id', senderId)
+      .single()
+    
+    return data?.profile_image_url
+  }
+
+  // Gérer la sélection d'un groupe avec marquage des messages comme lus
+  const handleSelectGroup = async (groupId: string, groupName: string) => {
+    try {
+      // Marquer comme lu avant d'ouvrir le chat
+      await fetch('/api/chat/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ groupId })
+      })
+      // Rafraîchir la liste pour mettre à jour le compteur
+      await fetchGroups()
+      // Ouvrir le chat
+      onSelectGroup(groupId, groupName)
+    } catch (error) {
+      console.error('Erreur handleSelectGroup:', error)
+      // Ouvrir quand même le chat en cas d'erreur
+      onSelectGroup(groupId, groupName)
+    }
   }
 
   const filteredGroups = groups.filter(g =>
@@ -109,10 +206,10 @@ export const ChatGroups = ({ onSelectGroup, onClose }: ChatGroupsProps) => {
               filteredGroups.map(group => (
                 <div
                   key={group.id}
-                  onClick={() => onSelectGroup(group.id, group.name)}
+                  onClick={() => handleSelectGroup(group.id, group.name)}
                   className="p-4 border-b border-white/[0.05] hover:bg-white/[0.04] cursor-pointer transition-colors"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <span className="text-2xl">{getGroupIcon(group.type)}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
@@ -121,23 +218,48 @@ export const ChatGroups = ({ onSelectGroup, onClose }: ChatGroupsProps) => {
                           <span className="text-xs text-white/30">{formatTime(group.lastMessage.time)}</span>
                         )}
                       </div>
-                      <div className="flex justify-between items-center mt-0.5">
-                        {group.lastMessage ? (
-                          <span className="text-xs text-white/50 truncate">
+                      
+                      {/* Dernier message avec avatar et badge de rôle */}
+                      {group.lastMessage && (
+                        <div className="flex items-center gap-2 mt-1">
+                          {/* Avatar du dernier expéditeur */}
+                          {group.lastMessage.senderAvatar ? (
+                            <img 
+                              src={group.lastMessage.senderAvatar} 
+                              alt="" 
+                              className="w-5 h-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className={`w-5 h-5 rounded-full ${getAvatarColor(group.lastMessage.senderName)} flex items-center justify-center`}>
+                              <span className="text-[8px] text-white font-bold">
+                                {getInitials(group.lastMessage.senderName)}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Badge rôle */}
+                          <span className={`text-[8px] px-1 py-0.5 rounded-full ${getRoleBadge(group.lastMessage.senderType).color}`}>
+                            {getRoleBadge(group.lastMessage.senderType).label}
+                          </span>
+                          
+                          <span className="text-xs text-white/50 truncate flex-1">
                             {group.lastMessage.senderName}: {group.lastMessage.content}
                           </span>
-                        ) : (
-                          <span className="text-xs text-white/40">Aucun message</span>
-                        )}
+                        </div>
+                      )}
+                      
+                      {!group.lastMessage && (
+                        <span className="text-xs text-white/40 mt-1 block">Aucun message</span>
+                      )}
+                      
+                      <div className="flex items-center gap-1 mt-2">
+                        <UserGroupIcon className="w-3 h-3 text-white/30" />
+                        <span className="text-xs text-white/30">{group.memberCount} membres</span>
                         {group.unreadCount > 0 && (
-                          <span className="bg-blue-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center ml-2">
+                          <span className="ml-2 bg-blue-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
                             {group.unreadCount > 99 ? '99+' : group.unreadCount}
                           </span>
                         )}
-                      </div>
-                      <div className="flex items-center gap-1 mt-1">
-                        <UserGroupIcon className="w-3 h-3 text-white/30" />
-                        <span className="text-xs text-white/30">{group.memberCount}</span>
                       </div>
                     </div>
                   </div>

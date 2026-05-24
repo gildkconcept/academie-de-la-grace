@@ -1210,21 +1210,40 @@ const baptises = studentsData.filter(s => s.baptized === true).length
           Déconnexion
         </Button>
       </div>
-
-      {/* Boutons mobile */}
-      <div className="flex items-center gap-2 lg:hidden">
-        <NotificationBell />
-        <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
-          <ChatBubbleLeftRightIcon className="w-5 h-5" />
-        </button>
-        <button
-          onClick={logout}
-          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-          title="Déconnexion"
-        >
-          <ArrowLeftOnRectangleIcon className="w-5 h-5" />
-        </button>
-      </div>
+{/* Boutons mobile */}
+<div className="flex items-center gap-2 lg:hidden">
+  <NotificationBell />
+  
+  <button onClick={() => setShowChat(true)} className="p-2 text-white/60 hover:text-white">
+    <ChatBubbleLeftRightIcon className="w-5 h-5" />
+  </button>
+  
+  {/* Bouton Sans téléphone mobile */}
+  <button
+    onClick={() => setShowCreateNoPhoneModal(true)}
+    className="p-2 text-purple-300/80 hover:text-purple-100"
+    title="Sans téléphone"
+  >
+    <PhoneXMarkIcon className="w-5 h-5" />
+  </button>
+  
+  {/* Bouton Présence assistée mobile */}
+  <button
+    onClick={() => setShowAssistedAttendanceModal(true)}
+    className="p-2 text-indigo-300/80 hover:text-indigo-300"
+    title="Présence assistée"
+  >
+    <PhoneXMarkIcon className="w-5 h-5" />
+  </button>
+  
+  <button
+    onClick={logout}
+    className="p-2 text-red-400 hover:text-red-300"
+    title="Déconnexion"
+  >
+    <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+  </button>
+</div>
     </div>
   </div>
 

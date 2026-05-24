@@ -16,6 +16,8 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
   const router = useRouter()
   const [step, setStep] = useState<'greeting' | 'verse' | 'complete'>('greeting')
   const [greeting, setGreeting] = useState('')
+  const [verse, setVerse] = useState<{ text: string; reference: string } | null>(null)
+  const [loadingVerse, setLoadingVerse] = useState(true)
 
   // Vérification de sécurité : si userData est undefined, rediriger
   useEffect(() => {
@@ -34,10 +36,41 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
     
     setGreeting(greetingText)
     
+    // Récupérer le verset du jour depuis l'API
+    const fetchVerse = async () => {
+      try {
+        const res = await fetch('/api/daily-verse', { credentials: 'include' })
+        const data = await res.json()
+        if (data.verse) {
+          setVerse({
+            text: data.verse.verse,
+            reference: data.verse.reference
+          })
+        } else {
+          // Verset par défaut : Romains 5:17
+          setVerse({
+            text: "Si par l'offense d'un seul la mort a régné par lui seul, à plus forte raison ceux qui reçoivent l'abondance de la grâce et du don de la justice régneront-ils dans la vie par Jésus-Christ lui seul.",
+            reference: "Romains 5:17"
+          })
+        }
+      } catch (error) {
+        console.error('Erreur chargement verset:', error)
+        // Verset par défaut en cas d'erreur : Romains 5:17
+        setVerse({
+          text: "Si par l'offense d'un seul la mort a régné par lui seul, à plus forte raison ceux qui reçoivent l'abondance de la grâce et du don de la justice régneront-ils dans la vie par Jésus-Christ lui seul.",
+          reference: "Romains 5:17"
+        })
+      } finally {
+        setLoadingVerse(false)
+      }
+    }
+    
+    fetchVerse()
+    
     // Timing adapté (un peu plus rapide sur mobile)
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
-    const delay1 = isMobile ? 1000 : 1200
-    const delay2 = isMobile ? 2400 : 2800
+    const delay1 = isMobile ? 3000 : 3000
+    const delay2 = isMobile ? 5000 : 5000
     const delay3 = isMobile ? 3500 : 4000
     
     const t1 = setTimeout(() => setStep('verse'), delay1)
@@ -64,9 +97,13 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
     return null
   }
 
-  const verse = {
-    text: "Car Dieu ne nous a pas donné un esprit de peur, mais un esprit de force, d'amour et de sagesse.",
-    reference: "2 Timothée 1:7"
+  // Attendre que le verset soit chargé
+  if (loadingVerse) {
+    return null
+  }
+
+  if (!verse) {
+    return null
   }
 
   const getRoleEmoji = () => {
@@ -139,7 +176,7 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
             </motion.div>
           )}
 
-          {/* Étape 2 : Verset */}
+          {/* Étape 2 : Verset (Romains 5:17) */}
           {step === 'verse' && (
             <motion.div
               initial={{ opacity: 0, y: 30 }}

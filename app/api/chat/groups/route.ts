@@ -31,23 +31,16 @@ export async function GET() {
       }
     }
 
-    console.log('🔍 Chat groups - user:', { role: user.role, branch: studentBranch, level: studentLevel, serviceId: studentServiceId, userId: user.id })
-
     // Récupérer tous les groupes
     let query = supabase.from('chat_groups').select('*').eq('is_active', true).order('created_at', { ascending: false })
 
     const { data: groups } = await query
 
-    console.log('🔍 Chat groups - all groups count:', groups?.length)
-    console.log('🔍 Chat groups - all groups:', groups?.map(g => ({ id: g.id, name: g.name, type: g.type, branch: g.branch, level: g.level, service_id: g.service_id })))
-
     // Filtrer les groupes accessibles
     const accessibleGroups = groups?.filter(group => {
       if (user.role === 'superadmin') return true
       if (user.role === 'service_manager') {
-        const match = group.type === 'service' && group.service_id === user.serviceId
-        console.log('🔍 Manager filter:', { group: group.name, type: group.type, groupServiceId: group.service_id, userServiceId: user.serviceId, match })
-        return match
+        return group.type === 'service' && group.service_id === user.serviceId
       }
       if (user.role === 'student') {
         if (group.type === 'branch') return group.branch === studentBranch
@@ -58,39 +51,43 @@ export async function GET() {
       return false
     }) || []
 
-    console.log('🔍 Chat groups - accessible count:', accessibleGroups.length)
+    const userType = user.role === 'student' ? 'student' : 'user'
 
     // Pour chaque groupe, compter les membres et les messages non lus
     const groupsWithInfo = await Promise.all(accessibleGroups.map(async (group) => {
+      // Compter les membres
       const { count: memberCount } = await supabase
         .from('chat_group_members')
         .select('*', { count: 'exact', head: true })
         .eq('group_id', group.id)
 
+      // Dernier message
       const { data: lastMessage } = await supabase
         .from('chat_messages')
-        .select('content, sender_name, created_at')
+        .select('content, sender_name, created_at, sender_id, sender_type')
         .eq('group_id', group.id)
         .eq('is_deleted', false)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
-      // Compter les messages non lus
-      const { data: readMessages } = await supabase
-        .from('chat_message_reads')
-        .select('message_id')
-        .eq('user_id', user.id)
-        .eq('user_type', user.role === 'student' ? 'student' : 'user')
-
-      const readIds = new Set(readMessages?.map(r => r.message_id) || [])
-
+      // Récupérer TOUS les IDs des messages du groupe
       const { data: allMessages } = await supabase
         .from('chat_messages')
         .select('id')
         .eq('group_id', group.id)
         .eq('is_deleted', false)
 
+      // Récupérer les messages que l'utilisateur a lus
+      const { data: readMessages } = await supabase
+        .from('chat_message_reads')
+        .select('message_id')
+        .eq('user_id', user.id)
+        .eq('user_type', userType)
+
+      const readIds = new Set(readMessages?.map(r => r.message_id) || [])
+      
+      // Compter les messages non lus (ceux qui ne sont pas dans readIds)
       const unreadCount = allMessages?.filter(m => !readIds.has(m.id)).length || 0
 
       return {
@@ -99,9 +96,11 @@ export async function GET() {
         lastMessage: lastMessage ? {
           content: lastMessage.content?.substring(0, 50) || '📎 Fichier',
           senderName: lastMessage.sender_name,
+          senderId: lastMessage.sender_id,
+          senderType: lastMessage.sender_type,
           time: lastMessage.created_at
         } : null,
-        unreadCount: unreadCount || 0
+        unreadCount: unreadCount
       }
     }))
 

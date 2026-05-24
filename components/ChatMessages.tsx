@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeftIcon, PaperAirplaneIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { supabase } from '../lib/supabase'
 
 interface Message {
   id: string
   sender_id: string
   sender_name: string
   sender_type: string
+  sender_avatar?: string
   content: string
   type: string
   reply_to: string | null
@@ -20,19 +22,91 @@ interface ChatMessagesProps {
   groupName: string
   currentUserId: string
   currentUserName: string
+  currentUserAvatar?: string
   onBack: () => void
 }
 
-export const ChatMessages = ({ groupId, groupName, currentUserId, currentUserName, onBack }: ChatMessagesProps) => {
+// Fonction pour obtenir les initiales
+const getInitials = (name: string) => {
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
+
+// Couleurs de fallback basées sur le nom
+const getAvatarColor = (name: string) => {
+  const colors = [
+    'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+    'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
+    'bg-orange-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-violet-500'
+  ]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i)
+    hash |= 0
+  }
+  return colors[Math.abs(hash) % colors.length]
+}
+
+// Badge rôle
+const getRoleBadge = (senderType: string) => {
+  if (senderType === 'user' || senderType === 'superadmin') {
+    return { label: 'Admin', color: 'bg-red-500/20 text-red-300 border-red-500/30' }
+  }
+  if (senderType === 'service_manager') {
+    return { label: 'Manager', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' }
+  }
+  return { label: 'Étudiant', color: 'bg-green-500/20 text-green-300 border-green-500/30' }
+}
+
+export const ChatMessages = ({ 
+  groupId, 
+  groupName, 
+  currentUserId, 
+  currentUserName, 
+  currentUserAvatar,
+  onBack 
+}: ChatMessagesProps) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+
+  // Marquer tous les messages du groupe comme lus
+  const markMessagesAsRead = async () => {
+    try {
+      await fetch('/api/chat/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ groupId })
+      })
+    } catch (error) {
+      console.error('Erreur marquage lu:', error)
+    }
+  }
 
   useEffect(() => {
     fetchMessages()
+    markMessagesAsRead()
     const interval = setInterval(fetchMessages, 5000)
     return () => clearInterval(interval)
+  }, [groupId])
+
+  // Marquer comme lu quand l'onglet redevient actif
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        markMessagesAsRead()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [groupId])
 
   useEffect(() => {
@@ -43,13 +117,48 @@ export const ChatMessages = ({ groupId, groupName, currentUserId, currentUserNam
     try {
       const res = await fetch(`/api/chat/messages?groupId=${groupId}&limit=50`, { credentials: 'include' })
       const data = await res.json()
-      if (res.ok) setMessages(data.messages || [])
-    } catch (error) { console.error('Erreur:', error) }
-    finally { setLoading(false) }
+      if (res.ok) {
+        const messagesData = data.messages || []
+        const enrichedMessages = await enrichMessagesWithAvatars(messagesData)
+        setMessages(enrichedMessages)
+      }
+    } catch (error) {
+      console.error('Erreur:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const enrichMessagesWithAvatars = async (messagesData: Message[]) => {
+    const userIds = [...new Set(messagesData.map(m => m.sender_id))]
+    const avatars: Record<string, string> = {}
+    
+    for (const userId of userIds) {
+      const message = messagesData.find(m => m.sender_id === userId)
+      const isStudent = message?.sender_type === 'student'
+      const table = isStudent ? 'students' : 'users'
+      
+      const { data } = await supabase
+        .from(table)
+        .select('profile_image_url')
+        .eq('id', userId)
+        .single()
+      
+      if (data?.profile_image_url) {
+        avatars[userId] = data.profile_image_url
+      }
+    }
+    
+    return messagesData.map(msg => ({
+      ...msg,
+      sender_avatar: avatars[msg.sender_id]
+    }))
   }
 
   const sendMessage = async () => {
-    if (!newMessage.trim()) return
+    if (!newMessage.trim() || sending) return
+    
+    setSending(true)
     try {
       const res = await fetch('/api/chat/messages', {
         method: 'POST',
@@ -60,8 +169,13 @@ export const ChatMessages = ({ groupId, groupName, currentUserId, currentUserNam
       if (res.ok) {
         setNewMessage('')
         fetchMessages()
+        markMessagesAsRead()
       }
-    } catch (error) { console.error('Erreur:', error) }
+    } catch (error) {
+      console.error('Erreur:', error)
+    } finally {
+      setSending(false)
+    }
   }
 
   const formatTime = (dateStr: string) => {
@@ -74,77 +188,140 @@ export const ChatMessages = ({ groupId, groupName, currentUserId, currentUserNam
 
   const isMine = (senderId: string) => senderId === currentUserId
 
+  // Grouper les messages par date
+  const groupedMessages = messages.reduce((groups, message) => {
+    const date = new Date(message.created_at).toLocaleDateString('fr-FR')
+    if (!groups[date]) groups[date] = []
+    groups[date].push(message)
+    return groups
+  }, {} as Record<string, Message[]>)
+
   return (
-    <div className="fixed inset-0 z-50" style={{ fontFamily: "'Crimson Text', Georgia, serif" }}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm md:hidden" onClick={onBack} />
-      <div className="absolute inset-0 md:right-4 md:top-16 md:inset-auto md:w-96 md:h-[600px] md:max-h-[80vh] flex flex-col md:rounded-xl overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('/ok.png')" }} />
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(8,20,90,0.97) 0%, rgba(15,45,130,0.95) 40%, rgba(10,30,100,0.96) 70%, rgba(4,12,65,0.98) 100%)' }} />
-        
-        <div className="relative z-10 flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center gap-3 p-4 border-b border-white/[0.08]">
-            <button onClick={onBack} className="p-1 hover:bg-white/10 rounded-lg">
-              <ArrowLeftIcon className="w-5 h-5 text-white/60" />
-            </button>
-            <div className="flex-1">
-              <h3 className="text-white text-sm font-medium">{groupName}</h3>
-              <p className="text-white/40 text-xs">{messages.length} messages</p>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {loading ? (
-              <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /></div>
-            ) : messages.length === 0 ? (
-              <p className="text-center text-white/40 text-sm py-8">Aucun message. Soyez le premier à écrire !</p>
-            ) : (
-              messages.map(msg => (
-                <div key={msg.id} className={`flex ${isMine(msg.sender_id) ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] ${isMine(msg.sender_id) ? 'order-1' : ''}`}>
-                    {!isMine(msg.sender_id) && (
-                      <span className="text-xs text-white/50 block mb-1">{msg.sender_name}</span>
-                    )}
-                    <div className={`p-3 rounded-2xl text-sm ${
-                      isMine(msg.sender_id)
-                        ? 'bg-indigo-500/30 text-white rounded-br-md'
-                        : 'bg-white/[0.08] text-white/90 rounded-bl-md'
-                    }`}>
-                      {msg.content}
-                    </div>
-                    <div className={`text-[10px] text-white/30 mt-0.5 ${isMine(msg.sender_id) ? 'text-right' : ''}`}>
-                      {formatTime(msg.created_at)}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <div className="p-3 border-t border-white/[0.08]">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="Écrire un message..."
-                className="flex-1 p-2.5 bg-white/90 border border-white/30 rounded-full text-gray-900 placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-400"
-              />
-              <button
-                onClick={sendMessage}
-                disabled={!newMessage.trim()}
-                className="p-2.5 bg-white text-[#1a3a8f] rounded-full hover:shadow-lg transition-all disabled:opacity-50"
-              >
-                <PaperAirplaneIcon className="w-5 h-5" />
+    <>
+      <div className="fixed inset-0 z-50" style={{ fontFamily: "'Crimson Text', Georgia, serif" }}>
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm md:hidden" onClick={onBack} />
+        <div className="absolute inset-0 md:right-4 md:top-16 md:inset-auto md:w-96 md:h-[600px] md:max-h-[80vh] flex flex-col md:rounded-xl overflow-hidden">
+          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('/ok.png')" }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(8,20,90,0.97) 0%, rgba(15,45,130,0.95) 40%, rgba(10,30,100,0.96) 70%, rgba(4,12,65,0.98) 100%)' }} />
+          
+          <div className="relative z-10 flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-4 border-b border-white/[0.08]">
+              <button onClick={onBack} className="p-1 hover:bg-white/10 rounded-lg">
+                <ArrowLeftIcon className="w-5 h-5 text-white/60" />
               </button>
+              <div className="flex-1">
+                <h3 className="text-white text-sm font-medium">{groupName}</h3>
+                <p className="text-white/40 text-xs">{messages.length} messages</p>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {loading ? (
+                <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /></div>
+              ) : messages.length === 0 ? (
+                <p className="text-center text-white/40 text-sm py-8">Aucun message. Soyez le premier à écrire !</p>
+              ) : (
+                Object.entries(groupedMessages).map(([date, dateMessages]) => (
+                  <div key={date}>
+                    <div className="text-center my-3">
+                      <span className="text-xs text-white/30 bg-white/5 px-2 py-1 rounded-full">{date}</span>
+                    </div>
+                    {dateMessages.map((msg) => {
+                      const roleBadge = getRoleBadge(msg.sender_type)
+                      const avatarColor = getAvatarColor(msg.sender_name)
+                      const isCurrentUser = isMine(msg.sender_id)
+                      
+                      return (
+                        <div key={msg.id} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} mb-3`}>
+                          <div className={`flex gap-2 max-w-[80%] ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
+                            {/* Avatar */}
+                            <div className="flex-shrink-0">
+                              {msg.sender_avatar ? (
+                                <img
+                                  src={msg.sender_avatar}
+                                  alt={msg.sender_name}
+                                  className="w-9 h-9 rounded-full object-cover border-2 border-white/20 cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => setImagePreview(msg.sender_avatar!)}
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div 
+                                  className={`w-9 h-9 rounded-full ${avatarColor} flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity border-2 border-white/20`}
+                                >
+                                  <span className="text-white text-xs font-bold">
+                                    {getInitials(msg.sender_name)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Contenu du message */}
+                            <div className={`flex-1 ${isCurrentUser ? 'items-end' : ''}`}>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-white text-xs font-medium">{msg.sender_name}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${roleBadge.color}`}>
+                                  {roleBadge.label}
+                                </span>
+                                <span className="text-white/30 text-[10px]">{formatTime(msg.created_at)}</span>
+                              </div>
+                              <div className={`p-3 rounded-2xl text-sm ${
+                                isCurrentUser
+                                  ? 'bg-indigo-500/30 text-white rounded-br-md'
+                                  : 'bg-white/[0.08] text-white/90 rounded-bl-md'
+                              }`}>
+                                {msg.content}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <div className="p-3 border-t border-white/[0.08]">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                  placeholder="Écrire un message..."
+                  className="flex-1 p-2.5 bg-white/90 border border-white/30 rounded-full text-gray-900 placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-400"
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={!newMessage.trim() || sending}
+                  className="p-2.5 bg-white text-[#1a3a8f] rounded-full hover:shadow-lg transition-all disabled:opacity-50"
+                >
+                  <PaperAirplaneIcon className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Modal preview image */}
+      {imagePreview && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-60 p-4" onClick={() => setImagePreview(null)}>
+          <div className="relative max-w-lg w-full">
+            <img src={imagePreview} alt="Preview" className="w-full rounded-lg" />
+            <button
+              onClick={() => setImagePreview(null)}
+              className="absolute top-2 right-2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
