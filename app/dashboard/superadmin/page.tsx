@@ -12,6 +12,7 @@ import { PhoneXMarkIcon } from '@heroicons/react/24/outline'
 import { LiveStatus } from '@/components/LiveStatus'
 
 
+
 import { 
   AttendanceChart, 
   CustomPieChart,
@@ -1180,68 +1181,85 @@ const baptises = studentsData.filter(s => s.baptized === true).length
         </h1>
       </div>
 
-           {/* Boutons desktop */}
-      <div className="hidden lg:flex items-center space-x-4">
+      {/* Boutons desktop */}
+      <div className="hidden lg:flex items-center space-x-2">
         <NotificationBell />
         
-        <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
+        <button onClick={() => setShowChat(true)} className="flex items-center gap-1 px-2 py-1.5 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors">
           <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" /> Chat
         </button>
         
         <button
           onClick={() => setShowCreateNoPhoneModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-lg text-xs hover:bg-purple-500/30 transition-colors"
+          className="flex items-center gap-1 px-2 py-1.5 bg-purple-500/20 text-purple-300 rounded-lg text-xs hover:bg-purple-500/30 transition-colors"
         >
           <PhoneXMarkIcon className="w-3.5 h-3.5" />
-          Sans téléphone
+          <span className="hidden xl:inline">Sans tel</span>
+          <span className="inline xl:hidden">📵</span>
         </button>
         
         <button
           onClick={() => setShowAssistedAttendanceModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-lg text-xs hover:bg-indigo-500/30 transition-colors"
+          className="flex items-center gap-1 px-2 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-lg text-xs hover:bg-indigo-500/30 transition-colors"
         >
           <PhoneXMarkIcon className="w-3.5 h-3.5" />
-          Présence assistée
+          <span className="hidden xl:inline">Prés. assistée</span>
+          <span className="inline xl:hidden">✏️</span>
         </button>
         
         <button
           onClick={() => router.push('/dashboard/superadmin/monthly-reports')}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 text-blue-300 rounded-lg text-xs hover:bg-blue-500/30 transition-colors"
+          className="flex items-center gap-1 px-2 py-1.5 bg-blue-500/20 text-blue-300 rounded-lg text-xs hover:bg-blue-500/30 transition-colors"
         >
           <DocumentChartBarIcon className="w-3.5 h-3.5" />
-          Rapports mensuels
+          <span className="hidden xl:inline">Rapports</span>
+          <span className="inline xl:hidden">📊</span>
         </button>
         
-        {/* 🟢 NOUVEAU BOUTON ACTIVITÉ LIVE */}
+        {/* BOUTON ACTIVITÉ LIVE */}
         <button
           onClick={() => router.push('/dashboard/superadmin/online-users')}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-300 rounded-lg text-xs hover:bg-green-500/30 transition-colors relative"
+          className="flex items-center gap-1 px-2 py-1.5 bg-green-500/20 text-green-300 rounded-lg text-xs hover:bg-green-500/30 transition-colors relative"
         >
           <div className="relative">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <div className="absolute inset-0 w-2 h-2 rounded-full bg-green-400 animate-ping opacity-75" />
+            <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
           </div>
-          Activité LIVE
+          <span className="hidden xl:inline">LIVE</span>
+          <span className="inline xl:hidden">🟢</span>
         </button>
-       <button
-  onClick={() => router.push('/dashboard/superadmin/rankings')}
-  className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 text-yellow-300 rounded-lg text-xs hover:bg-yellow-500/30 transition-colors"
-  title="Classement"
->
-  <TrophyIcon className="w-3.5 h-3.5" />
-  <span>Classement</span>
-</button>
+        
+        {/* BOUTON CLASSEMENT */}
+        <button
+          onClick={() => router.push('/dashboard/superadmin/rankings')}
+          className="flex items-center gap-1 px-2 py-1.5 bg-yellow-500/20 text-yellow-300 rounded-lg text-xs hover:bg-yellow-500/30 transition-colors"
+        >
+          <TrophyIcon className="w-3.5 h-3.5" />
+          <span className="hidden xl:inline">Classement</span>
+          <span className="inline xl:hidden">🏆</span>
+        </button>
 
-        <Button onClick={toggleProfile} variant="outline" size="sm" className="flex items-center gap-2">
-          <UserCircleIcon className="w-4 h-4" />
-          {showProfile ? 'Tableau de bord' : 'Mon profil'}
+        {/* BOUTON NOTES MANUELLES */}
+        <button
+          onClick={() => router.push('/dashboard/superadmin/manual-notes')}
+          className="flex items-center gap-1 px-2 py-1.5 bg-purple-500/20 text-purple-300 rounded-lg text-xs hover:bg-purple-500/30 transition-colors"
+        >
+          <PhoneXMarkIcon className="w-3.5 h-3.5" />
+          <span className="hidden xl:inline">Notes</span>
+          <span className="inline xl:hidden">📝</span>
+        </button>
+
+        <Button onClick={toggleProfile} variant="outline" size="sm" className="flex items-center gap-1 h-8 px-2 text-xs">
+          <UserCircleIcon className="w-3.5 h-3.5" />
+          <span className="hidden xl:inline">{showProfile ? 'Dashboard' : 'Profil'}</span>
+          <span className="inline xl:hidden">👤</span>
         </Button>
         
-        <Button onClick={logout} variant="destructive" size="sm">
-          Déconnexion
+        <Button onClick={logout} variant="destructive" size="sm" className="h-8 px-2 text-xs">
+          <ArrowLeftOnRectangleIcon className="w-3.5 h-3.5" />
+          <span className="hidden xl:inline">Déco</span>
+          <span className="inline xl:hidden">🚪</span>
         </Button>
       </div>
-
       {/* Boutons mobile */}
       <div className="flex items-center gap-2 lg:hidden">
         <NotificationBell />
@@ -1269,7 +1287,7 @@ const baptises = studentsData.filter(s => s.baptized === true).length
     </div>
   </div>
 
-      {/* Menu mobile déroulant */}
+{/* Menu mobile déroulant */}
 {mobileMenuOpen && (
   <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.95)] backdrop-blur-2xl">
     <div className="px-4 py-3 space-y-2">
@@ -1314,13 +1332,22 @@ const baptises = studentsData.filter(s => s.baptized === true).length
         <span>Activité LIVE</span>
       </button>
       
-      {/* 🆕 BOUTON CLASSEMENT */}
+      {/* BOUTON CLASSEMENT */}
       <button
         onClick={() => { router.push('/dashboard/superadmin/rankings'); setMobileMenuOpen(false) }}
         className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
       >
         <TrophyIcon className="w-5 h-5 mr-3 text-yellow-300" />
         <span>Classement</span>
+      </button>
+      
+      {/* 🆕 BOUTON NOTES MANUELLES */}
+      <button
+        onClick={() => { router.push('/dashboard/superadmin/manual-notes'); setMobileMenuOpen(false) }}
+        className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+      >
+        <PhoneXMarkIcon className="w-5 h-5 mr-3 text-purple-300" />
+        <span>Notes manuelles</span>
       </button>
       
       <button

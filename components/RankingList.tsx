@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { TrophyIcon, FunnelIcon, DocumentArrowDownIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { TrophyIcon, FunnelIcon, DocumentArrowDownIcon, XMarkIcon, ScaleIcon, ChartBarIcon } from '@heroicons/react/24/outline'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -14,6 +14,10 @@ interface RankingStudent {
   final_score: number
   attendance_score: number
   quiz_score: number
+  missed_quizzes?: number
+  missed_sessions?: number
+  total_quizzes_expected?: number
+  total_sessions_expected?: number
   student: {
     id: string
     full_name: string
@@ -37,19 +41,23 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
   const [services, setServices] = useState<any[]>([])
   const [branches, setBranches] = useState<string[]>([])
   const [showFilters, setShowFilters] = useState(false)
+  const [useFairRanking, setUseFairRanking] = useState(true)
   const [stats, setStats] = useState({ 
     totalStudents: 0, 
     averageScore: 0, 
-    topStudent: null as RankingStudent | null 
+    topStudent: null as RankingStudent | null,
+    totalStudentsWithMissedQuizzes: 0,
+    totalStudentsWithMissedSessions: 0
   })
 
   useEffect(() => {
     fetchServicesAndBranches()
+    fetchRankings()
   }, [])
 
   useEffect(() => {
     fetchRankings()
-  }, [selectedLevel, selectedPeriod, selectedService, selectedBranch])
+  }, [selectedLevel, selectedPeriod, selectedService, selectedBranch, useFairRanking])
 
   const fetchServicesAndBranches = async () => {
     const { data: servicesData } = await supabase.from('services').select('id, name')
@@ -65,19 +73,27 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
   const fetchRankings = async () => {
     setLoading(true)
     try {
-      let url = `/api/rankings?period=${selectedPeriod}`
-      if (selectedLevel !== 'all') url += `&level=${selectedLevel}`
-      if (selectedService !== 'all') url += `&serviceId=${selectedService}`
-      if (selectedBranch !== 'all') url += `&branch=${encodeURIComponent(selectedBranch)}`
+      let url = useFairRanking ? '/api/rankings/fair' : '/api/rankings'
+      
+      const params = new URLSearchParams()
+      if (selectedLevel !== 'all') params.append('level', selectedLevel)
+      if (selectedService !== 'all') params.append('serviceId', selectedService)
+      if (selectedBranch !== 'all') params.append('branch', selectedBranch)
+      if (selectedPeriod !== 'all' && !useFairRanking) params.append('period', selectedPeriod)
+      
+      if (params.toString()) url += `?${params.toString()}`
       
       const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
+      
       if (res.ok) {
         setRankings(data.rankings || [])
         setStats({
           totalStudents: data.stats?.totalStudents || 0,
           averageScore: data.stats?.averageScore || 0,
-          topStudent: data.rankings?.[0] || null
+          topStudent: data.rankings?.[0] || null,
+          totalStudentsWithMissedQuizzes: data.stats?.totalStudentsWithMissedQuizzes || 0,
+          totalStudentsWithMissedSessions: data.stats?.totalStudentsWithMissedSessions || 0
         })
       } else {
         toast.error(data.error || 'Erreur chargement classement')
@@ -111,6 +127,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
     }
 
     const doc = new jsPDF({ orientation: 'landscape' })
+    const modeText = useFairRanking ? 'Classement équitable' : 'Classement simple'
     const periodText = selectedPeriod === 'monthly' ? 'Mensuel' : 
                        selectedPeriod === 'weekly' ? 'Hebdomadaire' :
                        selectedPeriod === 'quarterly' ? 'Trimestriel' : 'Annuel'
@@ -118,7 +135,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
     doc.setFontSize(20)
     doc.text('Académie de la Grâce', 148, 15, { align: 'center' })
     doc.setFontSize(16)
-    doc.text(`Classement académique - ${periodText}`, 148, 25, { align: 'center' })
+    doc.text(`${modeText} - ${periodText}`, 148, 25, { align: 'center' })
     
     const now = new Date()
     doc.setFontSize(10)
@@ -130,6 +147,11 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
     
     if (rankings.length > 0 && rankings[0]) {
       doc.text(`Meilleur étudiant: ${rankings[0].student.full_name} (${Math.round(rankings[0].final_score)}%)`, 20, 59)
+    }
+    
+    if (useFairRanking && stats.totalStudentsWithMissedQuizzes > 0) {
+      doc.text(`Étudiants avec quiz manqués: ${stats.totalStudentsWithMissedQuizzes}`, 20, 66)
+      doc.text(`Étudiants avec séances manquées: ${stats.totalStudentsWithMissedSessions}`, 20, 73)
     }
 
     let dataToExport = rankings
@@ -151,29 +173,24 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
       r.student.branch,
       `${Math.round(r.final_score)}%`,
       `${Math.round(r.attendance_score)}%`,
-      `${Math.round(r.quiz_score)}%`
+      `${Math.round(r.quiz_score)}%`,
+      useFairRanking ? `${r.missed_quizzes || 0}/${r.total_quizzes_expected || 0}` : '-'
     ])
 
+    const headers = useFairRanking 
+      ? [['Rang', 'Étudiant', 'Niveau', 'Service', 'Branche', 'Score', 'Présence', 'Quiz', 'Manqués']]
+      : [['Rang', 'Étudiant', 'Niveau', 'Service', 'Branche', 'Score', 'Présence', 'Quiz']]
+
     autoTable(doc, {
-      head: [['Rang', 'Étudiant', 'Niveau', 'Service', 'Branche', 'Score', 'Présence', 'Quiz']],
+      head: headers,
       body: tableData,
-      startY: 68,
+      startY: useFairRanking ? 82 : 68,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [99, 102, 241] },
       alternateRowStyles: { fillColor: [240, 240, 240] },
-      columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: 50 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 40 },
-        4: { cellWidth: 35 },
-        5: { cellWidth: 25 },
-        6: { cellWidth: 25 },
-        7: { cellWidth: 25 }
-      }
     })
 
-    doc.save(`classement_academique_${now.toISOString().split('T')[0]}.pdf`)
+    doc.save(`classement_${useFairRanking ? 'equitable' : 'simple'}_${now.toISOString().split('T')[0]}.pdf`)
     toast.success('PDF exporté avec succès')
   }
 
@@ -196,7 +213,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
     return (
       <div className="space-y-3 lg:hidden">
         {top3[0] && (
-          <div className="bg-gradient-to-b from-yellow-500 to-amber-600 rounded-xl p-4 text-center">
+          <div key="first-place" className="bg-gradient-to-b from-yellow-500 to-amber-600 rounded-xl p-4 text-center">
             <div className="text-5xl mb-2">🥇</div>
             {top3[0].student.profile_image_url ? (
               <img src={top3[0].student.profile_image_url} alt="" className="w-16 h-16 rounded-full mx-auto object-cover border-2 border-white/30" />
@@ -207,11 +224,14 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
             )}
             <p className="text-white font-semibold text-base mt-2">{top3[0].student.full_name}</p>
             <p className="text-white/80 text-sm">{Math.round(top3[0].final_score)}%</p>
+            {useFairRanking && top3[0].missed_quizzes > 0 && (
+              <p className="text-white/50 text-[10px] mt-1">⚠️ {top3[0].missed_quizzes} quiz manqués</p>
+            )}
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
           {top3[1] && (
-            <div className="bg-gradient-to-b from-gray-400 to-gray-500 rounded-xl p-3 text-center">
+            <div key="second-place" className="bg-gradient-to-b from-gray-400 to-gray-500 rounded-xl p-3 text-center">
               <div className="text-3xl mb-1">🥈</div>
               <div className="w-12 h-12 rounded-full bg-white/20 mx-auto flex items-center justify-center">
                 <span className="text-lg font-bold text-white/60">{top3[1].student.full_name?.charAt(0)}</span>
@@ -221,7 +241,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
             </div>
           )}
           {top3[2] && (
-            <div className="bg-gradient-to-b from-amber-600 to-amber-700 rounded-xl p-3 text-center">
+            <div key="third-place" className="bg-gradient-to-b from-amber-600 to-amber-700 rounded-xl p-3 text-center">
               <div className="text-3xl mb-1">🥉</div>
               <div className="w-12 h-12 rounded-full bg-white/20 mx-auto flex items-center justify-center">
                 <span className="text-lg font-bold text-white/60">{top3[2].student.full_name?.charAt(0)}</span>
@@ -256,6 +276,9 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
               <div className="flex-1">
                 <p className="text-white font-medium text-sm">{ranking.student.full_name}</p>
                 <p className="text-white/40 text-xs">Niv.{ranking.student.level} • {ranking.student.service_name || '-'}</p>
+                {useFairRanking && ranking.missed_quizzes > 0 && (
+                  <p className="text-white/30 text-[10px]">⚠️ {ranking.missed_quizzes} quiz manqués</p>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-white font-bold">{Math.round(ranking.final_score)}%</p>
@@ -283,24 +306,57 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
           <TrophyIcon className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400" />
           <div>
             <h2 className="text-base sm:text-xl font-normal text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
-              Classement
+              {useFairRanking ? '⚖️ Classement équitable' : '📊 Classement académique'}
             </h2>
-            <p className="text-white/40 text-[10px] sm:text-xs hidden sm:block">Basé sur les présences (40%) et quiz (60%)</p>
+            <p className="text-white/40 text-[10px] sm:text-xs hidden sm:block">
+              {useFairRanking 
+                ? 'Prend en compte les quiz manqués et les séances manquées dès l\'inscription' 
+                : 'Basé sur les présences (40%) et quiz (60%)'}
+            </p>
           </div>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          {/* Toggle entre les deux modes de classement */}
+          <div className="flex gap-1 bg-white/10 rounded-lg p-0.5">
+            <button
+              onClick={() => setUseFairRanking(true)}
+              className={`px-3 py-1.5 text-xs rounded-md transition-all flex items-center gap-1 ${
+                useFairRanking 
+                  ? 'bg-green-500/30 text-green-300' 
+                  : 'text-white/50 hover:text-white/70'
+              }`}
+              title="Classement équitable - prend en compte l'ancienneté"
+            >
+              <ScaleIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Équitable</span>
+            </button>
+            <button
+              onClick={() => setUseFairRanking(false)}
+              className={`px-3 py-1.5 text-xs rounded-md transition-all flex items-center gap-1 ${
+                !useFairRanking 
+                  ? 'bg-blue-500/30 text-blue-300' 
+                  : 'text-white/50 hover:text-white/70'
+              }`}
+              title="Classement simple - moyenne simple des scores"
+            >
+              <ChartBarIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Simple</span>
+            </button>
+          </div>
+          
           <button
             onClick={exportRankingsPDF}
-            className="flex-1 sm:flex-none px-3 py-2 sm:px-4 bg-red-500/20 text-red-300 rounded-lg text-xs sm:text-sm hover:bg-red-500/30 transition-colors flex items-center justify-center gap-1 sm:gap-2"
+            className="px-3 py-2 bg-red-500/20 text-red-300 rounded-lg text-xs hover:bg-red-500/30 transition-colors flex items-center justify-center gap-1"
           >
-            <DocumentArrowDownIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <DocumentArrowDownIcon className="w-3.5 h-3.5" />
             PDF
           </button>
+          
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex-1 sm:flex-none px-3 py-2 sm:px-4 bg-white/10 text-white/80 rounded-lg text-xs sm:text-sm hover:bg-white/20 transition-colors flex items-center justify-center gap-1 sm:gap-2"
+            className="px-3 py-2 bg-white/10 text-white/80 rounded-lg text-xs hover:bg-white/20 transition-colors flex items-center justify-center gap-1"
           >
-            <FunnelIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <FunnelIcon className="w-3.5 h-3.5" />
             Filtres
           </button>
         </div>
@@ -317,15 +373,6 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
-              <label className="block text-[10px] sm:text-xs text-white/50 mb-1">Période</label>
-              <select value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)} className={selectClass}>
-                <option value="weekly">Cette semaine</option>
-                <option value="monthly">Ce mois</option>
-                <option value="quarterly">Ce trimestre</option>
-                <option value="yearly">Cette année</option>
-              </select>
-            </div>
-            <div>
               <label className="block text-[10px] sm:text-xs text-white/50 mb-1">Niveau</label>
               <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className={selectClass}>
                 <option value="all">Tous niveaux</option>
@@ -339,7 +386,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
                 <label className="block text-[10px] sm:text-xs text-white/50 mb-1">Service</label>
                 <select value={selectedService} onChange={(e) => setSelectedService(e.target.value)} className={selectClass}>
                   <option value="all">Tous services</option>
-                  {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
             )}
@@ -347,15 +394,26 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
               <label className="block text-[10px] sm:text-xs text-white/50 mb-1">Branche</label>
               <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className={selectClass}>
                 <option value="all">Toutes branches</option>
-                {branches.map(b => <option key={b} value={b}>{b}</option>)}
+                {branches.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
+            {!useFairRanking && (
+              <div>
+                <label className="block text-[10px] sm:text-xs text-white/50 mb-1">Période</label>
+                <select value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)} className={selectClass}>
+                  <option value="weekly">Cette semaine</option>
+                  <option value="monthly">Ce mois</option>
+                  <option value="quarterly">Ce trimestre</option>
+                  <option value="yearly">Cette année</option>
+                </select>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.08] rounded-xl p-3 sm:p-4 text-center">
           <div className="text-xl sm:text-2xl font-bold text-white">{stats.totalStudents}</div>
           <div className="text-[10px] sm:text-xs text-white/40">Étudiants classés</div>
@@ -364,13 +422,25 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
           <div className="text-xl sm:text-2xl font-bold text-blue-300">{Math.round(stats.averageScore)}%</div>
           <div className="text-[10px] sm:text-xs text-white/40">Score moyen</div>
         </div>
+        {useFairRanking && (
+          <>
+            <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.08] rounded-xl p-3 sm:p-4 text-center">
+              <div className="text-xl sm:text-2xl font-bold text-orange-300">{stats.totalStudentsWithMissedQuizzes}</div>
+              <div className="text-[10px] sm:text-xs text-white/40">Quiz manqués</div>
+            </div>
+            <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.08] rounded-xl p-3 sm:p-4 text-center">
+              <div className="text-xl sm:text-2xl font-bold text-red-300">{stats.totalStudentsWithMissedSessions}</div>
+              <div className="text-[10px] sm:text-xs text-white/40">Séances manquées</div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Podium Desktop */}
       {top3.length > 0 && (
         <div className="hidden lg:grid grid-cols-3 gap-2 sm:gap-4">
-          {top3.map((student, idx) => {
-            const rank = idx + 1
+          {top3.map((student) => {
+            const rank = student.rank
             const isSecond = rank === 2
             return (
               <div key={student.id} className={`text-center ${isSecond ? 'order-first' : ''}`}>
@@ -386,6 +456,9 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
                   <p className="text-white font-medium text-xs sm:text-sm mt-2 truncate">{student.student.full_name}</p>
                   <p className="text-white/60 text-[10px] sm:text-xs">Niveau {student.student.level}</p>
                   <p className="text-white font-bold text-sm sm:text-base mt-1">{Math.round(student.final_score)}%</p>
+                  {useFairRanking && student.missed_quizzes && student.missed_quizzes > 0 && (
+                    <p className="text-white/40 text-[8px] mt-1">⚠️ {student.missed_quizzes} quiz manqués</p>
+                  )}
                 </div>
               </div>
             )
@@ -410,6 +483,9 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
                 <th className="px-4 py-3 text-center text-xs text-white/40">Score</th>
                 <th className="px-4 py-3 text-center text-xs text-white/40">Présence</th>
                 <th className="px-4 py-3 text-center text-xs text-white/40">Quiz</th>
+                {useFairRanking && (
+                  <th className="px-4 py-3 text-center text-xs text-white/40">Manqués</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -452,6 +528,13 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
                       <span className="text-xs text-white/60">{Math.round(ranking.quiz_score)}%</span>
                     </div>
                   </td>
+                  {useFairRanking && (
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-xs text-orange-300">
+                        {ranking.missed_quizzes || 0}/{ranking.total_quizzes_expected || 0}
+                      </span>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
