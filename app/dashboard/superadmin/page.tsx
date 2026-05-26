@@ -78,6 +78,8 @@ const [branches, setBranches] = useState<string[]>([])
 const [attendanceBySession, setAttendanceBySession] = useState<any[]>([])
 const [sessionStudents, setSessionStudents] = useState<Student[]>([])
 const [branchStats, setBranchStats] = useState<any[]>([])
+const [selectedGenerationLevel, setSelectedGenerationLevel] = useState<string>('all')
+const [generatingCode, setGeneratingCode] = useState(false)
 const [stats, setStats] = useState({
   totalStudents: 0,
   totalServices: 0,
@@ -727,347 +729,373 @@ const baptises = studentsData.filter(s => s.baptized === true).length
   }
 
   // === FONCTIONS EXISTANTES (génération code, modals, PDF) ===
-  const generateCode = async () => {
-    if (!navigator.geolocation) {
-      toast.error('Géolocalisation non supportée par votre navigateur')
-      return
-    }
-
-    toast.loading('Récupération de votre position...', { id: 'loc' })
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        toast.dismiss('loc')
-        const { latitude, longitude } = position.coords
-
-        try {
-          toast.loading('Génération du code en cours...', { id: 'generate' })
-
-          const res = await fetch('/api/code/generate', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({
-              lat: latitude,
-              lng: longitude,
-              radius: 200
-            })
-          })
-
-          const data = await res.json()
-          toast.dismiss('generate')
-
-          if (res.ok) {
-            const isMobile = window.innerWidth <= 768
-            if (isMobile) {
-              showCodeModal(data.code, data.expiresAt, data.center)
-            } else {
-              const codeWindow = window.open('', '_blank')
-              if (codeWindow) {
-                displayCodeInWindow(codeWindow, data.code, data.expiresAt, data.center)
-              } else {
-                showCodeModal(data.code, data.expiresAt, data.center)
-              }
-            }
-
-            setTimeout(async () => {
-              try {
-                await fetch('/api/code/mark-absent', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ sessionId: data.sessionId })
-                })
-                fetchAllSessions()
-                toast.info('Les absents ont été marqués automatiquement')
-              } catch (error) {
-                console.error('Erreur marquage absents:', error)
-              }
-            }, 15 * 60 * 1000) // ← MODIFIÉ: 5 → 15 minutes
-
-            toast.success(`Code généré (valable 15 minutes)`) // ← MODIFIÉ
-            fetchAllSessions()
-          } else {
-            toast.error(data.error || 'Erreur lors de la génération')
-          }
-        } catch (error) {
-          console.error('Erreur:', error)
-          toast.dismiss('generate')
-          toast.error('Erreur lors de la génération du code')
-        }
-      },
-      (error: GeolocationPositionError) => {
-        toast.dismiss('loc')
-        console.error(error)
-        let message = 'Impossible d’obtenir votre position'
-        if (error.code === error.PERMISSION_DENIED) {
-          message = '❌ Activez la localisation pour générer un code'
-        } else if (error.code === error.TIMEOUT) {
-          message = 'Délai dépassé, vérifiez votre connexion'
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          message = 'Position indisponible, vérifiez vos paramètres GPS'
-        }
-        toast.error(message)
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
+const generateCode = async () => {
+  if (!navigator.geolocation) {
+    toast.error('Géolocalisation non supportée par votre navigateur')
+    return
   }
 
-  const showCodeModal = (code: string, expiresAt: string, center?: { lat: number; lng: number; radius: number }) => {
-    const expiresAtDate = new Date(expiresAt);
-    const expirationLocale = expiresAtDate.toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+  setGeneratingCode(true)
+  toast.loading('Récupération de votre position...', { id: 'loc' })
 
-    const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
-    modal.innerHTML = `
-      <div class="bg-white rounded-2xl p-6 max-w-md w-full">
-        <div class="text-center">
-          <div class="bg-green-100 text-green-800 px-4 py-2 rounded-full inline-block mb-4">
-            🌍 CODE UNIVERSEL
-          </div>
-          <div class="text-6xl sm:text-8xl font-bold tracking-wider text-indigo-600 mb-6 font-mono">
-            ${code}
-          </div>
-          <div class="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full inline-block mb-4">
-            ⏳ Valable 15 minutes
-          </div>
-          <div class="bg-gray-100 p-4 rounded-xl mb-6">
-            <div class="flex justify-between items-center py-2 border-b border-gray-200">
-              <span class="text-gray-600">⏰ Expire à :</span>
-              <span class="font-bold text-red-600 text-lg">${expirationLocale}</span>
-            </div>
-            ${center ? `
-            <div class="flex justify-between items-center py-2 border-b border-gray-200">
-              <span class="text-gray-600">📍 Rayon de validation :</span>
-              <span class="font-bold text-blue-600">${center.radius} mètres</span>
-            </div>
-            <div class="flex justify-between items-center py-2">
-              <span class="text-gray-600">🎯 Position :</span>
-              <span class="font-mono text-sm">${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}</span>
-            </div>
-            ` : ''}
-          </div>
-          <div class="bg-blue-50 p-4 rounded-xl mb-4">
-            <p class="text-sm text-blue-800">
-              📱 Montrez ce code aux étudiants. Ils ont 15 minutes pour l'entrer, et doivent se trouver à moins de ${center?.radius || 200} mètres de votre position.
-            </p>
-          </div>
-          <button onclick="this.closest('.fixed').remove()" 
-                  class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-xl transition-colors">
-            Fermer
-          </button>
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      toast.dismiss('loc')
+      const { latitude, longitude } = position.coords
+
+      try {
+        toast.loading('Génération du code en cours...', { id: 'generate' })
+
+        // ✅ Envoyer le niveau sélectionné
+        const level = selectedGenerationLevel === 'all' ? null : parseInt(selectedGenerationLevel)
+
+        const res = await fetch('/api/code/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // ← Utilise les cookies au lieu du token
+          body: JSON.stringify({
+            lat: latitude,
+            lng: longitude,
+            radius: 200,
+            level: level
+          })
+        })
+
+        const data = await res.json()
+        toast.dismiss('generate')
+
+        if (res.ok) {
+          // ✅ Déterminer le mode d'affichage
+          const modeText = data.mode === 'universal' 
+            ? '🌍 UNIVERSEL (tous niveaux)' 
+            : `🎓 NIVEAU ${data.level} uniquement`
+          
+          const isMobile = window.innerWidth <= 768
+          if (isMobile) {
+            showCodeModal(data.code, data.expiresAt, data.center, modeText)
+          } else {
+            const codeWindow = window.open('', '_blank')
+            if (codeWindow) {
+              displayCodeInWindow(codeWindow, data.code, data.expiresAt, data.center, modeText)
+            } else {
+              showCodeModal(data.code, data.expiresAt, data.center, modeText)
+            }
+          }
+
+          setTimeout(async () => {
+            try {
+              await fetch('/api/code/mark-absent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: data.sessionId })
+              })
+              fetchAllSessions()
+              toast.info('Les absents ont été marqués automatiquement')
+            } catch (error) {
+              console.error('Erreur marquage absents:', error)
+            }
+          }, 15 * 60 * 1000)
+
+          toast.success(`Code généré (valable 15 minutes) - ${modeText}`)
+          fetchAllSessions()
+        } else {
+          toast.error(data.error || 'Erreur lors de la génération')
+        }
+      } catch (error) {
+        console.error('Erreur:', error)
+        toast.dismiss('generate')
+        toast.error('Erreur lors de la génération du code')
+      } finally {
+        setGeneratingCode(false)
+      }
+    },
+    (error: GeolocationPositionError) => {
+      toast.dismiss('loc')
+      setGeneratingCode(false)
+      let message = 'Impossible d’obtenir votre position'
+      if (error.code === error.PERMISSION_DENIED) {
+        message = '❌ Activez la localisation pour générer un code'
+      } else if (error.code === error.TIMEOUT) {
+        message = 'Délai dépassé, vérifiez votre connexion'
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        message = 'Position indisponible, vérifiez vos paramètres GPS'
+      }
+      toast.error(message)
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  )
+}
+
+const showCodeModal = (code: string, expiresAt: string, center?: { lat: number; lng: number; radius: number }, modeText?: string) => {
+  const expiresAtDate = new Date(expiresAt);
+  const expirationLocale = expiresAtDate.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
+  // ✅ Utiliser modeText s'il est fourni, sinon "CODE UNIVERSEL"
+  const badgeText = modeText || '🌍 CODE UNIVERSEL';
+  const subtitleText = modeText === '🌍 UNIVERSEL (tous niveaux)' 
+    ? 'Montrez ce code aux étudiants de tous les niveaux.' 
+    : modeText?.replace('🎓 ', '').replace(' uniquement', '') 
+      ? `Montrez ce code aux étudiants de ${modeText?.replace('🎓 ', '').replace(' uniquement', '')}.` 
+      : 'Montrez ce code aux étudiants concernés.';
+
+  const modal = document.createElement('div');
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl p-6 max-w-md w-full">
+      <div class="text-center">
+        <div class="bg-green-100 text-green-800 px-4 py-2 rounded-full inline-block mb-4">
+          ${badgeText}
         </div>
+        <div class="text-6xl sm:text-8xl font-bold tracking-wider text-indigo-600 mb-6 font-mono">
+          ${code}
+        </div>
+        <div class="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full inline-block mb-4">
+          ⏳ Valable 15 minutes
+        </div>
+        <div class="bg-gray-100 p-4 rounded-xl mb-6">
+          <div class="flex justify-between items-center py-2 border-b border-gray-200">
+            <span class="text-gray-600">⏰ Expire à :</span>
+            <span class="font-bold text-red-600 text-lg">${expirationLocale}</span>
+          </div>
+          ${center ? `
+          <div class="flex justify-between items-center py-2 border-b border-gray-200">
+            <span class="text-gray-600">📍 Rayon de validation :</span>
+            <span class="font-bold text-blue-600">${center.radius} mètres</span>
+          </div>
+          <div class="flex justify-between items-center py-2">
+            <span class="text-gray-600">🎯 Position :</span>
+            <span class="font-mono text-sm">${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}</span>
+          </div>
+          ` : ''}
+        </div>
+        <div class="bg-blue-50 p-4 rounded-xl mb-4">
+          <p class="text-sm text-blue-800">
+            📱 ${subtitleText} Ils ont 15 minutes pour l'entrer${center ? `, et doivent se trouver à moins de ${center.radius} mètres de votre position.` : '.'}
+          </p>
+        </div>
+        <button onclick="this.closest('.fixed').remove()" 
+                class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-xl transition-colors">
+          Fermer
+        </button>
       </div>
-    `;
-    document.body.appendChild(modal);
+    </div>
+  `;
+  document.body.appendChild(modal);
 
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.remove();
-    });
-  };
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+};
+const displayCodeInWindow = (codeWindow: Window, code: string, expiresAt: string, center?: { lat: number; lng: number; radius: number }, modeText?: string) => {
+  const maintenant = new Date();
+  const expiresAtDate = new Date(expiresAt);
+  
+  const heureLocale = maintenant.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  
+  const expirationLocale = expiresAtDate.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
 
-  const displayCodeInWindow = (codeWindow: Window, code: string, expiresAt: string, center?: { lat: number; lng: number; radius: number }) => {
-    const maintenant = new Date();
-    const expiresAtDate = new Date(expiresAt);
-    
-    const heureLocale = maintenant.toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-    
-    const expirationLocale = expiresAtDate.toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+  // ✅ Utiliser modeText s'il est fourni, sinon "CODE UNIVERSEL"
+  const badgeText = modeText || '🌍 CODE UNIVERSEL';
+  const subtitleText = modeText === '🌍 UNIVERSEL (tous niveaux)' 
+    ? 'Code valable pour TOUS les étudiants' 
+    : modeText?.replace('🎓 ', '').replace(' uniquement', '') || 'Code valable pour les étudiants concernés';
 
-    codeWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Code de présence - 15 minutes</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { 
-              display: flex; 
-              justify-content: center; 
-              align-items: center; 
-              min-height: 100vh; 
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-              padding: 1rem;
-            }
-            .container { 
-              text-align: center; 
-              background: white; 
-              padding: 2rem; 
-              border-radius: 2rem; 
-              box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-              max-width: 700px;
-              width: 100%;
-            }
-            .universal-badge {
-              background: #10b981;
-              color: white;
-              padding: 0.75rem 1.5rem;
-              border-radius: 3rem;
-              display: inline-block;
-              margin-bottom: 1.5rem;
-              font-weight: 600;
-              font-size: 1.1rem;
-            }
-            .duration {
-              background: #f59e0b;
-              color: white;
-              padding: 0.75rem 1.5rem;
-              border-radius: 3rem;
-              display: inline-block;
-              margin: 1rem 0 1.5rem 0;
-              font-weight: 600;
-              font-size: 1.1rem;
-            }
-            .warning {
-              background: #fee2e2;
-              color: #b91c1c;
-              padding: 1rem;
-              border-radius: 1rem;
-              margin: 1rem 0;
-              font-size: 1rem;
-              border-left: 4px solid #b91c1c;
-            }
-            .instruction {
-              font-size: 1.5rem;
-              color: #374151;
-              margin-bottom: 1rem;
-              font-weight: 500;
-            }
-            .code { 
-              font-size: min(10rem, 20vw); 
-              font-weight: 800; 
-              letter-spacing: 1.5rem;
-              color: #4f46e5;
-              margin: 1.5rem 0;
-              text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-              font-family: 'Courier New', monospace;
-              line-height: 1.2;
-              word-break: break-all;
-            }
-            .time-info {
-              background: #f3f4f6;
-              padding: 1.5rem;
-              border-radius: 1rem;
-              margin: 2rem 0;
-            }
-            .time-row {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              padding: 0.75rem 0;
-              border-bottom: 1px solid #e5e7eb;
-              font-size: 1.1rem;
-            }
-            .time-row:last-child { border-bottom: none; }
-            .time-label { color: #4b5563; font-weight: 500; }
-            .time-value {
-              font-weight: 700;
-              color: #1f2937;
-              background: white;
-              padding: 0.25rem 0.75rem;
-              border-radius: 2rem;
-              font-size: 1.2rem;
-            }
-            .expires-value {
-              color: #ef4444;
-              font-size: 1.3rem;
-              font-weight: 800;
-            }
-            .radius-info {
-              background: #dbeafe;
-              color: #1e40af;
-              padding: 0.75rem;
-              border-radius: 0.5rem;
-              margin: 1rem 0;
-            }
-            .admin-info {
-              background: #e0f2fe;
-              color: #0369a1;
-              padding: 0.75rem;
-              border-radius: 0.5rem;
-              margin: 1rem 0;
-              font-size: 0.9rem;
-            }
-            .current-time {
-              color: #6b7280;
-              font-size: 0.9rem;
-              margin-top: 1rem;
-            }
-            .note {
-              font-size: 0.9rem;
-              color: #9ca3af;
-              margin-top: 0.5rem;
-            }
-            @media (max-width: 640px) {
-              .container { padding: 1.5rem; }
-              .code { letter-spacing: 0.5rem; }
-              .time-row { flex-direction: column; gap: 0.5rem; }
-              .time-value { width: 100%; text-align: center; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="universal-badge">🌍 CODE UNIVERSEL</div>
-            <div class="duration">⏳ Valable 15 minutes</div>
-            <div class="warning">
-              ⚠️ Passé ce délai, les absents seront marqués automatiquement
+  codeWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Code de présence - 15 minutes</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            padding: 1rem;
+          }
+          .container { 
+            text-align: center; 
+            background: white; 
+            padding: 2rem; 
+            border-radius: 2rem; 
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            max-width: 700px;
+            width: 100%;
+          }
+          .mode-badge {
+            background: #10b981;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 3rem;
+            display: inline-block;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+          }
+          .duration {
+            background: #f59e0b;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 3rem;
+            display: inline-block;
+            margin: 1rem 0 1.5rem 0;
+            font-weight: 600;
+            font-size: 1.1rem;
+          }
+          .warning {
+            background: #fee2e2;
+            color: #b91c1c;
+            padding: 1rem;
+            border-radius: 1rem;
+            margin: 1rem 0;
+            font-size: 1rem;
+            border-left: 4px solid #b91c1c;
+          }
+          .instruction {
+            font-size: 1.5rem;
+            color: #374151;
+            margin-bottom: 1rem;
+            font-weight: 500;
+          }
+          .code { 
+            font-size: min(10rem, 20vw); 
+            font-weight: 800; 
+            letter-spacing: 1.5rem;
+            color: #4f46e5;
+            margin: 1.5rem 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            font-family: 'Courier New', monospace;
+            line-height: 1.2;
+            word-break: break-all;
+          }
+          .time-info {
+            background: #f3f4f6;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            margin: 2rem 0;
+          }
+          .time-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 1.1rem;
+          }
+          .time-row:last-child { border-bottom: none; }
+          .time-label { color: #4b5563; font-weight: 500; }
+          .time-value {
+            font-weight: 700;
+            color: #1f2937;
+            background: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 2rem;
+            font-size: 1.2rem;
+          }
+          .expires-value {
+            color: #ef4444;
+            font-size: 1.3rem;
+            font-weight: 800;
+          }
+          .radius-info {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+          }
+          .admin-info {
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+          }
+          .subtitle {
+            font-size: 1.1rem;
+            color: #374151;
+            margin-top: 1rem;
+            font-weight: 500;
+          }
+          .current-time {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+          }
+          @media (max-width: 640px) {
+            .container { padding: 1.5rem; }
+            .code { letter-spacing: 0.5rem; }
+            .time-row { flex-direction: column; gap: 0.5rem; }
+            .time-value { width: 100%; text-align: center; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="mode-badge">${badgeText}</div>
+          <div class="duration">⏳ Valable 15 minutes</div>
+          <div class="warning">
+            ⚠️ Passé ce délai, les absents seront marqués automatiquement
+          </div>
+          <div class="instruction">🔑 Code de présence</div>
+          <div class="code">${code}</div>
+          
+          <div class="time-info">
+            <div class="time-row">
+              <span class="time-label">⏰ Expire à :</span>
+              <span class="time-value expires-value">${expirationLocale}</span>
             </div>
-            <div class="instruction">🔑 Code de présence</div>
-            <div class="code">${code}</div>
-            
-            <div class="time-info">
-              <div class="time-row">
-                <span class="time-label">⏰ Expire à :</span>
-                <span class="time-value expires-value">${expirationLocale}</span>
-              </div>
-              <div class="time-row">
-                <span class="time-label">🕒 Heure actuelle :</span>
-                <span class="time-value">${heureLocale}</span>
-              </div>
-            </div>
-
-            ${center ? `
-            <div class="radius-info">
-              <strong>📍 Zone de validation</strong><br/>
-              Rayon de ${center.radius} mètres autour de votre position<br/>
-              <span class="text-xs">(${center.lat.toFixed(5)}, ${center.lng.toFixed(5)})</span>
-            </div>
-            ` : ''}
-            
-            <div class="admin-info">
-              👤 Généré par ${user?.name} (Administrateur)
-            </div>
-            
-            <p style="font-size: 1.2rem; color: #374151;">
-              <strong>Code valable pour TOUS les étudiants</strong>
-            </p>
-            
-            <div class="current-time">
-              Les étudiants doivent se trouver à moins de ${center?.radius || 200} mètres pour valider.
-              Le code expire après 15 minutes.
+            <div class="time-row">
+              <span class="time-label">🕒 Heure actuelle :</span>
+              <span class="time-value">${heureLocale}</span>
             </div>
           </div>
-        </body>
-      </html>
-    `);
-    codeWindow.document.close();
-  };
+
+          ${center ? `
+          <div class="radius-info">
+            <strong>📍 Zone de validation</strong><br/>
+            Rayon de ${center.radius} mètres autour de votre position<br/>
+            <span class="text-xs">(${center.lat.toFixed(5)}, ${center.lng.toFixed(5)})</span>
+          </div>
+          ` : ''}
+          
+          <div class="admin-info">
+            👤 Généré par ${user?.name} (Administrateur)
+          </div>
+          
+          <div class="subtitle">
+            <strong>${subtitleText}</strong>
+          </div>
+          
+          <div class="current-time">
+            Les étudiants doivent se trouver à moins de ${center?.radius || 200} mètres pour valider.
+            Le code expire après 15 minutes.
+          </div>
+        </div>
+      </body>
+    </html>
+  `);
+  codeWindow.document.close();
+};
 
   const generatePDF = async (type: 'all' | 'present' | 'absent') => {
     if (selectedSession === 'all') {
@@ -1566,26 +1594,51 @@ const baptises = studentsData.filter(s => s.baptized === true).length
             <h2 className="text-xl font-bold text-white mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>📋 Historique des séances</h2>
             <ServiceHistoryDetail />
           </div>
-          {/* Génération de code académique avec géolocalisation */}
-          <Card className="mb-8">
-            <CardHeader className="px-4 sm:px-6 py-4">
-              <CardTitle className="text-base sm:text-lg">🎯 Génération du code de présence académique</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 sm:px-6 pb-6">
-              <div className="flex flex-col items-center justify-center py-4">
-                <Button
-                  onClick={generateCode}
-                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-auto py-4 sm:py-6 px-4 sm:px-8 text-base sm:text-lg font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 sm:gap-3"
-                >
-                  <span className="text-xl sm:text-2xl">📍</span>
-                  <span>GÉNÉRER LE CODE AVEC MA POSITION</span>
-                </Button>
-                <p className="text-xs sm:text-sm text-gray-500 mt-3 text-center">
-                  Votre position sera enregistrée. Les étudiants devront être à moins de 200 mètres pour valider.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Génération de code académique avec géolocalisation */}
+<Card className="mb-8">
+  <CardHeader className="px-4 sm:px-6 py-4">
+    <CardTitle className="text-base sm:text-lg">🎯 Génération du code de présence académique</CardTitle>
+  </CardHeader>
+  <CardContent className="px-4 sm:px-6 pb-6">
+    
+    {/* ✅ NOUVEAU : Sélecteur de niveau */}
+    <div className="mb-6">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        🎯 Niveau cible
+      </label>
+      <select
+        value={selectedGenerationLevel}
+        onChange={(e) => setSelectedGenerationLevel(e.target.value)}
+        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+        disabled={generatingCode}
+      >
+        <option value="all">🌍 Tous niveaux (universel)</option>
+        <option value="1">📚 Niveau 1 uniquement</option>
+        <option value="2">📚 Niveau 2 uniquement</option>
+        <option value="3">📚 Niveau 3 uniquement</option>
+      </select>
+      <p className="text-xs text-gray-500 mt-1">
+        {selectedGenerationLevel === 'all' 
+          ? 'Les étudiants de tous les niveaux pourront utiliser ce code.' 
+          : `Seuls les étudiants du niveau ${selectedGenerationLevel} pourront utiliser ce code.`}
+      </p>
+    </div>
+
+    <div className="flex flex-col items-center justify-center py-4">
+      <Button
+        onClick={generateCode}
+        disabled={generatingCode}
+        className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-auto py-4 sm:py-6 px-4 sm:px-8 text-base sm:text-lg font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 sm:gap-3"
+      >
+        <span className="text-xl sm:text-2xl">📍</span>
+        <span>{generatingCode ? 'GÉNÉRATION EN COURS...' : 'GÉNÉRER LE CODE AVEC MA POSITION'}</span>
+      </Button>
+      <p className="text-xs sm:text-sm text-gray-500 mt-3 text-center">
+        Votre position sera enregistrée. Les étudiants devront être à moins de 200 mètres pour valider.
+      </p>
+    </div>
+  </CardContent>
+</Card>
           
           {/* Filtres avancés */}
           <div className="lg:hidden mb-4">

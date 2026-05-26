@@ -28,6 +28,8 @@ import {
 
 export default function StudentDashboard() {
   const { user, loading, logout } = useAuth()
+  const [activeSessions, setActiveSessions] = useState<any[]>([])
+  const [loadingSessions, setLoadingSessions] = useState(false) 
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -42,12 +44,17 @@ export default function StudentDashboard() {
   const [showChat, setShowChat] = useState(false)
   const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: string } | null>(null)
 
-  useEffect(() => {
-    if (!loading && !user) router.push('/login')
-    if (user?.role === 'service_manager') router.push('/dashboard/manager')
-    if (user?.role === 'superadmin') router.push('/dashboard/superadmin')
-    if (user?.id) { fetchUserLevel(); fetchData(); fetchBadges() }
-  }, [user, loading])
+ useEffect(() => {
+  if (!loading && !user) router.push('/login')
+  if (user?.role === 'service_manager') router.push('/dashboard/manager')
+  if (user?.role === 'superadmin') router.push('/dashboard/superadmin')
+  if (user?.id) { 
+    fetchUserLevel(); 
+    fetchData(); 
+    fetchBadges();
+    fetchActiveSessions();  
+  }
+}, [user, loading])
 
   const fetchUserLevel = async () => {
     const { data } = await supabase.from('students').select('level').eq('id', user?.id).single()
@@ -69,6 +76,23 @@ export default function StudentDashboard() {
     if (!user?.id) return
     const { data } = await supabase.from('student_badges').select('awarded_at, badge:badges(*)').eq('student_id', user.id).order('awarded_at', { ascending: false })
     if (data) setBadges(data.map((item: any) => ({ ...item.badge, awarded_at: item.awarded_at })))
+  }
+
+  const fetchActiveSessions = async () => {
+    setLoadingSessions(true)
+    try {
+      const res = await fetch('/api/sessions/active', {
+        credentials: 'include'
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setActiveSessions(data.sessions || [])
+      }
+    } catch (error) {
+      console.error('Erreur récupération sessions:', error)
+    } finally {
+      setLoadingSessions(false)
+    }
   }
 
   const verifyCode = async () => {
