@@ -224,7 +224,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
             )}
             <p className="text-white font-semibold text-base mt-2">{top3[0].student.full_name}</p>
             <p className="text-white/80 text-sm">{Math.round(top3[0].final_score)}%</p>
-            {useFairRanking && top3[0].missed_quizzes > 0 && (
+            {useFairRanking && top3[0]?.missed_quizzes && top3[0].missed_quizzes > 0 && (
               <p className="text-white/50 text-[10px] mt-1">⚠️ {top3[0].missed_quizzes} quiz manqués</p>
             )}
           </div>
@@ -276,7 +276,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
               <div className="flex-1">
                 <p className="text-white font-medium text-sm">{ranking.student.full_name}</p>
                 <p className="text-white/40 text-xs">Niv.{ranking.student.level} • {ranking.student.service_name || '-'}</p>
-                {useFairRanking && ranking.missed_quizzes > 0 && (
+                {useFairRanking && ranking.missed_quizzes && ranking.missed_quizzes > 0 && (
                   <p className="text-white/30 text-[10px]">⚠️ {ranking.missed_quizzes} quiz manqués</p>
                 )}
               </div>
