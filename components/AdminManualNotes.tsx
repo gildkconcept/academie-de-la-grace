@@ -15,6 +15,7 @@ interface Student {
   phone: string
   has_phone: boolean
   maison_grace: string
+  branch?: string
 }
 
 interface Quiz {
