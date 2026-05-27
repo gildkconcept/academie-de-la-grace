@@ -1,46 +1,42 @@
-// services/quizService.ts
+import axiosInstance from '@/lib/axios';
 
 export const quizService = {
   async getAll() {
-    const res = await fetch('/api/quizzes', { credentials: 'include' })
-    return res.json()
+    const response = await axiosInstance.get('/quizzes');
+    return response.data;
   },
 
   async getById(id: string) {
-    const res = await fetch(`/api/quizzes?id=${id}`, { credentials: 'include' })
-    return res.json()
+    const response = await axiosInstance.get(`/quizzes/${id}`);
+    return response.data;
   },
 
-  async create(data: any) {
-    const res = await fetch('/api/quizzes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data)
-    })
-    return res.json()
-  },
-
-  async submit(quizId: string, answers: Record<string, string>) {
-    const res = await fetch(`/api/quizzes/${quizId}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ answers })
-    })
-    return res.json()
+  async submit(id: string, answers: Record<string, string>) {
+    const response = await axiosInstance.post(`/quizzes/${id}/submit`, { answers });
+    return response.data;
   },
 
   async getMyResults() {
-    const res = await fetch('/api/my-results', { credentials: 'include' })
-    return res.json()
+    const response = await axiosInstance.get('/quizzes/my-results');
+    return response.data;
   },
 
   async getAllResults(quizId?: string, level?: string) {
-    let url = '/api/quiz-results?'
-    if (quizId && quizId !== 'all') url += `quizId=${quizId}&`
-    if (level && level !== 'all') url += `level=${level}&`
-    const res = await fetch(url, { credentials: 'include' })
-    return res.json()
-  }
-}
+    let url = '/quiz-results?';
+    if (quizId && quizId !== 'all') url += `quizId=${quizId}&`;
+    if (level && level !== 'all') url += `level=${level}&`;
+    const response = await axiosInstance.get(url);
+    return response.data;
+  },
+
+  async getHistory(limit = 50, offset = 0, filters?: any) {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString(), ...filters }).toString();
+    const response = await axiosInstance.get(`/quiz/history?${params}`);
+    return response.data;
+  },
+
+  async getDetail(resultId: string) {
+    const response = await axiosInstance.get(`/quiz/detail?resultId=${resultId}`);
+    return response.data;
+  },
+};

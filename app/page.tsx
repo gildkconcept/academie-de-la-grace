@@ -93,16 +93,16 @@ export default function Home() {
         <div className="px-6 pb-10">
           <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
             <div className="bg-white/[0.07] backdrop-blur-2xl border border-white/[0.13] rounded-2xl p-6 text-center">
-              <span className="block text-4xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>+200</span>
-              <span className="block text-blue-300/80 text-xs mt-1 tracking-[0.05em]">Ouvriers formés</span>
+              <span className="block text-4xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>+2000</span>
+              <span className="block text-blue-300/80 text-xs mt-1 tracking-[0.05em]">Membres</span>
             </div>
             <div className="bg-white/[0.07] backdrop-blur-2xl border border-white/[0.13] rounded-2xl p-6 text-center">
-              <span className="block text-4xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>12</span>
-              <span className="block text-blue-300/80 text-xs mt-1 tracking-[0.05em]">Modules actifs</span>
+              <span className="block text-4xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>3</span>
+              <span className="block text-blue-300/80 text-xs mt-1 tracking-[0.05em]">Niveau</span>
             </div>
             <div className="bg-white/[0.07] backdrop-blur-2xl border border-white/[0.13] rounded-2xl p-6 text-center">
-              <span className="block text-4xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>98%</span>
-              <span className="block text-blue-300/80 text-xs mt-1 tracking-[0.05em]">Satisfaction</span>
+              <span className="block text-4xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>9</span>
+              <span className="block text-blue-300/80 text-xs mt-1 tracking-[0.05em]">Branche</span>
             </div>
           </div>
         </div>

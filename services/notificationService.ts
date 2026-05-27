@@ -1,49 +1,29 @@
-// services/notificationService.ts
+import axiosInstance from '@/lib/axios';
 
 export const notificationService = {
   async getAll(limit = 50, unreadOnly = false) {
-    const url = `/api/notifications?limit=${limit}${unreadOnly ? '&unread=true' : ''}`
-    const res = await fetch(url, { credentials: 'include' })
-    return res.json()
+    const url = `/notifications?limit=${limit}${unreadOnly ? '&unread=true' : ''}`;
+    const response = await axiosInstance.get(url);
+    return response.data;
   },
 
   async markAsRead(id: string) {
-    const res = await fetch(`/api/notifications/${id}`, {
-      method: 'PATCH',
-      credentials: 'include'
-    })
-    return res.json()
+    const response = await axiosInstance.patch(`/notifications/${id}`);
+    return response.data;
   },
 
   async markAllAsRead() {
-    const res = await fetch('/api/notifications/read-all', {
-      method: 'PATCH',
-      credentials: 'include'
-    })
-    return res.json()
+    const response = await axiosInstance.patch('/notifications/read-all');
+    return response.data;
   },
 
   async delete(id: string) {
-    const res = await fetch(`/api/notifications/${id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    })
-    return res.json()
+    const response = await axiosInstance.delete(`/notifications/${id}`);
+    return response.data;
   },
 
-  async create(data: {
-    userIds: string[]
-    title: string
-    message: string
-    type: string
-    link?: string
-  }) {
-    const res = await fetch('/api/notifications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data)
-    })
-    return res.json()
-  }
-}
+  async create(data: { userIds: string[]; title: string; message: string; type: string; link?: string }) {
+    const response = await axiosInstance.post('/notifications', data);
+    return response.data;
+  },
+};

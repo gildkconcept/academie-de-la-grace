@@ -10,6 +10,8 @@ import { CreateNoPhoneStudent } from '@/components/CreateNoPhoneStudent'
 import { DocumentChartBarIcon } from '@heroicons/react/24/outline'
 import { PhoneXMarkIcon } from '@heroicons/react/24/outline'
 import { LiveStatus } from '@/components/LiveStatus'
+import { sessionService } from '@/services/sessionService';
+import { attendanceService } from '@/services/attendanceService';
 
 
 
@@ -25,6 +27,7 @@ import {
   Legend,
   ResponsiveContainer,
   LineChart,
+  
   Line
 } from '@/components/charts'
 import { NotificationBell } from '@/components/NotificationBell'
@@ -133,25 +136,65 @@ const [showStudentFilters, setShowStudentFilters] = useState(false)
     setMobileMenuOpen(false)
   }
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login')
-    }
-    if (user?.role === 'student') {
-      router.push('/dashboard/student')
-    }
-    if (user?.role === 'service_manager') {
-      router.push('/dashboard/manager')
-    }
-    if (user?.role === 'superadmin') {
-      fetchData()
-      fetchAllSessions()
-      fetchServiceAttendances()
-      fetchCultTypes()
-      fetchGlobalStats()
-      fetchBadgesList()
-    }
-  }, [user, loading])
+ useEffect(() => {
+  if (!loading && !user) {
+    router.push('/login')
+  }
+  if (user?.role === 'student') {
+    router.push('/dashboard/student')
+  }
+  if (user?.role === 'service_manager') {
+    router.push('/dashboard/manager')
+  }
+  if (user?.role === 'superadmin') {
+    fetchData()
+    fetchAllSessions()
+    fetchServiceAttendances()
+    fetchCultTypes()
+    fetchGlobalStats()
+    fetchBadgesList()
+  }
+}, [user, loading])  // ← Ne pas oublier les dépendances
+
+// ✅ AJOUTER CE SECOND useEffect POUR LES MISES À JOUR EN TEMPS RÉEL
+useEffect(() => {
+  if (!user || user.role !== 'superadmin') return
+
+  console.log('🔌 [REALTIME] Abonnement aux changements de présence...')
+
+  // Abonnement aux changements dans la table attendance
+  const attendanceChannel = supabase
+    .channel('attendance_changes')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'attendance' }, 
+      (payload) => {
+        console.log('🔄 [REALTIME] Changement détecté dans attendance:', payload.eventType)
+        // Recharger les données des graphiques uniquement
+        fetchData()
+      }
+    )
+    .subscribe()
+
+  // Abonnement aux changements dans la table students (pour les niveaux)
+  const studentsChannel = supabase
+    .channel('students_changes')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'students' }, 
+      (payload) => {
+        console.log('🔄 [REALTIME] Changement détecté dans students:', payload.eventType)
+        fetchData()
+        fetchGlobalStats()
+      }
+    )
+    .subscribe()
+
+  // Nettoyage à la déconnexion
+  return () => {
+    console.log('🔌 [REALTIME] Désabonnement des canaux...')
+    attendanceChannel.unsubscribe()
+    studentsChannel.unsubscribe()
+  }
+}, [user])  // ← Dépendance à user uniquement [user, loading])
 
   useEffect(() => {
     applyFilters()
@@ -210,7 +253,7 @@ const [showStudentFilters, setShowStudentFilters] = useState(false)
         averageProgress: Math.round(avgProgress)
       })
 
-      generateChartData(studentsData || [], servicesData || [])
+    await generateChartData(studentsData || [], servicesData || [])
       
     } catch (error) {
       console.error('Erreur:', error)
@@ -220,41 +263,27 @@ const [showStudentFilters, setShowStudentFilters] = useState(false)
     }
   }
 
-  const fetchCultTypes = async () => {
-    try {
-      const res = await fetch('/api/session-types', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      })
-      const data = await res.json()
-      if (res.ok) setCultTypes(data)
-    } catch (error) {
-      console.error('Erreur chargement types:', error)
-    }
+ const fetchCultTypes = async () => {
+  try {
+    const data = await attendanceService.getSessionTypes();
+    setCultTypes(data);
+  } catch (error) {
+    console.error('Erreur chargement types:', error);
   }
+};
 
-  const fetchServiceAttendances = async () => {
-    try {
-      let url = `/api/service/attendance/all?date=${selectedDate}`
-      if (selectedServiceForAttendance !== 'all') {
-        url += `&serviceId=${selectedServiceForAttendance}`
-      }
-      if (selectedCultType !== 'all') {
-        url += `&type=${selectedCultType}`
-      }
-      
-      const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setServiceAttendances(data)
-      } else {
-        console.error('Erreur:', data.error)
-      }
-    } catch (error) {
-      console.error('Erreur récupération présences service:', error)
-    }
+const fetchServiceAttendances = async () => {
+  try {
+    const data = await attendanceService.getServiceAttendance(
+      selectedDate, 
+      selectedServiceForAttendance, 
+      selectedCultType
+    );
+    setServiceAttendances(data);
+  } catch (error) {
+    console.error('Erreur récupération présences service:', error);
   }
+};
 
   const generateServiceAttendancePDF = async () => {
     if (serviceAttendances.length === 0) {
@@ -354,49 +383,115 @@ const [showStudentFilters, setShowStudentFilters] = useState(false)
     }
   };
 
-  const generateChartData = (studentsData: Student[], servicesData: Service[]) => {
-    const servicePresence = servicesData.map(service => {
-      const serviceStudents = studentsData.filter(s => s.service_id === service.id)
-      const presentCount = Math.floor(Math.random() * serviceStudents.length)
-      return {
-        name: service.name.substring(0, 15),
-        présents: presentCount,
-        absents: serviceStudents.length - presentCount,
-        total: serviceStudents.length
-      }
-    })
-    setPresenceByService(servicePresence)
+const generateChartData = async (studentsData: Student[], servicesData: Service[]) => {
+  console.log('📊 [CHART] Génération des graphiques avec vraies données...')
+  
+  // 1. Récupérer toutes les présences pour calculer les taux réels
+  const { data: allAttendance } = await supabase
+    .from('attendance')
+    .select('student_id, status')
+  
+  // 2. Récupérer les sessions pour avoir le nombre total
+  const { data: allSessions } = await supabase
+    .from('sessions')
+    .select('id')
+  
+  const totalSessions = allSessions?.length || 1
+  
+  // ===== PRÉSENCES PAR SERVICE =====
+  const servicePresence = servicesData.map(service => {
+    const serviceStudents = studentsData.filter(s => s.service_id === service.id)
+    const studentIds = serviceStudents.map(s => s.id)
+    
+    // Compter les présences réelles pour ce service
+    const presentCount = allAttendance?.filter(a => 
+      studentIds.includes(a.student_id) && a.status === 'present'
+    ).length || 0
+    
+    const totalExpected = serviceStudents.length * totalSessions
+    const absentsCount = totalExpected - presentCount
+    
+    return {
+      name: service.name.substring(0, 15),
+      présents: presentCount,
+      absents: absentsCount > 0 ? absentsCount : 0,
+      total: serviceStudents.length,
+      taux: totalExpected > 0 ? Math.round((presentCount / totalExpected) * 100) : 0
+    }
+  })
+  setPresenceByService(servicePresence)
 
-    const niveau1 = studentsData.filter(s => s.level === 1)
-    const niveau2 = studentsData.filter(s => s.level === 2)
-    const niveau3 = studentsData.filter(s => s.level === 3)
-    setPresenceByLevel([
-      { name: 'Niveau 1', présents: Math.floor(Math.random() * niveau1.length), total: niveau1.length },
-      { name: 'Niveau 2', présents: Math.floor(Math.random() * niveau2.length), total: niveau2.length },
-      { name: 'Niveau 3', présents: Math.floor(Math.random() * niveau3.length), total: niveau3.length }
-    ])
-
-    const branchMap = new Map()
-    studentsData.forEach(s => {
-      const count = branchMap.get(s.branch) || 0
-      branchMap.set(s.branch, count + 1)
-    })
-    const topBranches = Array.from(branchMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, total]) => ({
-        name: name.substring(0, 15),
-        présents: Math.floor(Math.random() * total),
-        total
-      }))
-    setPresenceByBranch(topBranches)
-const baptises = studentsData.filter(s => s.baptized === true).length
-    const nonBaptises = studentsData.length - baptises
-    setBaptismStats([
-      { name: 'Baptisés', value: baptises },
-      { name: 'Non baptisés', value: nonBaptises }
-    ])
+  // ===== PRÉSENCES PAR NIVEAU =====
+  const niveau1 = studentsData.filter(s => s.level === 1)
+  const niveau2 = studentsData.filter(s => s.level === 2)
+  const niveau3 = studentsData.filter(s => s.level === 3)
+  
+  const getPresentCountByLevel = (levelStudents: Student[]) => {
+    const studentIds = levelStudents.map(s => s.id)
+    return allAttendance?.filter(a => studentIds.includes(a.student_id) && a.status === 'present').length || 0
   }
+  
+  setPresenceByLevel([
+    { 
+      name: 'Niveau 1', 
+      présents: getPresentCountByLevel(niveau1), 
+      total: niveau1.length,
+      taux: niveau1.length > 0 ? Math.round((getPresentCountByLevel(niveau1) / (niveau1.length * totalSessions)) * 100) : 0
+    },
+    { 
+      name: 'Niveau 2', 
+      présents: getPresentCountByLevel(niveau2), 
+      total: niveau2.length,
+      taux: niveau2.length > 0 ? Math.round((getPresentCountByLevel(niveau2) / (niveau2.length * totalSessions)) * 100) : 0
+    },
+    { 
+      name: 'Niveau 3', 
+      présents: getPresentCountByLevel(niveau3), 
+      total: niveau3.length,
+      taux: niveau3.length > 0 ? Math.round((getPresentCountByLevel(niveau3) / (niveau3.length * totalSessions)) * 100) : 0
+    }
+  ])
+
+  // ===== PRÉSENCES PAR BRANCHE =====
+  const branchMap = new Map<string, { total: number; present: number }>()
+  
+  // Initialiser la map
+  studentsData.forEach(s => {
+    const current = branchMap.get(s.branch) || { total: 0, present: 0 }
+    current.total++
+    branchMap.set(s.branch, current)
+  })
+  
+  // Compter les présences par branche
+  for (const [branch, data] of branchMap) {
+    const branchStudents = studentsData.filter(s => s.branch === branch)
+    const studentIds = branchStudents.map(s => s.id)
+    const presentCount = allAttendance?.filter(a => studentIds.includes(a.student_id) && a.status === 'present').length || 0
+    branchMap.set(branch, { total: data.total, present: presentCount })
+  }
+  
+  const topBranches = Array.from(branchMap.entries())
+    .map(([name, data]) => ({
+      name: name.substring(0, 15),
+      présents: data.present,
+      total: data.total,
+      taux: data.total > 0 ? Math.round((data.present / (data.total * totalSessions)) * 100) : 0
+    }))
+    .sort((a, b) => b.taux - a.taux)
+    .slice(0, 5)
+  
+  setPresenceByBranch(topBranches)
+  
+  // ===== STATISTIQUES BAPTÊME (déjà correctes) =====
+  const baptises = studentsData.filter(s => s.baptized === true).length
+  const nonBaptises = studentsData.length - baptises
+  setBaptismStats([
+    { name: 'Baptisés', value: baptises },
+    { name: 'Non baptisés', value: nonBaptises }
+  ])
+  
+  console.log('✅ [CHART] Graphiques générés avec succès')
+}
 
   const fetchAllSessions = async () => {
     try {
@@ -540,19 +635,14 @@ const baptises = studentsData.filter(s => s.baptized === true).length
     setSelectedBaptism('all')
   }
 
-  // === NOUVELLES FONCTIONS ===
-  const fetchGlobalStats = async () => {
-    try {
-      const res = await fetch('/api/stats/global', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      })
-      const data = await res.json()
-      if (res.ok) setGlobalStats(data)
-      else console.error('Erreur stats globales:', data.error)
-    } catch (error) {
-      console.error('Erreur fetchGlobalStats:', error)
-    }
+const fetchGlobalStats = async () => {
+  try {
+    const data = await attendanceService.getStatsGlobal();
+    setGlobalStats(data);
+  } catch (error) {
+    console.error('Erreur stats globales:', error);
   }
+};
 
   const fetchBadgesList = async () => {
     try {
@@ -746,15 +836,16 @@ const generateCode = async () => {
       try {
         toast.loading('Génération du code en cours...', { id: 'generate' })
 
-        // ✅ Envoyer le niveau sélectionné
         const level = selectedGenerationLevel === 'all' ? null : parseInt(selectedGenerationLevel)
+        const token = localStorage.getItem('token')
 
-        const res = await fetch('/api/code/generate', {
+        // ✅ CHANGEMENT ICI : Appel vers le backend Node.js
+        const res = await fetch('http://localhost:3001/api/sessions/generate', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
-          credentials: 'include', // ← Utilise les cookies au lieu du token
           body: JSON.stringify({
             lat: latitude,
             lng: longitude,
@@ -766,8 +857,7 @@ const generateCode = async () => {
         const data = await res.json()
         toast.dismiss('generate')
 
-        if (res.ok) {
-          // ✅ Déterminer le mode d'affichage
+        if (res.ok && data.success) {
           const modeText = data.mode === 'universal' 
             ? '🌍 UNIVERSEL (tous niveaux)' 
             : `🎓 NIVEAU ${data.level} uniquement`
@@ -784,11 +874,15 @@ const generateCode = async () => {
             }
           }
 
+          // ✅ Marquer les absents après expiration
           setTimeout(async () => {
             try {
-              await fetch('/api/code/mark-absent', {
+              await fetch('http://localhost:3001/api/sessions/mark-absent', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ sessionId: data.sessionId })
               })
               fetchAllSessions()
@@ -798,7 +892,7 @@ const generateCode = async () => {
             }
           }, 15 * 60 * 1000)
 
-          toast.success(`Code généré (valable 15 minutes) - ${modeText}`)
+          toast.success(`Code ${data.code} généré - ${modeText}`)
           fetchAllSessions()
         } else {
           toast.error(data.error || 'Erreur lors de la génération')
@@ -1276,6 +1370,16 @@ const displayCodeInWindow = (codeWindow: Window, code: string, expiresAt: string
           <span className="inline xl:hidden">📝</span>
         </button>
 
+        {/* ✅ BOUTON PROMOTIONS - NOUVEAU */}
+        <button
+          onClick={() => router.push('/dashboard/superadmin/promotions')}
+          className="flex items-center gap-1 px-2 py-1.5 bg-green-500/20 text-green-300 rounded-lg text-xs hover:bg-green-500/30 transition-colors"
+        >
+          <UserGroupIcon className="w-3.5 h-3.5" />
+          <span className="hidden xl:inline">Promotions</span>
+          <span className="inline xl:hidden">🎓</span>
+        </button>
+
         <Button onClick={toggleProfile} variant="outline" size="sm" className="flex items-center gap-1 h-8 px-2 text-xs">
           <UserCircleIcon className="w-3.5 h-3.5" />
           <span className="hidden xl:inline">{showProfile ? 'Dashboard' : 'Profil'}</span>
@@ -1288,6 +1392,7 @@ const displayCodeInWindow = (codeWindow: Window, code: string, expiresAt: string
           <span className="inline xl:hidden">🚪</span>
         </Button>
       </div>
+      
       {/* Boutons mobile */}
       <div className="flex items-center gap-2 lg:hidden">
         <NotificationBell />
@@ -1315,87 +1420,96 @@ const displayCodeInWindow = (codeWindow: Window, code: string, expiresAt: string
     </div>
   </div>
 
-{/* Menu mobile déroulant */}
-{mobileMenuOpen && (
-  <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.95)] backdrop-blur-2xl">
-    <div className="px-4 py-3 space-y-2">
-      <div className="pb-2 mb-2 border-b border-white/[0.08]">
-        <p className="text-xs text-white/50">Connecté en tant que</p>
-        <p className="text-sm text-white font-medium">{user?.name}</p>
-      </div>
-      
-      <button
-        onClick={() => { setShowCreateNoPhoneModal(true); setMobileMenuOpen(false) }}
-        className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-      >
-        <PhoneXMarkIcon className="w-5 h-5 mr-3 text-purple-300" />
-        <span>Sans téléphone</span>
-      </button>
-      
-      <button
-        onClick={() => { setShowAssistedAttendanceModal(true); setMobileMenuOpen(false) }}
-        className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-      >
-        <PhoneXMarkIcon className="w-5 h-5 mr-3 text-indigo-300" />
-        <span>Présence assistée</span>
-      </button>
-      
-      <button
-        onClick={() => { router.push('/dashboard/superadmin/monthly-reports'); setMobileMenuOpen(false) }}
-        className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-      >
-        <DocumentChartBarIcon className="w-5 h-5 mr-3 text-blue-300" />
-        <span>Rapports mensuels</span>
-      </button>
-      
-      {/* BOUTON ACTIVITÉ LIVE */}
-      <button
-        onClick={() => { router.push('/dashboard/superadmin/online-users'); setMobileMenuOpen(false) }}
-        className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-      >
-        <div className="relative mr-3">
-          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          <div className="absolute inset-0 w-2 h-2 rounded-full bg-green-400 animate-ping opacity-75" />
+  {/* Menu mobile déroulant */}
+  {mobileMenuOpen && (
+    <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.95)] backdrop-blur-2xl">
+      <div className="px-4 py-3 space-y-2">
+        <div className="pb-2 mb-2 border-b border-white/[0.08]">
+          <p className="text-xs text-white/50">Connecté en tant que</p>
+          <p className="text-sm text-white font-medium">{user?.name}</p>
         </div>
-        <span>Activité LIVE</span>
-      </button>
-      
-      {/* BOUTON CLASSEMENT */}
-      <button
-        onClick={() => { router.push('/dashboard/superadmin/rankings'); setMobileMenuOpen(false) }}
-        className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-      >
-        <TrophyIcon className="w-5 h-5 mr-3 text-yellow-300" />
-        <span>Classement</span>
-      </button>
-      
-      {/* 🆕 BOUTON NOTES MANUELLES */}
-      <button
-        onClick={() => { router.push('/dashboard/superadmin/manual-notes'); setMobileMenuOpen(false) }}
-        className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-      >
-        <PhoneXMarkIcon className="w-5 h-5 mr-3 text-purple-300" />
-        <span>Notes manuelles</span>
-      </button>
-      
-      <button
-        onClick={() => { toggleProfile(); setMobileMenuOpen(false) }}
-        className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-      >
-        <UserCircleIcon className="w-5 h-5 mr-3" />
-        <span>{showProfile ? 'Tableau de bord' : 'Mon profil'}</span>
-      </button>
-      
-      <button
-        onClick={logout}
-        className="w-full flex items-center px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors mt-2 border-t border-white/[0.08] pt-3"
-      >
-        <ArrowLeftOnRectangleIcon className="w-5 h-5 mr-3" />
-        <span>Déconnexion</span>
-      </button>
+        
+        <button
+          onClick={() => { setShowCreateNoPhoneModal(true); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <PhoneXMarkIcon className="w-5 h-5 mr-3 text-purple-300" />
+          <span>Sans téléphone</span>
+        </button>
+        
+        <button
+          onClick={() => { setShowAssistedAttendanceModal(true); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <PhoneXMarkIcon className="w-5 h-5 mr-3 text-indigo-300" />
+          <span>Présence assistée</span>
+        </button>
+        
+        <button
+          onClick={() => { router.push('/dashboard/superadmin/monthly-reports'); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <DocumentChartBarIcon className="w-5 h-5 mr-3 text-blue-300" />
+          <span>Rapports mensuels</span>
+        </button>
+        
+        {/* BOUTON ACTIVITÉ LIVE */}
+        <button
+          onClick={() => { router.push('/dashboard/superadmin/online-users'); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <div className="relative mr-3">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <div className="absolute inset-0 w-2 h-2 rounded-full bg-green-400 animate-ping opacity-75" />
+          </div>
+          <span>Activité LIVE</span>
+        </button>
+        
+        {/* BOUTON CLASSEMENT */}
+        <button
+          onClick={() => { router.push('/dashboard/superadmin/rankings'); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <TrophyIcon className="w-5 h-5 mr-3 text-yellow-300" />
+          <span>Classement</span>
+        </button>
+        
+        {/* BOUTON NOTES MANUELLES */}
+        <button
+          onClick={() => { router.push('/dashboard/superadmin/manual-notes'); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <PhoneXMarkIcon className="w-5 h-5 mr-3 text-purple-300" />
+          <span>Notes manuelles</span>
+        </button>
+
+        {/* ✅ BOUTON PROMOTIONS - NOUVEAU DANS MENU MOBILE */}
+        <button
+          onClick={() => { router.push('/dashboard/superadmin/promotions'); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <UserGroupIcon className="w-5 h-5 mr-3 text-green-300" />
+          <span>Promotions</span>
+        </button>
+        
+        <button
+          onClick={() => { toggleProfile(); setMobileMenuOpen(false) }}
+          className="w-full flex items-center px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <UserCircleIcon className="w-5 h-5 mr-3" />
+          <span>{showProfile ? 'Tableau de bord' : 'Mon profil'}</span>
+        </button>
+        
+        <button
+          onClick={logout}
+          className="w-full flex items-center px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors mt-2 border-t border-white/[0.08] pt-3"
+        >
+          <ArrowLeftOnRectangleIcon className="w-5 h-5 mr-3" />
+          <span>Déconnexion</span>
+        </button>
+      </div>
     </div>
-  </div>
-)}
+  )}
 </nav>
 
       {/* Contenu principal */}

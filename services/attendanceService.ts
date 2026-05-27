@@ -1,64 +1,79 @@
-// services/attendanceService.ts
+import axiosInstance from '@/lib/axios';
 
 export const attendanceService = {
-  async verifyCode(code: string) {
-    const res = await fetch('/api/code/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ code })
-    })
-    return res.json()
+  async verifyCode(code: string, lat?: number, lng?: number) {
+    const response = await axiosInstance.post('/sessions/verify', { code, lat, lng });
+    return response.data;
   },
 
-  async generateCode(lat?: number, lng?: number, radius?: number) {
-    const res = await fetch('/api/code/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ lat, lng, radius })
-    })
-    return res.json()
+  async generateCode(lat?: number, lng?: number, radius?: number, level?: number | null) {
+    const response = await axiosInstance.post('/sessions/generate', { lat, lng, radius, level });
+    return response.data;
   },
 
   async markServiceAttendance(sessionId: string, attendances: { studentId: string; status: string }[]) {
-    const res = await fetch('/api/service/attendance/mark', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ sessionId, attendances })
-    })
-    return res.json()
+    const response = await axiosInstance.post('/service/attendance/mark', { sessionId, attendances });
+    return response.data;
   },
 
   async getCurrentSession() {
-    const res = await fetch('/api/service/session/current', {
-      credentials: 'include'
-    })
-    return res.json()
+    const response = await axiosInstance.get('/service/session/current');
+    return response.data;
   },
 
   async startServiceSession(date: string, type: string) {
-    const res = await fetch('/api/service/session/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ date, type })
-    })
-    return res.json()
+    const response = await axiosInstance.post('/service/session/start', { date, type });
+    return response.data;
   },
 
   async getSessionHistory(limit = 20, offset = 0) {
-    const res = await fetch(`/api/service/session/history?limit=${limit}&offset=${offset}`, {
-      credentials: 'include'
-    })
-    return res.json()
+    const response = await axiosInstance.get(`/service/session/history?limit=${limit}&offset=${offset}`);
+    return response.data;
   },
 
   async getSessionStudents(sessionId: string) {
-    const res = await fetch(`/api/service/session/get?sessionId=${sessionId}`, {
-      credentials: 'include'
-    })
-    return res.json()
-  }
-}
+    const response = await axiosInstance.get(`/service/session/get?sessionId=${sessionId}`);
+    return response.data;
+  },
+
+  // Méthodes pour le superadmin
+  async getServiceAttendance(date: string, serviceId?: string, type?: string) {
+    let url = `/service/attendance/all?date=${date}`;
+    if (serviceId && serviceId !== 'all') url += `&serviceId=${serviceId}`;
+    if (type && type !== 'all') url += `&type=${type}`;
+    const response = await axiosInstance.get(url);
+    return response.data;
+  },
+
+  async getStatsGlobal() {
+    const response = await axiosInstance.get('/stats/global');
+    return response.data;
+  },
+
+  async getSessionTypes() {
+    const response = await axiosInstance.get('/session-types');
+    return response.data;
+  },
+
+  async getServiceSessionsHistory(limit = 20, offset = 0) {
+    const response = await axiosInstance.get(`/service-sessions/history?limit=${limit}&offset=${offset}`);
+    return response.data;
+  },
+
+  // ⚠️ NOUVELLES MÉTHODES POUR MonthlyReports
+  async getServices() {
+    const response = await axiosInstance.get('/services');
+    return response.data;
+  },
+
+  async getBranches() {
+    // Récupérer les branches uniques depuis les étudiants
+    const response = await axiosInstance.get('/students/branches');
+    return response.data;
+  },
+
+  async getMonthlyReport(params: URLSearchParams) {
+    const response = await axiosInstance.get(`/reports/monthly?${params}`);
+    return response.data;
+  },
+};

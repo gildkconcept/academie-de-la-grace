@@ -17,6 +17,7 @@ import { ChatGroups } from '@/components/ChatGroups'
 import { ChatMessages } from '@/components/ChatMessages'
 import { DailyVerseCard } from '@/components/DailyVerseCard'
 import { LiveStatus } from '@/components/LiveStatus'
+import { sessionService } from '@/services/sessionService'
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -44,48 +45,73 @@ export default function StudentDashboard() {
   const [showChat, setShowChat] = useState(false)
   const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: string } | null>(null)
 
- useEffect(() => {
-  if (!loading && !user) router.push('/login')
-  if (user?.role === 'service_manager') router.push('/dashboard/manager')
-  if (user?.role === 'superadmin') router.push('/dashboard/superadmin')
-  if (user?.id) { 
-    fetchUserLevel(); 
-    fetchData(); 
-    fetchBadges();
-    fetchActiveSessions();  
-  }
-}, [user, loading])
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login')
+      return
+    }
+    if (user?.role === 'service_manager') {
+      router.push('/dashboard/manager')
+      return
+    }
+    if (user?.role === 'superadmin') {
+      router.push('/dashboard/superadmin')
+      return
+    }
+    if (user?.id) { 
+      fetchUserLevel()
+      fetchData()
+      fetchBadges()
+      fetchActiveSessions()
+    }
+  }, [user, loading])
 
   const fetchUserLevel = async () => {
-    const { data } = await supabase.from('students').select('level').eq('id', user?.id).single()
+    if (!user?.id) return
+    const { data } = await supabase.from('students').select('level').eq('id', user.id).single()
     if (data) setUserLevel(data.level || 1)
   }
 
   const fetchData = async () => {
+    if (!user?.id) return
     setLoadingData(true)
     try {
-      const { data: attendanceData } = await supabase.from('attendance').select('*, sessions(*)').eq('student_id', user?.id).order('date', { ascending: false }).limit(10)
+      const { data: attendanceData } = await supabase
+        .from('attendance')
+        .select('*, sessions(*)')
+        .eq('student_id', user.id)
+        .order('date', { ascending: false })
+        .limit(10)
       if (attendanceData) setAttendance(attendanceData)
-      const { data: progressData } = await supabase.from('progress').select('*').eq('student_id', user?.id)
+      
+      const { data: progressData } = await supabase
+        .from('progress')
+        .select('*')
+        .eq('student_id', user.id)
       if (progressData) setProgress(progressData)
-    } catch (error) { toast.error('Erreur lors du chargement des données') }
-    finally { setLoadingData(false) }
+    } catch (error) { 
+      toast.error('Erreur lors du chargement des données') 
+    } finally { 
+      setLoadingData(false) 
+    }
   }
 
   const fetchBadges = async () => {
     if (!user?.id) return
-    const { data } = await supabase.from('student_badges').select('awarded_at, badge:badges(*)').eq('student_id', user.id).order('awarded_at', { ascending: false })
+    const { data } = await supabase
+      .from('student_badges')
+      .select('awarded_at, badge:badges(*)')
+      .eq('student_id', user.id)
+      .order('awarded_at', { ascending: false })
     if (data) setBadges(data.map((item: any) => ({ ...item.badge, awarded_at: item.awarded_at })))
   }
 
   const fetchActiveSessions = async () => {
+    if (!user?.id) return
     setLoadingSessions(true)
     try {
-      const res = await fetch('/api/sessions/active', {
-        credentials: 'include'
-      })
-      const data = await res.json()
-      if (res.ok && data.success) {
+      const data = await sessionService.getActiveSessions()
+      if (data.success) {
         setActiveSessions(data.sessions || [])
       }
     } catch (error) {
@@ -96,15 +122,28 @@ export default function StudentDashboard() {
   }
 
   const verifyCode = async () => {
-    if (code.length !== 6) { toast.error('Le code doit faire 6 chiffres'); return }
+    if (code.length !== 6) { 
+      toast.error('Le code doit faire 6 chiffres')
+      return 
+    }
     setVerifying(true)
     try {
-      const res = await fetch('/api/code/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ code }) })
-      const data = await res.json()
-      if (res.ok) { toast.success('✅ Présence enregistrée !'); setShowCodeInput(false); setCode(''); fetchData(); fetchBadges() }
-      else { toast.error(data.error || 'Code invalide') }
-    } catch (error) { toast.error('Erreur lors de la vérification') }
-    finally { setVerifying(false) }
+      const data = await sessionService.verifyCode(code)
+      if (data.success) { 
+        toast.success('✅ Présence enregistrée !')
+        setShowCodeInput(false)
+        setCode('')
+        fetchData()
+        fetchBadges()
+        fetchActiveSessions()
+      } else {
+        toast.error(data.error || 'Code invalide')
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Erreur lors de la vérification')
+    } finally {
+      setVerifying(false)
+    }
   }
 
   const calculateProgress = () => {

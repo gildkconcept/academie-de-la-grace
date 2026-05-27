@@ -1,5 +1,6 @@
 // stores/notificationStore.ts
 import { create } from 'zustand'
+import { notificationService } from '@/services/notificationService'
 import { Notification } from '@/types'
 
 interface NotificationState {
@@ -20,12 +21,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   fetchNotifications: async (unreadOnly = false) => {
     set({ loading: true })
     try {
-      const url = `/api/notifications?limit=50${unreadOnly ? '&unread=true' : ''}`
-      const res = await fetch(url, { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok) {
-        set({ notifications: data.notifications || [], unreadCount: data.unreadCount || 0, loading: false })
-      }
+      const data = await notificationService.getAll(50, unreadOnly)
+      set({ 
+        notifications: data.notifications || [], 
+        unreadCount: data.unreadCount || 0, 
+        loading: false 
+      })
     } catch (error) {
       console.error('Erreur fetch notifications:', error)
       set({ loading: false })
@@ -34,7 +35,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   markAsRead: async (id) => {
     try {
-      await fetch(`/api/notifications/${id}`, { method: 'PATCH', credentials: 'include' })
+      await notificationService.markAsRead(id)
       set(state => ({
         notifications: state.notifications.map(n => n.id === id ? { ...n, is_read: true } : n),
         unreadCount: Math.max(0, state.unreadCount - 1)
@@ -46,7 +47,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   markAllAsRead: async () => {
     try {
-      await fetch('/api/notifications/read-all', { method: 'PATCH', credentials: 'include' })
+      await notificationService.markAllAsRead()
       set(state => ({
         notifications: state.notifications.map(n => ({ ...n, is_read: true })),
         unreadCount: 0
@@ -58,7 +59,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   deleteNotification: async (id) => {
     try {
-      await fetch(`/api/notifications/${id}`, { method: 'DELETE', credentials: 'include' })
+      await notificationService.delete(id)
       set(state => {
         const deleted = state.notifications.find(n => n.id === id)
         return {

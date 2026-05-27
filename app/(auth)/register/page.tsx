@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { Service } from '@/types'
 import { EyeIcon, EyeSlashIcon, CameraIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { Service } from '@/types'
+import { serviceService } from '@/services/serviceService'
+import { authService } from '@/services/authService'
 
 const branchesList = [
   'Katartizo', 'Anagkazo', 'Prodige', 'Loyauté',
@@ -39,23 +40,42 @@ export default function RegisterPage() {
 
   useEffect(() => { fetchServices() }, [])
 
+  // Vérification de la disponibilité du username via le backend
   useEffect(() => {
-    if (formData.username.length < 3) { setUsernameStatus('idle'); setSuggestions([]); return }
+    if (formData.username.length < 3) { 
+      setUsernameStatus('idle'); 
+      setSuggestions([]); 
+      return 
+    }
+    
     const timeout = setTimeout(async () => {
       setUsernameStatus('checking')
       try {
-        const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(formData.username)}`)
-        const data = await res.json()
-        if (data.available) { setUsernameStatus('available'); setSuggestions([]) }
-        else { setUsernameStatus('taken'); setSuggestions(data.suggestions || []) }
-      } catch (error) { setUsernameStatus('idle') }
+        const data = await authService.checkUsername(formData.username)
+        if (data.available) { 
+          setUsernameStatus('available'); 
+          setSuggestions([]) 
+        } else { 
+          setUsernameStatus('taken'); 
+          setSuggestions(data.suggestions || []) 
+        }
+      } catch (error) { 
+        console.error('Erreur vérification username:', error)
+        setUsernameStatus('idle') 
+      }
     }, 500)
+    
     return () => clearTimeout(timeout)
   }, [formData.username])
 
+  // Récupération des services via le backend
   const fetchServices = async () => {
-    const { data } = await supabase.from('services').select('*').order('name')
-    if (data) setServices(data)
+    try {
+      const data = await serviceService.getAll()
+      setServices(data)
+    } catch (error) {
+      console.error('Erreur chargement services:', error)
+    }
   }
 
   const copyToClipboard = (text: string) => {
@@ -67,70 +87,93 @@ export default function RegisterPage() {
     const file = e.target.files?.[0]
     if (!file) return
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-    if (!allowedTypes.includes(file.type)) { toast.error('Format non autorisé (JPG, PNG, WebP)'); return }
-    if (file.size > 5 * 1024 * 1024) { toast.error('Image trop volumineuse (max 5 MB)'); return }
+    if (!allowedTypes.includes(file.type)) { 
+      toast.error('Format non autorisé (JPG, PNG, WebP)'); 
+      return 
+    }
+    if (file.size > 5 * 1024 * 1024) { 
+      toast.error('Image trop volumineuse (max 5 MB)'); 
+      return 
+    }
     setUploadingPhoto(true)
     try {
-      const fileName = `temp_${Date.now()}_${file.name.replace(/\s+/g, '_')}`
-      const { error } = await supabase.storage.from('student-profiles').upload(fileName, file)
-      if (error) { toast.error('Erreur lors de l\'upload'); return }
-      const { data: urlData } = supabase.storage.from('student-profiles').getPublicUrl(fileName)
-      setPreviewUrl(urlData.publicUrl)
-      setFormData({ ...formData, profileImageUrl: urlData.publicUrl })
-      toast.success('Photo prête !')
-    } catch (error) { toast.error('Erreur réseau') }
-    finally { setUploadingPhoto(false) }
+      const formDataPhoto = new FormData()
+      formDataPhoto.append('file', file)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/profile/upload-photo`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formDataPhoto
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPreviewUrl(data.url)
+        setFormData(prev => ({ ...prev, profileImageUrl: data.url }))
+        toast.success('Photo prête !')
+      } else { 
+        toast.error(data.error || 'Erreur lors de l\'upload') 
+      }
+    } catch (error) { 
+      toast.error('Erreur réseau') 
+    } finally { 
+      setUploadingPhoto(false) 
+    }
   }
 
   const handlePhotoDelete = () => {
     setPreviewUrl(null)
-    setFormData({ ...formData, profileImageUrl: '' })
+    setFormData(prev => ({ ...prev, profileImageUrl: '' }))
     toast.success('Photo retirée')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (usernameStatus === 'taken') { toast.error('Ce nom d\'utilisateur n\'est pas disponible'); return }
-    if (formData.username.length < 3) { toast.error('Le nom d\'utilisateur doit contenir au moins 3 caractères'); return }
+    if (usernameStatus === 'taken') { 
+      toast.error('Ce nom d\'utilisateur n\'est pas disponible'); 
+      return 
+    }
+    if (formData.username.length < 3) { 
+      toast.error('Le nom d\'utilisateur doit contenir au moins 3 caractères'); 
+      return 
+    }
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          branch: formData.branch,
-          level: formData.level,
-          serviceId: formData.serviceId,
-          baptized: formData.baptized === 'true',
-          phone: formData.phone,
-          username: formData.username,
-          password: formData.password,
-          maisonGrace: formData.maisonGrace,
-          profileImageUrl: formData.profileImageUrl
-        })
+      const data = await authService.register({
+        fullName: formData.fullName,
+        branch: formData.branch,
+        level: formData.level,
+        serviceId: formData.serviceId,
+        baptized: formData.baptized === 'true',
+        phone: formData.phone,
+        username: formData.username,
+        password: formData.password,
+        maisonGrace: formData.maisonGrace,
+        profileImageUrl: formData.profileImageUrl
       })
-      const data = await res.json()
-      if (res.ok) {
-        setGeneratedUsername(data.username || formData.username)
+      
+      if (data.username) {
+        setGeneratedUsername(data.username)
         toast.success('Compte créé avec succès !')
       } else {
         toast.error(data.error || 'Erreur lors de l\'inscription')
       }
-    } catch (error) { toast.error('Une erreur est survenue') }
-    finally { setLoading(false) }
+    } catch (error: any) {
+      console.error('Erreur inscription:', error)
+      toast.error(error.response?.data?.error || 'Une erreur est survenue')
+    } finally { 
+      setLoading(false) 
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
   const applySuggestion = (suggestion: string) => {
-    setFormData({ ...formData, username: suggestion })
+    setFormData(prev => ({ ...prev, username: suggestion }))
     setUsernameStatus('checking')
   }
 
-  // ========== SUCCÈS ==========
+  // Page de succès
   if (generatedUsername) {
     return (
       <div className="min-h-screen relative overflow-hidden flex items-center justify-center" style={{ fontFamily: "'Crimson Text', Georgia, serif", color: 'white' }}>
@@ -162,55 +205,21 @@ export default function RegisterPage() {
     )
   }
 
-  // ========== FORMULAIRE ==========
+  // Formulaire d'inscription
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center py-12" style={{ fontFamily: "'Crimson Text', Georgia, serif", color: 'white' }}>
       <div className="fixed inset-0 bg-cover bg-center z-0" style={{ backgroundImage: "url('/ok.png')" }} />
       <div className="fixed inset-0 z-10" style={{ background: 'linear-gradient(135deg, rgba(8,20,90,0.88) 0%, rgba(15,45,130,0.82) 40%, rgba(10,30,100,0.87) 70%, rgba(4,12,65,0.92) 100%)' }} />
-      <div className="fixed w-[250px] h-[250px] rounded-full bg-blue-400/20 blur-[80px] -top-[30px] -right-[30px] z-20 pointer-events-none" />
-      <div className="fixed w-[200px] h-[200px] rounded-full bg-blue-600/15 blur-[80px] bottom-[5%] -left-[30px] z-20 pointer-events-none" />
-
+      
       <div className="relative z-30 w-full max-w-md px-4">
         <div className="text-center mb-6">
           <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-sm font-bold text-[#1a3a8f] mx-auto mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>AG</div>
           <h2 className="text-2xl font-normal text-white" style={{ fontFamily: "'Playfair Display', serif" }}>Inscription Étudiant</h2>
           <p className="text-blue-200/70 text-xs mt-1">Rejoignez l'Académie de la Grâce</p>
-          <p className="text-blue-200/50 text-xs mt-2 bg-white/5 py-1.5 px-3 rounded-lg inline-block">🔑 Choisissez un nom d'utilisateur unique (minimum 3 caractères)</p>
         </div>
 
         <div className="bg-white/[0.07] backdrop-blur-3xl border border-white/[0.18] rounded-3xl p-8 shadow-[0_32px_64px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.22)]">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            
-            {/* Photo de profil */}
-            <div>
-              <label className="block text-xs text-white/80 mb-1">Photo de profil <span className="text-white/40">(optionnel)</span></label>
-              <div className="flex items-center gap-3">
-                {previewUrl ? (
-                  <div className="relative">
-                    <img src={previewUrl} alt="Aperçu" className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
-                    {uploadingPhoto && <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /></div>}
-                  </div>
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border-2 border-dashed border-white/20">
-                    <CameraIcon className="w-5 h-5 text-white/40" />
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <label className="cursor-pointer inline-flex items-center gap-1 px-3 py-1.5 bg-white/10 text-white rounded-lg text-xs hover:bg-white/20 transition-colors">
-                    <CameraIcon className="w-3.5 h-3.5" />
-                    {previewUrl ? 'Changer' : 'Ajouter'}
-                    <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" disabled={uploadingPhoto} />
-                  </label>
-                  {previewUrl && (
-                    <button type="button" onClick={handlePhotoDelete} className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-500/20 text-red-300 rounded-lg text-xs hover:bg-red-500/30 transition-colors">
-                      <TrashIcon className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Champs */}
+          <form onSubmit={handleSubmit} className="space-y-4">
             <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} placeholder="Nom et prénom *" className="w-full px-4 py-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-indigo-400 text-sm" />
             
             <select name="branch" required value={formData.branch} onChange={handleChange} className="w-full px-4 py-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-indigo-400 [&>option]:bg-white [&>option]:text-gray-900">
@@ -241,15 +250,15 @@ export default function RegisterPage() {
             <div>
               <input type="text" name="username" required minLength={3} value={formData.username} onChange={handleChange} placeholder="Nom d'utilisateur *"
                 className={`w-full px-4 py-2.5 bg-white/90 border rounded-lg text-gray-900 placeholder-gray-500 text-sm focus:outline-none ${usernameStatus === 'available' ? 'border-green-400' : usernameStatus === 'taken' ? 'border-red-400' : 'border-white/30'}`} />
-              {usernameStatus === 'checking' && <p className="text-xs text-white/50 mt-1">⏳ Vérification en cours...</p>}
+              {usernameStatus === 'checking' && <p className="text-xs text-white/50 mt-1">⏳ Vérification...</p>}
               {usernameStatus === 'available' && <p className="text-xs text-green-300 mt-1">✅ Disponible</p>}
               {usernameStatus === 'taken' && <p className="text-xs text-red-300 mt-1">❌ Déjà utilisé</p>}
               {suggestions.length > 0 && (
-                <div className="mt-1">
+                <div className="mt-2">
                   <p className="text-xs text-white/50">Suggestions :</p>
                   <div className="flex gap-2 flex-wrap mt-1">
                     {suggestions.map(sug => (
-                      <button key={sug} type="button" onClick={() => applySuggestion(sug)} className="px-2 py-1 bg-white/10 rounded-md text-xs text-white/80 hover:bg-white/20 transition-colors">{sug}</button>
+                      <button key={sug} type="button" onClick={() => applySuggestion(sug)} className="px-2 py-1 bg-white/10 rounded-md text-xs text-white/80 hover:bg-white/20">{sug}</button>
                     ))}
                   </div>
                 </div>
@@ -275,10 +284,6 @@ export default function RegisterPage() {
             Déjà inscrit ?{' '}
             <Link href="/login" className="text-white hover:underline font-semibold">Se connecter</Link>
           </p>
-        </div>
-
-        <div className="text-center mt-6">
-          <Link href="/" className="text-xs text-blue-200/40 hover:text-white/60 transition-colors">← Retour à l'accueil</Link>
         </div>
       </div>
     </div>

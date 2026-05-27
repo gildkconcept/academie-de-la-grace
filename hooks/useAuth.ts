@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { authService } from '@/services/authService'
 import { User } from '@/types'
 
 export function useAuth() {
@@ -10,14 +11,15 @@ export function useAuth() {
   const router = useRouter()
 
   useEffect(() => {
-    // Le cookie est envoyé automatiquement, plus besoin de le lire depuis localStorage
-    fetch('/api/auth/verify', {
-      credentials: 'include' // ← Envoie le cookie HttpOnly automatiquement
-    })
-      .then(res => res.json())
+    const token = localStorage.getItem('token')
+    if (!token) {
+      setLoading(false)
+      return
+    }
+
+    authService.verify()
       .then(data => {
         if (data.user) {
-          console.log('📦 Données utilisateur reçues de verify:', data.user)
           setUser({
             id: data.user.id,
             name: data.user.name,
@@ -31,34 +33,19 @@ export function useAuth() {
             profileImageUrl: data.user.profileImageUrl || null
           })
         } else {
-          // Pas d'utilisateur → rediriger vers login (sauf si déjà sur login)
-          if (window.location.pathname !== '/login' && 
-              window.location.pathname !== '/register' &&
-              window.location.pathname !== '/forgot-credentials') {
-            router.push('/login')
-          }
+          localStorage.removeItem('token')
         }
       })
-      .catch(error => {
-        console.error('❌ Erreur auth:', error)
+      .catch(() => {
+        localStorage.removeItem('token')
       })
       .finally(() => setLoading(false))
   }, [])
 
   const logout = async () => {
-    try {
-      // Appeler l'API logout pour supprimer le cookie côté serveur
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        credentials: 'include'
-      })
-    } catch (error) {
-      console.error('Erreur logout:', error)
-    } finally {
-      setUser(null)
-      // ✅ Utiliser window.location pour une redirection forcée
-      window.location.href = '/login'
-    }
+    await authService.logout()
+    setUser(null)
+    router.push('/login')
   }
 
   return { user, loading, logout }

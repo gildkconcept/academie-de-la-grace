@@ -1,23 +1,20 @@
+// app/dashboard/superadmin/promotions/page.tsx
 'use client'
 
 import { useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-import { MonthlyReports } from '@/components/MonthlyReports'
+import { PromotionManager } from '@/components/PromotionManager'
 import { ArrowLeftIcon } from '@heroicons/react/24/outline'
 
-export default function MonthlyReportsPage() {  // ← Assure-toi d'avoir "export default" ici
+export default function PromotionsPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login')
-    }
-    if (user && user.role !== 'superadmin') {
-      router.push('/dashboard/student')
-    }
-  }, [user, loading, router])
+    if (!loading && !user) router.push('/login')
+    if (user && user.role !== 'superadmin') router.push('/dashboard/student')
+  }, [user, loading])
 
   if (loading) {
     return (
@@ -33,32 +30,23 @@ export default function MonthlyReportsPage() {  // ← Assure-toi d'avoir "expor
     <div className="min-h-screen relative" style={{ fontFamily: "'Crimson Text', Georgia, serif" }}>
       <div className="fixed inset-0 bg-cover bg-center z-0" style={{ backgroundImage: "url('/ok.png')" }} />
       <div className="fixed inset-0 z-10" style={{ background: 'linear-gradient(135deg, rgba(8,20,90,0.94) 0%, rgba(15,45,130,0.9) 40%, rgba(10,30,100,0.92) 70%, rgba(4,12,65,0.96) 100%)' }} />
-      <div className="fixed w-[300px] h-[300px] rounded-full bg-blue-400/10 blur-[100px] -top-[50px] -right-[50px] z-20 pointer-events-none" />
       
       <div className="relative z-30">
         <div className="bg-[rgba(5,15,70,0.6)] backdrop-blur-2xl border-b border-white/[0.08] sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push('/dashboard/superadmin')}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              >
-                <ArrowLeftIcon className="w-5 h-5 text-white/60 hover:text-white" />
+              <button onClick={() => router.push('/dashboard/superadmin')} className="p-2 hover:bg-white/10 rounded-lg">
+                <ArrowLeftIcon className="w-5 h-5 text-white/60" />
               </button>
-              <div>
-                <h1 className="text-2xl font-normal text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  📊 Rapports mensuels de présence
-                </h1>
-                <p className="text-blue-200/50 text-xs mt-1">
-                  Analyse détaillée de la participation académique par mois
-                </p>
-              </div>
+              <h1 className="text-2xl font-normal text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
+                🎓 Gestion des promotions
+              </h1>
             </div>
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <MonthlyReports />
+          <PromotionManager />
         </div>
       </div>
     </div>

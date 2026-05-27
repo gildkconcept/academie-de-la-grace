@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 import { LoginIntro } from '@/components/auth/LoginIntro'
+import { authService } from '@/services/authService'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -14,24 +15,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [showIntro, setShowIntro] = useState(false)
   const [userData, setUserData] = useState<{ name: string; role: string; level?: number } | null>(null)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username, password })
-      })
-
-      const data = await res.json()
-
-      if (res.ok) {
-        console.log('Données utilisateur reçues:', data.user) // Vérification
-        // Stocker les données utilisateur
+      const data = await authService.login({ username, password })
+      
+      if (data.success) {
+        console.log('Données utilisateur reçues:', data.user)
         setUserData({
           name: data.user.name || data.user.username,
           role: data.user.role,
@@ -44,7 +38,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error('Erreur de connexion:', error)
-      toast.error('Une erreur est survenue')
+      toast.error('Impossible de se connecter au serveur')
       setLoading(false)
     }
   }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { ClipboardIcon, ShareIcon, HeartIcon } from '@heroicons/react/24/outline'
+import { verseService } from '@/services/verseService'
 
 interface DailyVerse {
   id: string
@@ -24,9 +25,8 @@ export const DailyVerseCard = () => {
 
   const fetchDailyVerse = async () => {
     try {
-      const res = await fetch('/api/daily-verse', { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok && data.verse) {
+      const data = await verseService.getToday()
+      if (data.verse) {
         setVerse(data.verse)
       }
     } catch (error) {

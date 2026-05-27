@@ -1,62 +1,43 @@
-// services/authService.ts
+import axiosInstance from '../app/../lib/axios';
 import { LoginInput, RegisterInput } from '@/lib/validators'
 
 export const authService = {
   async login(data: LoginInput) {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data)
-    })
-    return res.json()
+  
+    const response = await axiosInstance.post('/auth/login', data);
+    if (response.data.success) {
+      localStorage.setItem('token', response.data.token);
+    }
+    return response.data;
   },
 
   async register(data: RegisterInput) {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-    return res.json()
+    const response = await axiosInstance.post('/auth/register', data);
+    return response.data;
   },
 
   async verify() {
-    const res = await fetch('/api/auth/verify', {
-      credentials: 'include'
-    })
-    return res.json()
+    const response = await axiosInstance.get('/auth/verify');
+    return response.data;
   },
 
   async logout() {
-    const res = await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include'
-    })
-    return res.json()
+    localStorage.removeItem('token');
+    return { success: true };
   },
 
   async checkUsername(username: string) {
-    const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(username)}`)
-    return res.json()
+    const response = await axiosInstance.get(`/auth/check-username?username=${encodeURIComponent(username)}`);
+    return response.data;
   },
 
   async verifyRecovery(data: { phone: string; fullName: string; branch: string; serviceId: string }) {
-    const res = await fetch('/api/auth/verify-recovery', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-    return res.json()
+    const response = await axiosInstance.post('/auth/verify-recovery', data);
+    return response.data;
   },
 
   async resetAccount(data: { recoveryToken: string; newUsername: string; newPassword: string }) {
-    const res = await fetch('/api/auth/reset-account', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data)
-    })
-    return res.json()
+    const response = await axiosInstance.post('/auth/reset-account', data);
+    return response.data;
   }
-}
+};

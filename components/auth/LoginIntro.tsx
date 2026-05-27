@@ -19,7 +19,6 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
   const [verse, setVerse] = useState<{ text: string; reference: string } | null>(null)
   const [loadingVerse, setLoadingVerse] = useState(true)
 
-  // Vérification de sécurité : si userData est undefined, rediriger
   useEffect(() => {
     if (!userData || !userData.name) {
       console.error('userData is undefined, redirecting to login')
@@ -36,10 +35,10 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
     
     setGreeting(greetingText)
     
-    // Récupérer le verset du jour depuis l'API
     const fetchVerse = async () => {
       try {
-        const res = await fetch('/api/daily-verse', { credentials: 'include' })
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        const res = await fetch(`${API_URL}/api/verses/today`, { credentials: 'include' })
         const data = await res.json()
         if (data.verse) {
           setVerse({
@@ -47,7 +46,6 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
             reference: data.verse.reference
           })
         } else {
-          // Verset par défaut : Romains 5:17
           setVerse({
             text: "Si par l'offense d'un seul la mort a régné par lui seul, à plus forte raison ceux qui reçoivent l'abondance de la grâce et du don de la justice régneront-ils dans la vie par Jésus-Christ lui seul.",
             reference: "Romains 5:17"
@@ -55,7 +53,6 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
         }
       } catch (error) {
         console.error('Erreur chargement verset:', error)
-        // Verset par défaut en cas d'erreur : Romains 5:17
         setVerse({
           text: "Si par l'offense d'un seul la mort a régné par lui seul, à plus forte raison ceux qui reçoivent l'abondance de la grâce et du don de la justice régneront-ils dans la vie par Jésus-Christ lui seul.",
           reference: "Romains 5:17"
@@ -67,20 +64,31 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
     
     fetchVerse()
     
-    // Timing adapté (un peu plus rapide sur mobile)
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
-    const delay1 = isMobile ? 3000 : 3000
-    const delay2 = isMobile ? 5000 : 5000
-    const delay3 = isMobile ? 3500 : 4000
+    // Délais plus courts pour tester
+    const delay1 = 2000  // 2 secondes pour greeting
+    const delay2 = 3000  // 3 secondes pour verse
+    const delay3 = 4000  // 4 secondes pour complete
     
-    const t1 = setTimeout(() => setStep('verse'), delay1)
-    const t2 = setTimeout(() => setStep('complete'), delay2)
+    const t1 = setTimeout(() => {
+      console.log('🟢 Étape 1: passage à verse')
+      setStep('verse')
+    }, delay1)
+    
+    const t2 = setTimeout(() => {
+      console.log('🟢 Étape 2: passage à complete')
+      setStep('complete')
+    }, delay2)
+    
     const t3 = setTimeout(() => {
+      console.log('🔴 REDIRECTION - Rôle:', userData?.role)
       if (userData?.role === 'superadmin') {
+        console.log('👉 Redirection vers /dashboard/superadmin')
         router.push('/dashboard/superadmin')
       } else if (userData?.role === 'service_manager') {
+        console.log('👉 Redirection vers /dashboard/manager')
         router.push('/dashboard/manager')
       } else {
+        console.log('👉 Redirection vers /dashboard/student')
         router.push('/dashboard/student')
       }
     }, delay3)
@@ -92,12 +100,10 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
     }
   }, [userData, router])
 
-  // Si userData est undefined, ne rien afficher (la redirection va avoir lieu)
   if (!userData || !userData.name) {
     return null
   }
 
-  // Attendre que le verset soit chargé
   if (loadingVerse) {
     return null
   }
@@ -118,7 +124,6 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
     return `Niveau ${userData?.level || 1}`
   }
 
-  // Extraire le prénom en toute sécurité
   const firstName = userData?.name ? userData.name.split(' ')[0] : ''
 
   return (
@@ -130,25 +135,20 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
         className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden"
         style={{ fontFamily: "'Crimson Text', Georgia, serif" }}
       >
-        {/* Fond */}
         <div className="absolute inset-0 bg-cover bg-center scale-110" style={{ backgroundImage: "url('/ok.png')" }} />
         <div className="absolute inset-0" style={{ 
           background: 'linear-gradient(135deg, rgba(8,20,90,0.96) 0%, rgba(15,45,130,0.93) 40%, rgba(10,30,100,0.94) 70%, rgba(4,12,65,0.97) 100%)' 
         }} />
         
-        {/* Orbes - Masquées sur mobile pour performance */}
         <div className="hidden md:block absolute w-[300px] h-[300px] rounded-full bg-blue-400/10 blur-[100px] -top-[100px] -right-[100px] animate-float" />
         <div className="hidden md:block absolute w-[250px] h-[250px] rounded-full bg-blue-500/8 blur-[100px] bottom-[10%] -left-[100px] animate-float-delayed" />
         <div className="hidden md:block absolute w-[200px] h-[200px] rounded-full bg-indigo-400/8 blur-[80px] top-[40%] left-[20%] animate-float-slow" />
 
-        {/* Orbes simplifiées pour mobile */}
         <div className="md:hidden absolute w-[150px] h-[150px] rounded-full bg-blue-400/10 blur-[60px] -top-[50px] -right-[50px]" />
         <div className="md:hidden absolute w-[120px] h-[120px] rounded-full bg-blue-500/8 blur-[60px] bottom-[5%] -left-[50px]" />
 
-        {/* Contenu principal - Responsive */}
         <div className="relative z-10 text-center px-6 sm:px-4 max-w-2xl mx-auto w-full">
           
-          {/* Étape 1 : Message de bienvenue */}
           {step === 'greeting' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -176,7 +176,6 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
             </motion.div>
           )}
 
-          {/* Étape 2 : Verset (Romains 5:17) */}
           {step === 'verse' && (
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -200,7 +199,6 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
             </motion.div>
           )}
 
-          {/* Étape 3 : Loader élégant */}
           {step === 'complete' && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -209,16 +207,13 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
               className="flex flex-col items-center justify-center min-h-[60vh] md:min-h-0"
             >
               <div className="relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 mx-auto">
-                {/* Cercle extérieur */}
                 <div className="absolute inset-0 rounded-full border-2 border-white/10" />
-                {/* Cercle animé */}
                 <motion.div
                   className="absolute inset-0 rounded-full border-2 border-blue-400/50"
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
                   style={{ borderTopColor: 'transparent', borderRightColor: 'transparent' }}
                 />
-                {/* Orb central */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 bg-blue-400 rounded-full animate-pulse" />
                 </div>
@@ -228,7 +223,6 @@ export const LoginIntro = ({ userData }: LoginIntroProps) => {
           )}
         </div>
 
-        {/* Barre de progression responsive */}
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/5">
           <motion.div
             className="h-full bg-gradient-to-r from-blue-400 via-indigo-400 to-blue-400"

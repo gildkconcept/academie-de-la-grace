@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { EyeIcon, MagnifyingGlassIcon, XMarkIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline'
-import { supabase } from '@/lib/supabase'
+import { attendanceService } from '@/services/attendanceService'
+import { serviceService } from '@/services/serviceService'
 
 export const ServiceHistoryDetail = () => {
   const [sessions, setSessions] = useState<any[]>([])
@@ -21,42 +22,43 @@ export const ServiceHistoryDetail = () => {
   const [activeTab, setActiveTab] = useState<'history' | 'stats'>('history')
   const limit = 20
 
-  useEffect(() => { fetchData(); fetchServices() }, [page, selectedService, selectedType, startDate, endDate])
+  useEffect(() => { 
+    fetchData()
+    fetchServices() 
+  }, [page, selectedService, selectedType, startDate, endDate])
 
   const fetchServices = async () => {
-    const { data } = await supabase.from('services').select('id, name').order('name')
-    if (data) setServices(data)
+    try {
+      const data = await serviceService.getAll()
+      setServices(data)
+    } catch (error) {
+      console.error('Erreur chargement services:', error)
+    }
   }
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      const offset = page * limit
-      let url = `/api/service-sessions/history?limit=${limit}&offset=${offset}`
-      if (selectedService !== 'all') url += `&serviceId=${selectedService}`
-      if (selectedType !== 'all') url += `&type=${selectedType}`
-      if (startDate) url += `&startDate=${startDate}`
-      if (endDate) url += `&endDate=${endDate}`
-
-      const res = await fetch(url, { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok) {
-        setSessions(data.sessions || [])
-        setStats(data.stats || {})
-      }
-    } catch (error) { toast.error('Erreur réseau') }
-    finally { setLoading(false) }
+      const data = await attendanceService.getServiceSessionsHistory(limit, page * limit)
+      setSessions(data.sessions || [])
+      setStats(data.stats || {})
+    } catch (error) {
+      console.error('Erreur fetchData:', error)
+      toast.error('Erreur chargement historique')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const viewDetail = async (session: any) => {
     try {
-      const res = await fetch(`/api/service/session/get?sessionId=${session.id}`, { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok) {
-        setShowDetail(data.session || session)
-        setDetailStudents(data.students || [])
-      }
-    } catch (error) { toast.error('Erreur réseau') }
+      const data = await attendanceService.getSessionStudents(session.id)
+      setShowDetail(data.session || session)
+      setDetailStudents(data.students || [])
+    } catch (error) {
+      console.error('Erreur viewDetail:', error)
+      toast.error('Erreur chargement détails')
+    }
   }
 
   const exportPDF = async (session: any) => {
@@ -64,8 +66,10 @@ export const ServiceHistoryDetail = () => {
       const { jsPDF } = await import('jspdf')
       const autoTable = (await import('jspdf-autotable')).default
       const doc = new jsPDF()
-      doc.setFontSize(20); doc.text('Académie de la Grâce', 105, 15, { align: 'center' })
-      doc.setFontSize(16); doc.text('Rapport de séance', 105, 25, { align: 'center' })
+      doc.setFontSize(20)
+      doc.text('Académie de la Grâce', 105, 15, { align: 'center' })
+      doc.setFontSize(16)
+      doc.text('Rapport de séance', 105, 25, { align: 'center' })
       doc.setFontSize(12)
       doc.text(`Date: ${new Date(session.date).toLocaleDateString('fr-FR')}`, 105, 35, { align: 'center' })
       doc.text(`Service: ${session.service?.name || ''}`, 105, 42, { align: 'center' })
@@ -73,7 +77,10 @@ export const ServiceHistoryDetail = () => {
       doc.text(`Présents: ${session.stats?.present || 0} / ${session.stats?.total || 0}`, 105, 56, { align: 'center' })
       doc.save(`seance_${session.date}_${session.id.slice(0, 8)}.pdf`)
       toast.success('PDF généré')
-    } catch (error) { toast.error('Erreur PDF') }
+    } catch (error) { 
+      console.error('Erreur PDF:', error)
+      toast.error('Erreur génération PDF') 
+    }
   }
 
   const filteredSessions = sessions.filter(session => {
@@ -96,12 +103,16 @@ export const ServiceHistoryDetail = () => {
     <div className="space-y-6">
       {/* Onglets */}
       <div className="flex gap-4 border-b border-white/[0.08]">
-        <button onClick={() => setActiveTab('history')}
-          className={`pb-2 px-4 text-sm transition-colors ${activeTab === 'history' ? 'border-b-2 border-white text-white font-medium' : 'text-white/50 hover:text-white/80'}`}>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`pb-2 px-4 text-sm transition-colors ${activeTab === 'history' ? 'border-b-2 border-white text-white font-medium' : 'text-white/50 hover:text-white/80'}`}
+        >
           📋 Historique
         </button>
-        <button onClick={() => setActiveTab('stats')}
-          className={`pb-2 px-4 text-sm transition-colors ${activeTab === 'stats' ? 'border-b-2 border-white text-white font-medium' : 'text-white/50 hover:text-white/80'}`}>
+        <button
+          onClick={() => setActiveTab('stats')}
+          className={`pb-2 px-4 text-sm transition-colors ${activeTab === 'stats' ? 'border-b-2 border-white text-white font-medium' : 'text-white/50 hover:text-white/80'}`}
+        >
           📊 Statistiques
         </button>
       </div>
@@ -129,9 +140,13 @@ export const ServiceHistoryDetail = () => {
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex-1 relative">
               <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" placeholder="Rechercher..." value={searchTerm}
+              <input
+                type="text"
+                placeholder="Rechercher..."
+                value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 p-2 bg-white/90 border border-white/30 rounded-lg text-gray-900 text-sm" />
+                className="w-full pl-10 p-2 bg-white/90 border border-white/30 rounded-lg text-gray-900 text-sm"
+              />
             </div>
           </div>
 
@@ -152,7 +167,7 @@ export const ServiceHistoryDetail = () => {
 
           <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl overflow-hidden">
             <table className="min-w-full">
-              <thead>
+              <thead className="bg-white/[0.04]">
                 <tr>
                   {['Date', 'Service', 'Type', 'Présents', 'Absents', 'Total', 'Taux', 'Actions'].map(h => (
                     <th key={h} className="px-4 py-2 text-left text-xs text-white/40">{h}</th>
@@ -175,8 +190,12 @@ export const ServiceHistoryDetail = () => {
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex gap-1">
-                        <button onClick={() => viewDetail(session)} className="p-1.5 text-blue-300 hover:text-blue-200 hover:bg-white/10 rounded-lg"><EyeIcon className="w-4 h-4" /></button>
-                        <button onClick={() => exportPDF(session)} className="p-1.5 text-green-300 hover:text-green-200 hover:bg-white/10 rounded-lg"><DocumentArrowDownIcon className="w-4 h-4" /></button>
+                        <button onClick={() => viewDetail(session)} className="p-1.5 text-blue-300 hover:text-blue-200 hover:bg-white/10 rounded-lg">
+                          <EyeIcon className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => exportPDF(session)} className="p-1.5 text-green-300 hover:text-green-200 hover:bg-white/10 rounded-lg">
+                          <DocumentArrowDownIcon className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -196,23 +215,47 @@ export const ServiceHistoryDetail = () => {
                 <h3 className="text-white font-medium">Séance du {new Date(showDetail.date).toLocaleDateString('fr-FR')}</h3>
                 <p className="text-white/50 text-xs">{showDetail.service?.name || ''} - {showDetail.session_types?.label || showDetail.type || ''}</p>
               </div>
-              <button onClick={() => setShowDetail(null)} className="text-white/50 hover:text-white"><XMarkIcon className="w-5 h-5" /></button>
+              <button onClick={() => setShowDetail(null)} className="text-white/50 hover:text-white">
+                <XMarkIcon className="w-5 h-5" />
+              </button>
             </div>
             <div className="p-4">
               <div className="grid grid-cols-4 gap-3 mb-4">
-                <div className="bg-white/[0.04] rounded-lg p-2 text-center"><div className="text-lg font-bold text-white">{detailStudents.length}</div><div className="text-xs text-white/40">Total</div></div>
-                <div className="bg-green-500/10 rounded-lg p-2 text-center"><div className="text-lg font-bold text-green-300">{detailStudents.filter((s: any) => s.status === 'present').length}</div><div className="text-xs text-white/40">Présents</div></div>
-                <div className="bg-red-500/10 rounded-lg p-2 text-center"><div className="text-lg font-bold text-red-300">{detailStudents.filter((s: any) => s.status === 'absent').length}</div><div className="text-xs text-white/40">Absents</div></div>
-                <div className="bg-blue-500/10 rounded-lg p-2 text-center"><div className="text-lg font-bold text-blue-300">{detailStudents.length > 0 ? Math.round((detailStudents.filter((s: any) => s.status === 'present').length / detailStudents.length) * 100) : 0}%</div><div className="text-xs text-white/40">Taux</div></div>
+                <div className="bg-white/[0.04] rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold text-white">{detailStudents.length}</div>
+                  <div className="text-xs text-white/40">Total</div>
+                </div>
+                <div className="bg-green-500/10 rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold text-green-300">{detailStudents.filter((s: any) => s.status === 'present').length}</div>
+                  <div className="text-xs text-white/40">Présents</div>
+                </div>
+                <div className="bg-red-500/10 rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold text-red-300">{detailStudents.filter((s: any) => s.status === 'absent').length}</div>
+                  <div className="text-xs text-white/40">Absents</div>
+                </div>
+                <div className="bg-blue-500/10 rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold text-blue-300">{detailStudents.length > 0 ? Math.round((detailStudents.filter((s: any) => s.status === 'present').length / detailStudents.length) * 100) : 0}%</div>
+                  <div className="text-xs text-white/40">Taux</div>
+                </div>
               </div>
               <table className="min-w-full">
-                <thead className="bg-white/[0.04]"><tr>{['Nom','Tél','Statut','Méthode'].map(h => <th key={h} className="px-4 py-2 text-left text-xs text-white/40">{h}</th>)}</tr></thead>
+                <thead className="bg-white/[0.04]">
+                  <tr>
+                    {['Nom', 'Tél', 'Statut', 'Méthode'].map(h => (
+                      <th key={h} className="px-4 py-2 text-left text-xs text-white/40">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody className="divide-y divide-white/[0.04]">
                   {detailStudents.map((s: any) => (
                     <tr key={s.id}>
                       <td className="px-4 py-2 text-sm text-white/80">{s.name}</td>
                       <td className="px-4 py-2 text-xs text-white/50">{s.phone || '-'}</td>
-                      <td className="px-4 py-2"><span className={`px-2 py-0.5 text-xs rounded-full ${s.status === 'present' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>{s.status === 'present' ? 'Présent' : 'Absent'}</span></td>
+                      <td className="px-4 py-2">
+                        <span className={`px-2 py-0.5 text-xs rounded-full ${s.status === 'present' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+                          {s.status === 'present' ? 'Présent' : 'Absent'}
+                        </span>
+                      </td>
                       <td className="px-4 py-2 text-xs text-white/40">{s.method === 'code' ? '📱 Code' : s.method === 'manual' ? '✍️ Manuel' : '-'}</td>
                     </tr>
                   ))}

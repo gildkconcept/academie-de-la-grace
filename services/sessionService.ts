@@ -1,20 +1,23 @@
-// services/sessionService.ts
+import axiosInstance from '@/lib/axios';
 
 export const sessionService = {
-  async getTypes() {
-    const res = await fetch('/api/session-types', { credentials: 'include' })
-    return res.json()
+  async generateCode(lat?: number, lng?: number, radius?: number, level?: number | null) {
+    const response = await axiosInstance.post('/sessions/generate', { lat, lng, radius, level });
+    return response.data;
   },
 
-  async getAllSessions() {
-    const res = await fetch('/api/service/session/all', { credentials: 'include' })
-    return res.json()
+  async verifyCode(code: string, lat?: number, lng?: number) {
+    const response = await axiosInstance.post('/sessions/verify', { code, lat, lng });
+    return response.data;
   },
 
-  async getAttendance(sessionId: string) {
-    const res = await fetch(`/api/service/session/get?sessionId=${sessionId}`, {
-      credentials: 'include'
-    })
-    return res.json()
-  }
-}
+  async getActiveSessions() {
+    const response = await axiosInstance.get('/sessions/active');
+    return response.data;
+  },
+
+  async markAbsent(sessionId: string) {
+    const response = await axiosInstance.post('/sessions/mark-absent', { sessionId });
+    return response.data;
+  },
+};
