@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
 import { cookies } from 'next/headers'
+import { createNotification } from '@/lib/notifications'
 
 export async function PUT(
   request: Request,
@@ -22,7 +23,7 @@ export async function PUT(
     }
 
     const { id: studentId } = await params
-    const { level } = await request.json()
+    const { level, reason } = await request.json()
 
     // Validation du niveau
     const newLevel = parseInt(level)
@@ -33,10 +34,18 @@ export async function PUT(
       )
     }
 
-    // Récupérer l'étudiant
+    // ✅ Vérifier que seul le superadmin peut modifier les niveaux
+    if (currentUser.role !== 'superadmin') {
+      return NextResponse.json(
+        { error: 'Accès refusé. Seul le Super Admin peut modifier les niveaux.' },
+        { status: 403 }
+      )
+    }
+
+    // Récupérer l'étudiant avec plus d'informations
     const { data: student, error: fetchError } = await supabase
       .from('students')
-      .select('id, service_id, level')
+      .select('id, service_id, level, full_name, email')
       .eq('id', studentId)
       .is('deleted_at', null)
       .single()
@@ -45,24 +54,6 @@ export async function PUT(
       return NextResponse.json(
         { error: 'Étudiant non trouvé' },
         { status: 404 }
-      )
-    }
-
-    // Vérification des droits
-    if (currentUser.role === 'superadmin') {
-      // Superadmin peut tout modifier
-    } else if (currentUser.role === 'service_manager') {
-      // Le responsable ne peut modifier que les étudiants de son service
-      if (student.service_id !== currentUser.serviceId) {
-        return NextResponse.json(
-          { error: 'Accès refusé : vous ne pouvez modifier que les étudiants de votre service' },
-          { status: 403 }
-        )
-      }
-    } else {
-      return NextResponse.json(
-        { error: 'Accès refusé : droits insuffisants' },
-        { status: 403 }
       )
     }
 
@@ -76,10 +67,13 @@ export async function PUT(
       })
     }
 
-    // Mettre à jour le niveau
+    // Mettre à jour le niveau avec la date de mise à jour
     const { error: updateError } = await supabase
       .from('students')
-      .update({ level: newLevel })
+      .update({ 
+        level: newLevel,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', studentId)
 
     if (updateError) {
@@ -90,25 +84,51 @@ export async function PUT(
       )
     }
 
-    // Enregistrer l'historique
+    // ✅ Enregistrer l'historique avec la raison
     const { error: historyError } = await supabase
       .from('student_level_history')
       .insert({
         student_id: studentId,
         old_level: oldLevel,
         new_level: newLevel,
-        changed_by: currentUser.id
+        changed_by: currentUser.id,
+        reason: reason || `Promotion manuelle par ${currentUser.name || currentUser.username}`
       })
 
     if (historyError) {
       console.error('Erreur historique:', historyError)
     }
 
+    // ✅ Envoyer une notification à l'étudiant
+    const notificationResult = await createNotification({
+      userIds: studentId,
+      title: oldLevel < newLevel ? '🎉 Félicitations ! Promotion académique' : '📚 Changement de niveau académique',
+      message: oldLevel < newLevel 
+        ? `Félicitations ! Vous êtes passé(e) du Niveau ${oldLevel} au Niveau ${newLevel}. Continuez vos efforts !`
+        : `Votre niveau a été ajusté du Niveau ${oldLevel} au Niveau ${newLevel}.`,
+      type: 'promotion',
+      link: '/dashboard/student'
+    })
+
+    // ✅ Recalculer le classement (optionnel - si la fonction existe)
+    try {
+      await supabase.rpc('calculate_fair_ranking')
+    } catch (rpcError) {
+      console.log('Note: calculate_fair_ranking non disponible, classement mis à jour au prochain calcul')
+    }
+
+    console.log(`✅ Niveau changé pour ${student.full_name}: ${oldLevel} → ${newLevel}`)
+    if (notificationResult.created > 0) {
+      console.log(`📧 Notification envoyée à l'étudiant`)
+    }
+
     return NextResponse.json({
       success: true,
       message: `Niveau changé de ${oldLevel} à ${newLevel}`,
       oldLevel,
-      newLevel
+      newLevel,
+      studentName: student.full_name,
+      notificationSent: notificationResult.created > 0
     })
   } catch (error) {
     console.error('Erreur:', error)
