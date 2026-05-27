@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { verifyToken } from '@/lib/auth'
 import { cookies } from 'next/headers'
 
-// GET - Récupérer les étudiants sans téléphone
+// GET - Récupérer les étudiants sans téléphone (filtrés par niveau)
 export async function GET(request: Request) {
   try {
     const cookieStore = await cookies()
@@ -22,6 +22,20 @@ export async function GET(request: Request) {
     const serviceId = searchParams.get('serviceId')
     const sessionId = searchParams.get('sessionId')
 
+    // ✅ Récupérer la session et son niveau
+    let sessionLevel = null
+    if (sessionId) {
+      const { data: session } = await supabase
+        .from('sessions')
+        .select('level')
+        .eq('id', sessionId)
+        .single()
+      
+      if (session) {
+        sessionLevel = session.level
+      }
+    }
+
     // Récupérer les étudiants sans téléphone
     let query = supabase
       .from('students')
@@ -30,8 +44,14 @@ export async function GET(request: Request) {
       .is('deleted_at', null)
       .order('full_name')
 
+    // ✅ Filtrer par service si demandé
     if (serviceId && serviceId !== 'all') {
       query = query.eq('service_id', serviceId)
+    }
+
+    // ✅ Filtrer par niveau si la session a un niveau spécifique
+    if (sessionLevel !== null) {
+      query = query.eq('level', sessionLevel)
     }
 
     const { data: students, error } = await query
@@ -64,7 +84,7 @@ export async function GET(request: Request) {
   }
 }
 
-// POST - Marquer les présences assistées
+// POST - Marquer les présences assistées (avec vérification niveau)
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies()
@@ -85,10 +105,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
     }
 
-    // Vérifier que la session existe
+    // ✅ Vérifier que la session existe et récupérer son niveau
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .select('id, date')
+      .select('id, date, level')
       .eq('id', sessionId)
       .single()
 
@@ -96,8 +116,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Session non trouvée' }, { status: 404 })
     }
 
+    // ✅ Récupérer les IDs des étudiants autorisés (selon niveau de la session)
+    let studentsQuery = supabase
+      .from('students')
+      .select('id')
+      .eq('has_phone', false)
+      .is('deleted_at', null)
+
+    // ✅ Si la session a un niveau spécifique, filtrer par ce niveau
+    if (session.level !== null) {
+      studentsQuery = studentsQuery.eq('level', session.level)
+    }
+
+    const { data: authorizedStudents } = await studentsQuery
+    const authorizedIds = new Set(authorizedStudents?.map(s => s.id) || [])
+
+    // ✅ Filtrer les présences pour ne garder que les étudiants autorisés
+    const validAttendances = attendances.filter((a: any) => authorizedIds.has(a.studentId))
+
+    if (validAttendances.length === 0) {
+      return NextResponse.json({ 
+        error: 'Aucun étudiant autorisé pour cette session (vérifiez le niveau)' 
+      }, { status: 400 })
+    }
+
+    // Si des étudiants non autorisés ont été exclus, afficher un avertissement
+    const excludedCount = attendances.length - validAttendances.length
+    if (excludedCount > 0) {
+      console.log(`⚠️ ${excludedCount} étudiant(s) exclus car niveau incorrect pour cette session`)
+    }
+
     // Préparer les enregistrements
-    const records = attendances.map((att: any) => ({
+    const records = validAttendances.map((att: any) => ({
       student_id: att.studentId,
       session_id: sessionId,
       status: att.status,
@@ -117,9 +167,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erreur lors de l\'enregistrement' }, { status: 500 })
     }
 
+    const message = excludedCount > 0 
+      ? `${validAttendances.length} présence(s) enregistrée(s) (${excludedCount} étudiant(s) exclus niveau incorrect)`
+      : `${validAttendances.length} présence(s) enregistrée(s)`
+
     return NextResponse.json({
       success: true,
-      message: `${records.length} présence(s) enregistrée(s)`
+      message,
+      validCount: validAttendances.length,
+      excludedCount
     })
   } catch (error) {
     console.error('Erreur:', error)
