@@ -50,7 +50,8 @@ export function useLiveStatus() {
 
   useEffect(() => {
     sendHeartbeat()
-    const interval = setInterval(sendHeartbeat, 30000)
+    // ✅ MODIFICATION ICI : 30 secondes → 120 secondes (2 minutes)
+    const interval = setInterval(sendHeartbeat, 120000)
     return () => clearInterval(interval)
   }, [sendHeartbeat])
 
