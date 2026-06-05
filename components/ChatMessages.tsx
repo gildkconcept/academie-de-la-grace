@@ -94,7 +94,7 @@ export const ChatMessages = ({
   useEffect(() => {
     fetchMessages()
     markMessagesAsRead()
-    const interval = setInterval(fetchMessages, 5000)
+    const interval = setInterval(fetchMessages,30000)
     return () => clearInterval(interval)
   }, [groupId])
 

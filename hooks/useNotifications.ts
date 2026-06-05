@@ -15,8 +15,8 @@ export function useNotifications() {
 
   useEffect(() => {
     fetchNotifications()
-    // ✅ MODIFICATION : 30 secondes → 60 secondes
-    const interval = setInterval(() => fetchNotifications(), 60000)
+    // ✅ Notifications toutes les 3 minutes (180000 ms) au lieu de 30 secondes
+    const interval = setInterval(() => fetchNotifications(), 180000)
     return () => clearInterval(interval)
   }, [fetchNotifications])
 

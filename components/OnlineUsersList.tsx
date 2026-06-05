@@ -89,7 +89,7 @@ export const OnlineUsersList = () => {
       .subscribe()
     
     // Rafraîchissement toutes les 10 secondes
-    const interval = setInterval(fetchData, 10000)
+    const interval = setInterval(fetchData, 60000)
     
     return () => {
       channel.unsubscribe()

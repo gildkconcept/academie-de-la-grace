@@ -18,7 +18,7 @@ export function useLiveStatus() {
     return () => clearInterval(interval)
   }, [])
 
-  // Heartbeat toutes les 30 secondes
+  // Heartbeat toutes les 5 minutes (300 secondes)
   const sendHeartbeat = useCallback(async () => {
     try {
       // Déterminer la page actuelle
@@ -50,8 +50,8 @@ export function useLiveStatus() {
 
   useEffect(() => {
     sendHeartbeat()
-    // ✅ MODIFICATION ICI : 30 secondes → 120 secondes (2 minutes)
-    const interval = setInterval(sendHeartbeat, 120000)
+    // ✅ Heartbeat toutes les 5 minutes (300000 ms) au lieu de 30 secondes
+    const interval = setInterval(sendHeartbeat, 300000)
     return () => clearInterval(interval)
   }, [sendHeartbeat])
 
