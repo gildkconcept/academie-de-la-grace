@@ -35,52 +35,62 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Image trop volumineuse (max 5 MB)' }, { status: 400 })
     }
 
-    console.log('📸 UPLOAD PHOTO - userId:', user.id)
-    console.log('📸 UPLOAD PHOTO - file:', { name: file.name, type: file.type, size: file.size })
+    console.log('📸 Upload photo - userId:', user.id)
+    console.log('📸 Upload photo - file:', { name: file.name, type: file.type, size: file.size })
 
-    // Upload
+    // Générer un nom unique pour éviter les conflits
+    const timestamp = Date.now()
     const fileExt = file.name.split('.').pop()
-    const fileName = `${user.id}/profile.${fileExt}`
+    const fileName = `${user.id}/profile_${timestamp}.${fileExt}`
 
-    // Supprimer l'ancienne photo si elle existe
-    const exts = ['jpg', 'jpeg', 'png', 'webp']
-    const oldFiles = exts.map(ext => `${user.id}/profile.${ext}`)
-    await supabase.storage.from('student-profiles').remove(oldFiles)
-
-    const { error } = await supabase.storage
+    // ✅ SUPPRIMER L'ANCIENNE PHOTO (chercher tous les formats)
+    const { data: oldFiles } = await supabase.storage
       .from('student-profiles')
-      .upload(fileName, file, { upsert: true })
+      .list(user.id)
 
-    if (error) {
-      console.error('📸 UPLOAD PHOTO - Erreur Supabase:', error)
-      return NextResponse.json({ error: 'Erreur upload' }, { status: 500 })
+    if (oldFiles && oldFiles.length > 0) {
+      const oldPaths = oldFiles.map(f => `${user.id}/${f.name}`)
+      await supabase.storage.from('student-profiles').remove(oldPaths)
+      console.log('🗑️ Anciennes photos supprimées:', oldPaths)
+    }
+
+    // Upload nouvelle photo
+    const { error: uploadError } = await supabase.storage
+      .from('student-profiles')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: true  // ← Permet de remplacer si même nom
+      })
+
+    if (uploadError) {
+      console.error('❌ Erreur upload:', uploadError)
+      return NextResponse.json({ error: uploadError.message }, { status: 500 })
     }
 
     const { data: urlData } = supabase.storage
       .from('student-profiles')
       .getPublicUrl(fileName)
 
-    console.log('📸 UPLOAD PHOTO - url:', urlData.publicUrl)
+    console.log('✅ URL publique:', urlData.publicUrl)
 
-    // Mettre à jour dans la base
+    // Mettre à jour la base
     const table = (user.role === 'superadmin' || user.role === 'service_manager') ? 'users' : 'students'
     
-    console.log('📸 UPLOAD PHOTO - updateData:', { table, userId: user.id, profile_image_url: urlData.publicUrl })
-
     const { error: updateError } = await supabase
       .from(table)
       .update({ profile_image_url: urlData.publicUrl })
       .eq('id', user.id)
 
     if (updateError) {
-      console.error('📸 UPLOAD PHOTO - Erreur update base:', updateError)
+      console.error('❌ Erreur mise à jour base:', updateError)
       return NextResponse.json({ error: 'Erreur mise à jour profil' }, { status: 500 })
     }
 
-    console.log('📸 UPLOAD PHOTO - ✅ Succès !')
+    console.log('✅ Photo mise à jour avec succès !')
     return NextResponse.json({ url: urlData.publicUrl, message: 'Photo mise à jour' })
+    
   } catch (error) {
-    console.error('📸 UPLOAD PHOTO - Erreur globale:', error)
+    console.error('❌ Erreur globale:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }
