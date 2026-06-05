@@ -1,3 +1,4 @@
+// app/api/auth/verify/route.ts
 import { NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
@@ -5,7 +6,6 @@ import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   try {
-    // ✅ Utiliser cookies() de next/headers
     const cookieStore = await cookies()
     const token = cookieStore.get('token')?.value
     
@@ -21,10 +21,6 @@ export async function GET(request: Request) {
       return response
     }
 
-    // ... le reste du code est identique ...
-
-    console.log('🔍 Token décodé:', decoded)
-
     let userData = null
     
     if (decoded.role === 'superadmin' || decoded.role === 'service_manager') {
@@ -34,9 +30,8 @@ export async function GET(request: Request) {
         .eq('id', decoded.id)
         .maybeSingle()
       userData = data
-      console.log('👤 Utilisateur admin trouvé:', userData)
+      
     } else if (decoded.role === 'student') {
-      // Tentative 1 : Recherche par ID (ajout de profile_image_url)
       let { data } = await supabase
         .from('students')
         .select('id, full_name, username, service_id, level, email, phone, deleted_at, maison_grace, profile_image_url')
@@ -44,9 +39,7 @@ export async function GET(request: Request) {
         .is('deleted_at', null)
         .maybeSingle()
       
-      // Tentative 2 : Si non trouvé par ID, rechercher par username
       if (!data && decoded.username) {
-        console.log('🔍 Étudiant non trouvé par ID, recherche par username:', decoded.username)
         const { data: byUsername } = await supabase
           .from('students')
           .select('id, full_name, username, service_id, level, email, phone, deleted_at, maison_grace, profile_image_url')
@@ -54,18 +47,11 @@ export async function GET(request: Request) {
           .is('deleted_at', null)
           .maybeSingle()
         data = byUsername
-        if (data) {
-          console.log('✅ Étudiant trouvé par username, ID réel:', data.id)
-        }
       }
       
       userData = data
-      console.log('👤 Étudiant trouvé:', userData)
-      console.log('📊 Niveau dans la base:', userData?.level)
-      console.log('🏠 Maison de grâce:', userData?.maison_grace || 'non spécifiée')
       
       if (userData?.deleted_at) {
-        console.log('❌ Compte désactivé (soft-deleted)')
         return NextResponse.json(
           { error: 'Compte désactivé, contactez l\'administrateur' },
           { status: 403 }
@@ -73,16 +59,13 @@ export async function GET(request: Request) {
       }
     }
 
-    // Si aucun utilisateur trouvé
     if (!userData) {
-      console.log('❌ Aucun utilisateur trouvé pour ID:', decoded.id)
       return NextResponse.json(
         { error: 'Utilisateur non trouvé ou compte désactivé' },
         { status: 404 }
       )
     }
 
-    // Retourner les données en utilisant les infos réelles de la base
     return NextResponse.json({ 
       user: {
         id: userData.id,
@@ -94,11 +77,10 @@ export async function GET(request: Request) {
         phone: userData?.phone || '',
         level: userData?.level || (decoded.role === 'student' ? 1 : null),
         maisonGrace: userData?.maison_grace || null,
-        profileImageUrl: userData?.profile_image_url || null  // ← AJOUT
+        profileImageUrl: userData?.profile_image_url || null
       }
     })
-  } catch (error) {
-    console.error('❌ Erreur verify:', error)
+  } catch {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }

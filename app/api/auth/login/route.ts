@@ -1,17 +1,20 @@
+// app/api/auth/login/route.ts
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { comparePassword, generateToken } from '@/lib/auth'
 import { loginSchema } from '@/lib/validators'
-import { logger } from '@/lib/logger'
+
+// Désactiver les logs en production
+const isProduction = process.env.NODE_ENV === 'production'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     
-    // ✅ Valider les entrées avec Zod
+    // Valider les entrées avec Zod
     const validation = loginSchema.safeParse(body)
     if (!validation.success) {
-      logger.fail('Validation des données de connexion', { errors: validation.error.errors })
+
       return NextResponse.json(
         { error: validation.error.errors[0].message },
         { status: 400 }
@@ -20,19 +23,18 @@ export async function POST(request: Request) {
     
     const { username, password } = validation.data
     
-    logger.start('Tentative de connexion', { username })
+
 
     // Vérifier dans users (admins/managers)
     const { data: user } = await supabase
       .from('users')
-      .select('*')
+      .select('id, name, username, password, role, service_id')
       .eq('username', username)
       .maybeSingle()
 
     if (user && await comparePassword(password, user.password)) {
       const token = generateToken(user)
       
-      // Créer la réponse avec les données utilisateur
       const response = NextResponse.json({
         user: {
           id: user.id,
@@ -44,7 +46,6 @@ export async function POST(request: Request) {
         }
       })
 
-      // Stocker le token dans un cookie HttpOnly sécurisé
       response.cookies.set('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -53,11 +54,11 @@ export async function POST(request: Request) {
         path: '/'
       })
 
-      logger.success('Connexion admin réussie', { userId: user.id, username, role: user.role })
+
       return response
     }
 
-    // Vérifier dans students (uniquement ceux qui ne sont pas supprimés)
+    // Vérifier dans students
     const { data: student } = await supabase
       .from('students')
       .select('id, full_name, username, password, service_id, level, email, phone')
@@ -66,11 +67,7 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (student && await comparePassword(password, student.password)) {
-      logger.debug('Étudiant trouvé', { 
-        studentId: student.id, 
-        name: student.full_name, 
-        level: student.level 
-      })
+    
       
       const token = generateToken({ 
         id: student.id,
@@ -81,7 +78,6 @@ export async function POST(request: Request) {
         level: student.level
       })
       
-      // Créer la réponse avec les données utilisateur
       const response = NextResponse.json({
         user: {
           id: student.id,
@@ -93,7 +89,6 @@ export async function POST(request: Request) {
         }
       })
 
-      // Stocker le token dans un cookie HttpOnly sécurisé
       response.cookies.set('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -102,21 +97,20 @@ export async function POST(request: Request) {
         path: '/'
       })
 
-      logger.success('Connexion étudiant réussie', { 
-        studentId: student.id, 
-        username, 
-        level: student.level 
-      })
+    
       return response
     }
 
-    logger.fail('Connexion échouée', { username, reason: 'Identifiants incorrects' })
+
     return NextResponse.json(
       { error: 'Nom d\'utilisateur ou mot de passe incorrect' },
       { status: 401 }
     )
   } catch (error) {
-    logger.error('Erreur serveur lors du login', error)
+
+    if (!isProduction) {
+      console.error('Erreur serveur lors du login')
+    }
     return NextResponse.json(
       { error: 'Erreur serveur' },
       { status: 500 }
