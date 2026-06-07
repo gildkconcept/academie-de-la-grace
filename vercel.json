@@ -1,5 +1,0 @@
-{
-  "buildCommand": "npm install --legacy-peer-deps --include=dev && npm run build",
-  "installCommand": "npm install --legacy-peer-deps --include=dev",
-  "outputDirectory": ".next"
-}
