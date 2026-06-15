@@ -35,6 +35,7 @@ import { studentService } from '@/services/studentService'
 import { attendanceService } from '@/services/attendanceService'
 import { serviceService } from '@/services/serviceService'
 import { sessionService } from '@/services/sessionService'
+import axiosInstance from '@/lib/axios'
 
 export default function ManagerDashboard() {
   const { user, loading, logout } = useAuth()
@@ -132,11 +133,11 @@ export default function ManagerDashboard() {
     }
   }, [user, loading])
 
-  // ✅ CORRIGÉ - Utilise serviceService
+  // ✅ CORRIGÉ - Utilise serviceService avec typage
   const fetchServiceName = async () => {
     try {
       const services = await serviceService.getAll()
-      const service = services.find(s => s.id === user?.serviceId)
+      const service = services.find((s: { id: string; name: string }) => s.id === user?.serviceId)
       if (service) setServiceName(service.name)
     } catch (error) {
       console.error('Erreur chargement service:', error)
@@ -218,7 +219,7 @@ export default function ManagerDashboard() {
     }
   }
 
-  // ✅ CORRIGÉ - Utilise studentService et attendanceService
+  // ✅ CORRIGÉ - Utilise axiosInstance au lieu de fetch
   const fetchServiceStats = async () => {
     if (!user?.serviceId) return
     try {
@@ -231,14 +232,16 @@ export default function ManagerDashboard() {
 
       const totalSessions = 4 // Approximation
       const studentStats = await Promise.all(studentsData.map(async (student) => {
-        const { data: academicAttendances } = await fetch(`/api/attendance/student/${student.id}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        }).then(res => res.json()).catch(() => ({ data: null }))
-        
-        const totalPresent = academicAttendances?.filter((a: any) => a.status === 'present').length || 0
-        const rate = totalSessions > 0 ? Math.round((totalPresent / totalSessions) * 100) : 0
-        
-        return { ...student, attendanceRate: rate, isActive: rate >= 50 }
+        try {
+          const response = await axiosInstance.get(`/attendance/student/${student.id}`)
+          const academicAttendances = response.data || []
+          const totalPresent = academicAttendances?.filter((a: any) => a.status === 'present').length || 0
+          const rate = totalSessions > 0 ? Math.round((totalPresent / totalSessions) * 100) : 0
+          return { ...student, attendanceRate: rate, isActive: rate >= 50 }
+        } catch (error) {
+          console.error(`Erreur pour étudiant ${student.id}:`, error)
+          return { ...student, attendanceRate: 0, isActive: false }
+        }
       }))
 
       const averageRate = studentStats.length > 0 ? Math.round(studentStats.reduce((acc, s) => acc + s.attendanceRate, 0) / studentStats.length) : 0
