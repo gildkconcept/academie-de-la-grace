@@ -44,9 +44,7 @@ export const AssistedAttendanceModal = ({ isOpen, onClose, onComplete }: Assiste
       console.log('🔍 [Modal] Sessions valides:', validSessions.length)
       
       // Trier par date décroissante (les plus récentes d'abord)
-      validSessions.sort((a: { date: string }, b: { date: string }) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      )
+     validSessions.sort((a: { date: string }, b: { date: string }) => new Date(b.date).getTime() - new Date(a.date).getTime())
       
       setSessions(validSessions)
       
