@@ -137,7 +137,7 @@ export default function ManagerDashboard() {
   const fetchServiceName = async () => {
     try {
       const services = await serviceService.getAll()
-      const service = services.find((s: { id: string; name: string }) => s.id === user?.serviceId)
+     const service = services.find((s: any) => s.id === user?.serviceId)
       if (service) setServiceName(service.name)
     } catch (error) {
       console.error('Erreur chargement service:', error)
