@@ -1,10 +1,11 @@
+// components/AssistedAttendanceModal.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { AssistedAttendance } from './AssistedAttendance'
 import { attendanceService } from '@/services/attendanceService'
-import { sessionService } from '@/services/sessionService'
+import axiosInstance from '@/lib/axios'
 
 interface AssistedAttendanceModalProps {
   isOpen: boolean
@@ -29,26 +30,30 @@ export const AssistedAttendanceModal = ({ isOpen, onClose, onComplete }: Assiste
     try {
       console.log('🔍 [Modal] Récupération de toutes les sessions...')
       
-      // Utiliser la nouvelle méthode pour récupérer toutes les sessions
-      const data = await attendanceService.getAllSessionsHistory(50, 0)
+      // Utiliser axiosInstance pour récupérer toutes les sessions
+      const response = await axiosInstance.get('/sessions/all-history?limit=50&offset=0')
+      const data = response.data
+      
       console.log('🔍 [Modal] Sessions reçues:', data.sessions?.length || 0)
       
       // Filtrer pour n'avoir que les sessions valides (avec un code)
-    const validSessions = (data.sessions || []).filter((session: any) => {
-  return session.code && session.date
-})
+      const validSessions = (data.sessions || []).filter((session: { code: string; date: string }) => {
+        return session.code && session.date
+      })
       
       console.log('🔍 [Modal] Sessions valides:', validSessions.length)
       
       // Trier par date décroissante (les plus récentes d'abord)
-      validSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      validSessions.sort((a: { date: string }, b: { date: string }) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      )
       
       setSessions(validSessions)
       
       if (validSessions.length === 0) {
         console.log('⚠️ [Modal] Aucune session trouvée')
       } else {
-        console.log('✅ [Modal] Sessions chargées:', validSessions.map(s => ({ code: s.code, date: s.date, level: s.level })))
+        console.log('✅ [Modal] Sessions chargées:', validSessions.map((s: { code: string; date: string; level: number | null }) => ({ code: s.code, date: s.date, level: s.level })))
       }
     } catch (error) {
       console.error('❌ [Modal] Erreur chargement sessions:', error)
@@ -115,7 +120,7 @@ export const AssistedAttendanceModal = ({ isOpen, onClose, onComplete }: Assiste
                       className="w-full p-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-indigo-400"
                     >
                       <option value="">Sélectionnez une session</option>
-                      {sessions.map(session => (
+                      {sessions.map((session: { id: string; code: string; date: string; level: number | null }) => (
                         <option key={session.id} value={session.id}>
                           {new Date(session.date).toLocaleDateString('fr-FR')} - Code: {session.code} {session.level ? `(Niv.${session.level})` : '(Universel)'}
                         </option>
