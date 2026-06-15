@@ -29,7 +29,13 @@ interface OnlineUser {
 export const OnlineUsersList = () => {
   const [users, setUsers] = useState<OnlineUser[]>([])
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ totalOnline: 0, studentsOnline: 0, managersOnline: 0, mostActiveService: null })
+  // ✅ CORRIGÉ - Type explicite pour stats
+  const [stats, setStats] = useState<{
+    totalOnline: number;
+    studentsOnline: number;
+    managersOnline: number;
+    mostActiveService: string | null;
+  }>({ totalOnline: 0, studentsOnline: 0, managersOnline: 0, mostActiveService: null })
   const [services, setServices] = useState<any[]>([])
   const [branches, setBranches] = useState<string[]>([])
   
@@ -95,7 +101,7 @@ export const OnlineUsersList = () => {
     }
   }, [roleFilter, serviceFilter, levelFilter, branchFilter, statusFilter])
 
-  // ✅ Fonction pour obtenir le service affiché
+  // Fonction pour obtenir le service affiché
   const getServiceDisplay = (user: OnlineUser) => {
     if (user.service_name) return user.service_name
     if (user.service_id) {
@@ -105,7 +111,7 @@ export const OnlineUsersList = () => {
     return '-'
   }
 
-  // ✅ Fonction pour obtenir la branche/niveau affiché
+  // Fonction pour obtenir la branche/niveau affiché
   const getBranchDisplay = (user: OnlineUser) => {
     if (user.branch) return user.branch
     if (user.level) return `Niveau ${user.level}`
