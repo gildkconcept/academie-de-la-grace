@@ -34,9 +34,9 @@ export const AssistedAttendanceModal = ({ isOpen, onClose, onComplete }: Assiste
       console.log('🔍 [Modal] Sessions reçues:', data.sessions?.length || 0)
       
       // Filtrer pour n'avoir que les sessions valides (avec un code)
-      const validSessions = (data.sessions || []).filter(session => {
-        return session.code && session.date
-      })
+    const validSessions = (data.sessions || []).filter((session: any) => {
+  return session.code && session.date
+})
       
       console.log('🔍 [Modal] Sessions valides:', validSessions.length)
       
