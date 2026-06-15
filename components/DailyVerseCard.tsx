@@ -5,8 +5,9 @@ import { toast } from 'sonner'
 import { ClipboardIcon, ShareIcon, HeartIcon } from '@heroicons/react/24/outline'
 import { verseService } from '@/services/verseService'
 
+// ✅ CORRIGÉ - id en number
 interface DailyVerse {
-  id: string
+  id: number
   verse: string
   reference: string
   displayed_date: string
@@ -26,8 +27,16 @@ export const DailyVerseCard = () => {
   const fetchDailyVerse = async () => {
     try {
       const data = await verseService.getToday()
+      console.log('📖 Verset reçu:', data)
+      
       if (data.verse) {
-        setVerse(data.verse)
+        // ✅ Conversion si nécessaire
+        setVerse({
+          id: data.verse.id,
+          verse: data.verse.verse,
+          reference: data.verse.reference,
+          displayed_date: data.verse.displayed_date
+        })
       }
     } catch (error) {
       console.error('Erreur verset:', error)
