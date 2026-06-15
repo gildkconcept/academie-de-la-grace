@@ -231,7 +231,7 @@ export default function ManagerDashboard() {
       }
 
       const totalSessions = 4 // Approximation
-      const studentStats = await Promise.all(studentsData.map(async (student) => {
+const studentStats = await Promise.all(studentsData.map(async (student: Student) => {
         try {
           const response = await axiosInstance.get(`/attendance/student/${student.id}`)
           const academicAttendances = response.data || []
