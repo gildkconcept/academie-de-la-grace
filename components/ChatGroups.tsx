@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { XMarkIcon, ChatBubbleLeftRightIcon, UserGroupIcon } from '@heroicons/react/24/outline'
-import { supabase } from '../lib/supabase'
+import axiosInstance from '@/lib/axios'  
 
 interface ChatGroup {
   id: string
@@ -29,8 +29,11 @@ interface ChatGroupsProps {
   onClose: () => void
 }
 
-// Fonction pour obtenir les initiales
+// Fonction pour obtenir les initiales - AVEC VÉRIFICATION
 const getInitials = (name: string) => {
+  if (!name || name.length === 0) {
+    return '?'
+  }
   return name
     .split(' ')
     .map(part => part[0])
@@ -39,8 +42,11 @@ const getInitials = (name: string) => {
     .slice(0, 2)
 }
 
-// Couleurs de fallback basées sur le nom
+// Couleurs de fallback basées sur le nom - AVEC VÉRIFICATION
 const getAvatarColor = (name: string) => {
+  if (!name || name.length === 0) {
+    return 'bg-gray-500'
+  }
   const colors = [
     'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
     'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
@@ -54,12 +60,13 @@ const getAvatarColor = (name: string) => {
   return colors[Math.abs(hash) % colors.length]
 }
 
-// Badge rôle
+// Badge rôle - AVEC VALEUR PAR DÉFAUT
 const getRoleBadge = (senderType: string) => {
-  if (senderType === 'user' || senderType === 'superadmin') {
+  const type = senderType || 'student'
+  if (type === 'user' || type === 'superadmin') {
     return { label: 'Admin', color: 'bg-red-500/20 text-red-300' }
   }
-  if (senderType === 'service_manager') {
+  if (type === 'service_manager') {
     return { label: 'Manager', color: 'bg-blue-500/20 text-blue-300' }
   }
   return { label: 'Étudiant', color: 'bg-green-500/20 text-green-300' }
@@ -74,30 +81,11 @@ export const ChatGroups = ({ onSelectGroup, onClose }: ChatGroupsProps) => {
     fetchGroups() 
   }, [])
 
+  // ✅ CORRIGÉ - Utiliser axiosInstance au lieu de fetch
   const fetchGroups = async () => {
     try {
-      const res = await fetch('/api/chat/groups', { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok) {
-        const groupsData = data.groups || []
-        
-        // Enrichir les groupes avec les avatars des derniers messages
-        const enrichedGroups = await Promise.all(groupsData.map(async (group: ChatGroup) => {
-          if (group.lastMessage && group.lastMessage.senderId) {
-            const avatar = await getSenderAvatar(group.lastMessage.senderId, group.lastMessage.senderType)
-            return {
-              ...group,
-              lastMessage: {
-                ...group.lastMessage,
-                senderAvatar: avatar
-              }
-            }
-          }
-          return group
-        }))
-        
-        setGroups(enrichedGroups)
-      }
+      const response = await axiosInstance.get('/chat/groups')
+      setGroups(response.data.groups || [])
     } catch (error) { 
       console.error('Erreur fetchGroups:', error) 
     } finally { 
@@ -105,35 +93,14 @@ export const ChatGroups = ({ onSelectGroup, onClose }: ChatGroupsProps) => {
     }
   }
 
-  const getSenderAvatar = async (senderId: string, senderType: string): Promise<string | undefined> => {
-    const table = senderType === 'student' ? 'students' : 'users'
-    
-    const { data } = await supabase
-      .from(table)
-      .select('profile_image_url')
-      .eq('id', senderId)
-      .single()
-    
-    return data?.profile_image_url
-  }
-
-  // Gérer la sélection d'un groupe avec marquage des messages comme lus
+  // ✅ CORRIGÉ - Utiliser axiosInstance au lieu de fetch
   const handleSelectGroup = async (groupId: string, groupName: string) => {
     try {
-      // Marquer comme lu avant d'ouvrir le chat
-      await fetch('/api/chat/mark-read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ groupId })
-      })
-      // Rafraîchir la liste pour mettre à jour le compteur
+      await axiosInstance.post('/chat/mark-read', { groupId })
       await fetchGroups()
-      // Ouvrir le chat
       onSelectGroup(groupId, groupName)
     } catch (error) {
       console.error('Erreur handleSelectGroup:', error)
-      // Ouvrir quand même le chat en cas d'erreur
       onSelectGroup(groupId, groupName)
     }
   }
@@ -222,7 +189,6 @@ export const ChatGroups = ({ onSelectGroup, onClose }: ChatGroupsProps) => {
                       {/* Dernier message avec avatar et badge de rôle */}
                       {group.lastMessage && (
                         <div className="flex items-center gap-2 mt-1">
-                          {/* Avatar du dernier expéditeur */}
                           {group.lastMessage.senderAvatar ? (
                             <img 
                               src={group.lastMessage.senderAvatar} 
@@ -237,7 +203,6 @@ export const ChatGroups = ({ onSelectGroup, onClose }: ChatGroupsProps) => {
                             </div>
                           )}
                           
-                          {/* Badge rôle */}
                           <span className={`text-[8px] px-1 py-0.5 rounded-full ${getRoleBadge(group.lastMessage.senderType).color}`}>
                             {getRoleBadge(group.lastMessage.senderType).label}
                           </span>

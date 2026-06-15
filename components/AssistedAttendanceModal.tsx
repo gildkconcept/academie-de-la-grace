@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { AssistedAttendance } from './AssistedAttendance'
-import { supabase } from '@/lib/supabase'
+import { attendanceService } from '@/services/attendanceService'
+import { sessionService } from '@/services/sessionService'
 
 interface AssistedAttendanceModalProps {
   isOpen: boolean
@@ -26,15 +27,32 @@ export const AssistedAttendanceModal = ({ isOpen, onClose, onComplete }: Assiste
   const fetchSessions = async () => {
     setLoading(true)
     try {
-      const { data } = await supabase
-        .from('sessions')
-        .select('id, code, date')
-        .order('date', { ascending: false })
-        .limit(50)
+      console.log('🔍 [Modal] Récupération de toutes les sessions...')
       
-      setSessions(data || [])
+      // Utiliser la nouvelle méthode pour récupérer toutes les sessions
+      const data = await attendanceService.getAllSessionsHistory(50, 0)
+      console.log('🔍 [Modal] Sessions reçues:', data.sessions?.length || 0)
+      
+      // Filtrer pour n'avoir que les sessions valides (avec un code)
+      const validSessions = (data.sessions || []).filter(session => {
+        return session.code && session.date
+      })
+      
+      console.log('🔍 [Modal] Sessions valides:', validSessions.length)
+      
+      // Trier par date décroissante (les plus récentes d'abord)
+      validSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      
+      setSessions(validSessions)
+      
+      if (validSessions.length === 0) {
+        console.log('⚠️ [Modal] Aucune session trouvée')
+      } else {
+        console.log('✅ [Modal] Sessions chargées:', validSessions.map(s => ({ code: s.code, date: s.date, level: s.level })))
+      }
     } catch (error) {
-      console.error('Erreur chargement sessions:', error)
+      console.error('❌ [Modal] Erreur chargement sessions:', error)
+      setSessions([])
     } finally {
       setLoading(false)
     }
@@ -42,6 +60,7 @@ export const AssistedAttendanceModal = ({ isOpen, onClose, onComplete }: Assiste
 
   const handleSelectSession = () => {
     if (!selectedSessionId) return
+    console.log('🔍 [Modal] Session sélectionnée:', selectedSessionId)
     setShowAttendance(true)
   }
 
@@ -80,9 +99,15 @@ export const AssistedAttendanceModal = ({ isOpen, onClose, onComplete }: Assiste
                 <div>
                   <label className="block text-sm text-white/70 mb-1">Session académique</label>
                   {loading ? (
-                    <div className="text-center py-4 text-white/50">Chargement des sessions...</div>
+                    <div className="text-center py-4 text-white/50">
+                      <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-2" />
+                      Chargement des sessions...
+                    </div>
                   ) : sessions.length === 0 ? (
-                    <div className="text-center py-4 text-white/40 text-sm">Aucune session disponible</div>
+                    <div className="text-center py-6 bg-white/[0.04] rounded-lg">
+                      <p className="text-white/40 text-sm">Aucune session disponible</p>
+                      <p className="text-white/30 text-xs mt-2">Générez d'abord un code dans le tableau superadmin</p>
+                    </div>
                   ) : (
                     <select
                       value={selectedSessionId}
@@ -92,7 +117,7 @@ export const AssistedAttendanceModal = ({ isOpen, onClose, onComplete }: Assiste
                       <option value="">Sélectionnez une session</option>
                       {sessions.map(session => (
                         <option key={session.id} value={session.id}>
-                          {new Date(session.date).toLocaleDateString('fr-FR')} - Code: {session.code}
+                          {new Date(session.date).toLocaleDateString('fr-FR')} - Code: {session.code} {session.level ? `(Niv.${session.level})` : '(Universel)'}
                         </option>
                       ))}
                     </select>
@@ -108,7 +133,7 @@ export const AssistedAttendanceModal = ({ isOpen, onClose, onComplete }: Assiste
                   </button>
                   <button
                     onClick={handleSelectSession}
-                    disabled={!selectedSessionId}
+                    disabled={!selectedSessionId || loading}
                     className="flex-1 py-2.5 bg-white text-[#1a3a8f] rounded-lg text-sm font-bold hover:shadow-lg transition-all disabled:opacity-50"
                   >
                     Continuer

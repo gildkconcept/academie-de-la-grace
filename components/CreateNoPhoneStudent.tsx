@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { XMarkIcon, UserPlusIcon } from '@heroicons/react/24/outline'
-import { supabase } from '@/lib/supabase'
+import { serviceService } from '@/services/serviceService'
 
 interface CreateNoPhoneStudentProps {
   isOpen: boolean
@@ -34,8 +34,12 @@ export const CreateNoPhoneStudent = ({ isOpen, onClose, onSuccess }: CreateNoPho
   }, [])
 
   const fetchServices = async () => {
-    const { data } = await supabase.from('services').select('id, name').order('name')
-    if (data) setServices(data)
+    try {
+      const data = await serviceService.getAll()
+      setServices(data || [])
+    } catch (error) {
+      console.error('Erreur chargement services:', error)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,14 +51,36 @@ export const CreateNoPhoneStudent = ({ isOpen, onClose, onSuccess }: CreateNoPho
 
     setLoading(true)
     try {
+      const token = localStorage.getItem('token')
+      
+      // ✅ Pour un étudiant sans téléphone, on force phone = null et hasPhone = false
+      const payload = {
+        fullName: formData.fullName,
+        branch: formData.branch,
+        level: formData.level,
+        serviceId: formData.serviceId,
+        baptized: formData.baptized === 'true',
+        phone: null,  // ← Pas de téléphone
+        maisonGrace: formData.maisonGrace,
+        profileImageUrl: formData.profileImageUrl,
+        hasPhone: false  // ← Signaler qu'il n'a pas de téléphone
+      }
+      
+      console.log('📝 Création étudiant sans téléphone:', payload)
+      
       const res = await fetch('/api/students/create-no-phone', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         credentials: 'include',
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       })
 
       const data = await res.json()
+      console.log('📝 Réponse:', data)
+      
       if (res.ok) {
         toast.success('Étudiant sans téléphone créé avec succès')
         onSuccess()
@@ -72,6 +98,7 @@ export const CreateNoPhoneStudent = ({ isOpen, onClose, onSuccess }: CreateNoPho
         toast.error(data.error || 'Erreur lors de la création')
       }
     } catch (error) {
+      console.error('Erreur:', error)
       toast.error('Erreur réseau')
     } finally {
       setLoading(false)

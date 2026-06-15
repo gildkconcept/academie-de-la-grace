@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeftIcon, PaperAirplaneIcon, XMarkIcon } from '@heroicons/react/24/outline'
-import { supabase } from '../lib/supabase'
+import axiosInstance from '@/lib/axios'
 
 interface Message {
   id: string
@@ -31,8 +31,8 @@ interface ChatMessagesProps {
   onBack: () => void
 }
 
-// Fonction pour obtenir les initiales
 const getInitials = (name: string) => {
+  if (!name || name.length === 0) return '?'
   return name
     .split(' ')
     .map(part => part[0])
@@ -41,8 +41,8 @@ const getInitials = (name: string) => {
     .slice(0, 2)
 }
 
-// Couleurs de fallback basées sur le nom
 const getAvatarColor = (name: string) => {
+  if (!name || name.length === 0) return 'bg-gray-500'
   const colors = [
     'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
     'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
@@ -56,12 +56,12 @@ const getAvatarColor = (name: string) => {
   return colors[Math.abs(hash) % colors.length]
 }
 
-// Badge rôle
 const getRoleBadge = (senderType: string) => {
-  if (senderType === 'user' || senderType === 'superadmin') {
+  const type = senderType || 'student'
+  if (type === 'user' || type === 'superadmin') {
     return { label: 'Admin', color: 'bg-red-500/20 text-red-300 border-red-500/30' }
   }
-  if (senderType === 'service_manager') {
+  if (type === 'service_manager') {
     return { label: 'Manager', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' }
   }
   return { label: 'Étudiant', color: 'bg-green-500/20 text-green-300 border-green-500/30' }
@@ -82,22 +82,15 @@ export const ChatMessages = ({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   
-  // États pour la modification et la réponse
   const [editingMessage, setEditingMessage] = useState<Message | null>(null)
   const [editContent, setEditContent] = useState('')
   const [editing, setEditing] = useState(false)
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
 
-  // Marquer tous les messages du groupe comme lus
   const markMessagesAsRead = async () => {
     try {
-      await fetch('/api/chat/mark-read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ groupId })
-      })
+      await axiosInstance.post('/chat/mark-read', { groupId })
     } catch (error) {
       console.error('Erreur marquage lu:', error)
     }
@@ -110,7 +103,6 @@ export const ChatMessages = ({
     return () => clearInterval(interval)
   }, [groupId])
 
-  // Marquer comme lu quand l'onglet redevient actif
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -127,13 +119,8 @@ export const ChatMessages = ({
 
   const fetchMessages = async () => {
     try {
-      const res = await fetch(`/api/chat/messages?groupId=${groupId}&limit=50`, { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok) {
-        const messagesData = data.messages || []
-        const enrichedMessages = await enrichMessagesWithAvatars(messagesData)
-        setMessages(enrichedMessages)
-      }
+      const response = await axiosInstance.get(`/chat/messages?groupId=${groupId}&limit=50`)
+      setMessages(response.data.messages || [])
     } catch (error) {
       console.error('Erreur:', error)
     } finally {
@@ -141,53 +128,15 @@ export const ChatMessages = ({
     }
   }
 
-  const enrichMessagesWithAvatars = async (messagesData: Message[]) => {
-    const userIds = [...new Set(messagesData.map(m => m.sender_id))]
-    const avatars: Record<string, string> = {}
-    
-    for (const userId of userIds) {
-      const message = messagesData.find(m => m.sender_id === userId)
-      const isStudent = message?.sender_type === 'student'
-      const table = isStudent ? 'students' : 'users'
-      
-      const { data } = await supabase
-        .from(table)
-        .select('profile_image_url')
-        .eq('id', userId)
-        .single()
-      
-      if (data?.profile_image_url) {
-        avatars[userId] = data.profile_image_url
-      }
-    }
-    
-    return messagesData.map(msg => ({
-      ...msg,
-      sender_avatar: avatars[msg.sender_id]
-    }))
-  }
-
-  // Modifier un message
   const editMessage = async (messageId: string, newContent: string) => {
     if (!newContent.trim() || editing) return
     
     setEditing(true)
     try {
-      const res = await fetch('/api/chat/messages', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ messageId, content: newContent })
-      })
-      
-      if (res.ok) {
-        setEditingMessage(null)
-        setEditContent('')
-        fetchMessages()
-      } else {
-        const data = await res.json()
-        alert(data.error || 'Erreur lors de la modification')
-      }
+      await axiosInstance.put('/chat/messages', { messageId, content: newContent })
+      setEditingMessage(null)
+      setEditContent('')
+      fetchMessages()
     } catch (error) {
       console.error('Erreur modification:', error)
       alert('Erreur réseau')
@@ -196,25 +145,13 @@ export const ChatMessages = ({
     }
   }
 
-  // Supprimer un message
   const deleteMessage = async (messageId: string) => {
     if (!confirm('⚠️ Voulez-vous vraiment supprimer ce message ? Cette action est irréversible.')) return
     
     setDeleting(messageId)
     try {
-      const res = await fetch('/api/chat/messages', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ messageId })
-      })
-      
-      if (res.ok) {
-        fetchMessages()
-      } else {
-        const data = await res.json()
-        alert(data.error || 'Erreur lors de la suppression')
-      }
+      await axiosInstance.delete(`/chat/messages?messageId=${messageId}`)
+      fetchMessages()
     } catch (error) {
       console.error('Erreur suppression:', error)
       alert('Erreur réseau')
@@ -223,13 +160,11 @@ export const ChatMessages = ({
     }
   }
 
-  // Annuler l'édition
   const cancelEdit = () => {
     setEditingMessage(null)
     setEditContent('')
   }
 
-  // Annuler la réponse
   const cancelReply = () => {
     setReplyTo(null)
   }
@@ -249,19 +184,12 @@ export const ChatMessages = ({
         body.replyTo = replyTo.id
       }
       
-      const res = await fetch('/api/chat/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body)
-      })
+      await axiosInstance.post('/chat/messages', body)
       
-      if (res.ok) {
-        setNewMessage('')
-        setReplyTo(null)
-        fetchMessages()
-        markMessagesAsRead()
-      }
+      setNewMessage('')
+      setReplyTo(null)
+      fetchMessages()
+      markMessagesAsRead()
     } catch (error) {
       console.error('Erreur:', error)
     } finally {
@@ -279,7 +207,6 @@ export const ChatMessages = ({
 
   const isMine = (senderId: string) => senderId === currentUserId
 
-  // Grouper les messages par date
   const groupedMessages = messages.reduce((groups, message) => {
     const date = new Date(message.created_at).toLocaleDateString('fr-FR')
     if (!groups[date]) groups[date] = []
@@ -296,7 +223,6 @@ export const ChatMessages = ({
           <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(8,20,90,0.97) 0%, rgba(15,45,130,0.95) 40%, rgba(10,30,100,0.96) 70%, rgba(4,12,65,0.98) 100%)' }} />
           
           <div className="relative z-10 flex flex-col h-full">
-            {/* Header */}
             <div className="flex items-center gap-3 p-4 border-b border-white/[0.08]">
               <button onClick={onBack} className="p-1 hover:bg-white/10 rounded-lg">
                 <ArrowLeftIcon className="w-5 h-5 text-white/60" />
@@ -307,7 +233,6 @@ export const ChatMessages = ({
               </div>
             </div>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {loading ? (
                 <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /></div>
@@ -328,7 +253,6 @@ export const ChatMessages = ({
                       return (
                         <div key={msg.id} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} mb-3`}>
                           <div className={`flex gap-2 max-w-[80%] ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
-                            {/* Avatar */}
                             <div className="flex-shrink-0">
                               {msg.sender_avatar ? (
                                 <img
@@ -349,7 +273,6 @@ export const ChatMessages = ({
                               )}
                             </div>
                             
-                            {/* Contenu du message */}
                             <div className={`flex-1 ${isCurrentUser ? 'items-end' : ''}`}>
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <span className="text-white text-xs font-medium">{msg.sender_name}</span>
@@ -359,7 +282,6 @@ export const ChatMessages = ({
                                 <span className="text-white/30 text-[10px]">{formatTime(msg.created_at)}</span>
                               </div>
                               
-                              {/* Message cité (reply) */}
                               {msg.reply_to_message && !msg.reply_to_message.is_deleted && (
                                 <div className="mb-2 p-2 bg-white/05 rounded-lg border-l-2 border-blue-400/50 text-xs">
                                   <p className="text-blue-300/70 font-medium">
@@ -371,7 +293,6 @@ export const ChatMessages = ({
                                 </div>
                               )}
                               
-                              {/* Message cité supprimé */}
                               {msg.reply_to_message?.is_deleted && (
                                 <div className="mb-2 p-2 bg-white/05 rounded-lg border-l-2 border-red-400/50 text-xs">
                                   <p className="text-red-300/70 font-medium">
@@ -381,7 +302,6 @@ export const ChatMessages = ({
                                 </div>
                               )}
                               
-                              {/* Contenu ou message supprimé */}
                               {isDeleted ? (
                                 <div className={`p-3 rounded-2xl text-sm italic ${
                                   isCurrentUser
@@ -435,7 +355,6 @@ export const ChatMessages = ({
                                 </div>
                               )}
                               
-                              {/* Boutons d'action (uniquement pour l'auteur et message non supprimé) */}
                               {!isDeleted && isCurrentUser && !editingMessage && (
                                 <div className="flex items-center gap-2 mt-1">
                                   <button
@@ -463,7 +382,6 @@ export const ChatMessages = ({
                                 </div>
                               )}
                               
-                              {/* Bouton Répondre pour les autres utilisateurs */}
                               {!isDeleted && !isCurrentUser && !editingMessage && (
                                 <div className="flex items-center gap-2 mt-1">
                                   <button
@@ -485,7 +403,6 @@ export const ChatMessages = ({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Indicateur de réponse */}
             {replyTo && (
               <div className="p-2 border-t border-white/[0.08] bg-white/5">
                 <div className="flex justify-between items-center text-xs">
@@ -502,7 +419,6 @@ export const ChatMessages = ({
               </div>
             )}
 
-            {/* Input */}
             <div className="p-3 border-t border-white/[0.08]">
               <div className="flex gap-2">
                 <input
@@ -526,7 +442,6 @@ export const ChatMessages = ({
         </div>
       </div>
 
-      {/* Modal preview image */}
       {imagePreview && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-60 p-4" onClick={() => setImagePreview(null)}>
           <div className="relative max-w-lg w-full">

@@ -1,11 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Ignorer ESLint pendant le build
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Configuration output
   output: 'standalone',
+  
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://85.31.238.112:3001/api/:path*',
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig

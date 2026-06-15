@@ -2,9 +2,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { serviceService } from '@/services/serviceService'
+import { studentService } from '@/services/studentService'
+import { liveService } from '@/services/liveService'
 import { toast } from 'sonner'
-import { MagnifyingGlassIcon, FunnelIcon, UserGroupIcon, UserIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
+import { MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline'
 
 interface OnlineUser {
   id: string
@@ -43,20 +45,19 @@ export const OnlineUsersList = () => {
   const fetchData = async () => {
     setLoading(true)
     try {
-      let url = `/api/live/online-users?`
-      if (roleFilter !== 'all') url += `role=${roleFilter}&`
-      if (serviceFilter !== 'all') url += `serviceId=${serviceFilter}&`
-      if (levelFilter !== 'all') url += `level=${levelFilter}&`
-      if (branchFilter !== 'all') url += `branch=${encodeURIComponent(branchFilter)}&`
-      if (statusFilter !== 'all') url += `status=${statusFilter}&`
+      const data = await liveService.getOnlineUsers({
+        role: roleFilter,
+        serviceId: serviceFilter,
+        level: levelFilter,
+        branch: branchFilter,
+        status: statusFilter as 'online' | 'offline' | 'all'
+      })
       
-      const res = await fetch(url, { credentials: 'include' })
-      const data = await res.json()
+      console.log('📊 Données reçues - users:', data.users?.length)
+      console.log('📊 Premier utilisateur:', data.users?.[0])
       
-      if (res.ok) {
-        setUsers(data.users || [])
-        setStats(data.stats)
-      }
+      setUsers(data.users || [])
+      setStats(data.stats || { totalOnline: 0, studentsOnline: 0, managersOnline: 0, mostActiveService: null })
     } catch (error) {
       console.error('Erreur:', error)
       toast.error('Erreur chargement')
@@ -66,13 +67,18 @@ export const OnlineUsersList = () => {
   }
 
   const fetchServicesAndBranches = async () => {
-    const { data: servicesData } = await supabase.from('services').select('id, name')
-    if (servicesData) setServices(servicesData)
+    try {
+      const servicesData = await serviceService.getAll()
+      setServices(servicesData || [])
+    } catch (error) {
+      console.error('Erreur chargement services:', error)
+    }
     
-    const { data: studentsData } = await supabase.from('students').select('branch').is('deleted_at', null)
-    if (studentsData) {
-      const uniqueBranches = [...new Set(studentsData.map(s => s.branch))].sort()
-      setBranches(uniqueBranches)
+    try {
+      const branchesData = await studentService.getBranches()
+      setBranches(branchesData || [])
+    } catch (error) {
+      console.error('Erreur chargement branches:', error)
     }
   }
 
@@ -80,26 +86,35 @@ export const OnlineUsersList = () => {
     fetchData()
     fetchServicesAndBranches()
     
-    // Abonnement Realtime
-    const channel = supabase
-      .channel('online_users_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'online_users' }, () => {
-        fetchData()
-      })
-      .subscribe()
-    
-    // Rafraîchissement toutes les 10 secondes
-    const interval = setInterval(fetchData, 60000)
+    const interval = setInterval(() => {
+      fetchData()
+    }, 60000)
     
     return () => {
-      channel.unsubscribe()
       clearInterval(interval)
     }
   }, [roleFilter, serviceFilter, levelFilter, branchFilter, statusFilter])
 
+  // ✅ Fonction pour obtenir le service affiché
+  const getServiceDisplay = (user: OnlineUser) => {
+    if (user.service_name) return user.service_name
+    if (user.service_id) {
+      const service = services.find(s => s.id === user.service_id)
+      return service?.name || '-'
+    }
+    return '-'
+  }
+
+  // ✅ Fonction pour obtenir la branche/niveau affiché
+  const getBranchDisplay = (user: OnlineUser) => {
+    if (user.branch) return user.branch
+    if (user.level) return `Niveau ${user.level}`
+    return '-'
+  }
+
   const filteredUsers = users.filter(user => {
     if (searchTerm === '') return true
-    return user.user_name.toLowerCase().includes(searchTerm.toLowerCase())
+    return user.user_name?.toLowerCase().includes(searchTerm.toLowerCase())
   })
 
   const onlineUsers = filteredUsers.filter(u => u.is_online)
@@ -119,6 +134,11 @@ export const OnlineUsersList = () => {
       case 'service_manager': return 'bg-blue-500/20 text-blue-300'
       default: return 'bg-green-500/20 text-green-300'
     }
+  }
+
+  const getInitials = (name: string) => {
+    if (!name) return '?'
+    return name.trim().charAt(0).toUpperCase()
   }
 
   const inputClass = "w-full px-4 py-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-400"
@@ -216,37 +236,41 @@ export const OnlineUsersList = () => {
         
         {/* Version mobile */}
         <div className="block lg:hidden space-y-3">
-          {onlineUsers.map(user => (
-            <div key={user.id} className="bg-white/[0.04] border border-green-500/20 rounded-xl p-3">
-              <div className="flex items-center gap-3">
-                {user.profile_image_url ? (
-                  <img src={user.profile_image_url} alt={user.user_name} className="w-10 h-10 rounded-full object-cover" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                    <span className="text-sm font-bold">{user.user_name.charAt(0)}</span>
-                  </div>
-                )}
-                <div className="flex-1">
-                  <p className="text-white font-medium text-sm">{user.user_name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${getRoleBadge(user.user_role)}`}>
-                      {getRoleIcon(user.user_role)} {user.user_role === 'superadmin' ? 'Admin' : user.user_role === 'service_manager' ? 'Manager' : 'Étudiant'}
-                    </span>
-                    {user.service_name && <span className="text-xs text-white/40">{user.service_name}</span>}
-                  </div>
-                  {user.current_page && (
-                    <p className="text-xs text-blue-300/60 mt-1">📍 {user.current_page}</p>
+          {onlineUsers.length === 0 ? (
+            <p className="text-center text-white/40 py-4 text-sm">Aucun utilisateur en ligne</p>
+          ) : (
+            onlineUsers.map(user => (
+              <div key={user.id} className="bg-white/[0.04] border border-green-500/20 rounded-xl p-3">
+                <div className="flex items-center gap-3">
+                  {user.profile_image_url ? (
+                    <img src={user.profile_image_url} alt={user.user_name} className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                      <span className="text-sm font-bold">{getInitials(user.user_name)}</span>
+                    </div>
                   )}
-                  <p className="text-xs text-green-400/60 mt-1">Connecté depuis {user.connected_duration}</p>
-                </div>
-                <div className="relative">
-                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium text-sm truncate">{user.user_name}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${getRoleBadge(user.user_role)}`}>
+                        {getRoleIcon(user.user_role)} {user.user_role === 'superadmin' ? 'Admin' : user.user_role === 'service_manager' ? 'Manager' : 'Étudiant'}
+                      </span>
+                      <span className="text-xs text-white/40 truncate">{getServiceDisplay(user)}</span>
+                      <span className="text-xs text-white/40">{getBranchDisplay(user)}</span>
+                    </div>
+                    {user.current_page && (
+                      <p className="text-xs text-blue-300/60 mt-1 truncate">📍 {user.current_page}</p>
+                    )}
+                    {user.connected_duration && (
+                      <p className="text-xs text-green-400/60 mt-1">Connecté depuis {user.connected_duration}</p>
+                    )}
+                  </div>
+                  <div className="relative flex-shrink-0">
+                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {onlineUsers.length === 0 && (
-            <p className="text-center text-white/40 py-4 text-sm">Aucun utilisateur en ligne</p>
+            ))
           )}
         </div>
 
@@ -272,22 +296,22 @@ export const OnlineUsersList = () => {
                         <img src={user.profile_image_url} alt="" className="w-8 h-8 rounded-full object-cover" />
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                          <span className="text-xs font-bold">{user.user_name.charAt(0)}</span>
+                          <span className="text-xs font-bold">{getInitials(user.user_name)}</span>
                         </div>
                       )}
-                      <span className="text-sm text-white/80">{user.user_name}</span>
+                      <span className="text-sm text-white/80 truncate max-w-[150px]">{user.user_name}</span>
                     </div>
-                  </td>
+                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadge(user.user_role)}`}>
                       {user.user_role === 'superadmin' ? 'Super Admin' : user.user_role === 'service_manager' ? 'Manager' : 'Étudiant'}
                     </span>
-                  </td>
+                   </td>
                   <td className="px-4 py-3 text-sm text-white/60">
-                    {user.service_name || user.branch || '-'}
-                    {user.level && <span className="text-xs text-white/40 ml-1">(Niv.{user.level})</span>}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-blue-300/60">{user.current_page || '-'}</td>
+                    {getServiceDisplay(user)}
+                    {getBranchDisplay(user) !== '-' && <span className="text-xs text-white/40 ml-1">- {getBranchDisplay(user)}</span>}
+                   </td>
+                  <td className="px-4 py-3 text-sm text-blue-300/60 truncate max-w-[150px]">{user.current_page || '-'}</td>
                   <td className="px-4 py-3 text-sm text-green-300">{user.connected_duration || '-'}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center">
@@ -296,9 +320,16 @@ export const OnlineUsersList = () => {
                         <div className="absolute inset-0 w-2 h-2 rounded-full bg-green-400 animate-ping" />
                       </div>
                     </div>
-                  </td>
+                   </td>
                 </tr>
               ))}
+              {onlineUsers.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-white/40 text-sm">
+                    Aucun utilisateur en ligne
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -319,11 +350,11 @@ export const OnlineUsersList = () => {
                     <img src={user.profile_image_url} alt={user.user_name} className="w-10 h-10 rounded-full object-cover grayscale" />
                   ) : (
                     <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                      <span className="text-sm font-bold text-white/40">{user.user_name.charAt(0)}</span>
+                      <span className="text-sm font-bold text-white/40">{getInitials(user.user_name)}</span>
                     </div>
                   )}
-                  <div className="flex-1">
-                    <p className="text-white/60 font-medium text-sm">{user.user_name}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white/60 font-medium text-sm truncate">{user.user_name}</p>
                     <p className="text-xs text-white/30 mt-1">Dernière activité: {user.last_seen_formatted}</p>
                   </div>
                 </div>
@@ -349,13 +380,15 @@ export const OnlineUsersList = () => {
                           <img src={user.profile_image_url} alt="" className="w-8 h-8 rounded-full object-cover grayscale" />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-                            <span className="text-xs font-bold text-white/30">{user.user_name.charAt(0)}</span>
+                            <span className="text-xs font-bold text-white/30">{getInitials(user.user_name)}</span>
                           </div>
                         )}
-                        <span className="text-sm text-white/50">{user.user_name}</span>
+                        <span className="text-sm text-white/50 truncate max-w-[150px]">{user.user_name}</span>
                       </div>
+                     </td>
+                    <td className="px-4 py-3 text-sm text-white/40">
+                      {user.user_role === 'superadmin' ? 'Super Admin' : user.user_role === 'service_manager' ? 'Manager' : 'Étudiant'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-white/40">{user.user_role === 'superadmin' ? 'Super Admin' : user.user_role === 'service_manager' ? 'Manager' : 'Étudiant'}</td>
                     <td className="px-4 py-3 text-sm text-white/40">{user.last_seen_formatted}</td>
                   </tr>
                 ))}

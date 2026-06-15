@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { studentService } from '@/services/studentService'  
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { Student } from '@/types'
@@ -23,19 +23,25 @@ export default function DeletedStudentsPage() {
   const fetchDeletedStudents = async () => {
     setLoadingData(true)
     try {
-      const { data } = await supabase.from('students').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false })
+      const data = await studentService.getDeleted()  // ← Remplacé
       setDeletedStudents(data || [])
-    } catch (error) { console.error(error); toast.error('Erreur de chargement') }
-    finally { setLoadingData(false) }
+    } catch (error) { 
+      console.error(error); 
+      toast.error('Erreur de chargement') 
+    } finally { 
+      setLoadingData(false) 
+    }
   }
 
   const restoreStudent = async (studentId: string) => {
     try {
-      const { error } = await supabase.from('students').update({ deleted_at: null }).eq('id', studentId)
-      if (error) throw error
+      await studentService.restore(studentId)  // ← Remplacé
       toast.success('Étudiant restauré')
       fetchDeletedStudents()
-    } catch (error) { console.error(error); toast.error('Erreur lors de la restauration') }
+    } catch (error) { 
+      console.error(error); 
+      toast.error('Erreur lors de la restauration') 
+    }
   }
 
   if (loading || loadingData) {

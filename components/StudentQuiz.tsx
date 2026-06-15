@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { quizService } from '@/services/quizService'
 import { Quiz, QuizResult } from '@/types'
 
 export const StudentQuiz = () => {
@@ -56,33 +57,14 @@ export const StudentQuiz = () => {
     setLoading(true)
     setError(null)
     try {
-      console.log('🔍 StudentQuiz - Appel API /api/quizzes')
-      const res = await fetch('/api/quizzes', { credentials: 'include' })
-      console.log('🔍 StudentQuiz - Réponse status:', res.status)
-      const data = await res.json()
-      console.log('🔍 StudentQuiz - Données reçues:', JSON.stringify(data, null, 2))
-      
-      if (res.ok) {
-        const quizzesArray = Array.isArray(data) ? data : []
-        console.log('🔍 StudentQuiz - Nombre de quiz:', quizzesArray.length)
-        console.log('🔍 StudentQuiz - Quiz détaillés:', quizzesArray.map((q: any) => ({ 
-          id: q.id, 
-          title: q.title, 
-          level: q.level,
-          completed: q.completed,
-          start_date: q.start_date,
-          end_date: q.end_date,
-          is_active: q.is_active,
-          today: new Date().toISOString().split('T')[0]
-        })))
-        setQuizzes(quizzesArray)
-      } else {
-        console.log('🔴 StudentQuiz - Erreur API:', data.error)
-        setError(data.error || 'Erreur chargement quiz')
-      }
-    } catch (error) {
-      console.error('🔴 StudentQuiz - Exception:', error)
-      setError('Erreur de connexion')
+      console.log('🔍 StudentQuiz - Appel API /api/quizzes via quizService')
+      const data = await quizService.getAll()
+      const quizzesArray = Array.isArray(data) ? data : []
+      console.log('🔍 StudentQuiz - Nombre de quiz:', quizzesArray.length)
+      setQuizzes(quizzesArray)
+    } catch (error: any) {
+      console.error('🔴 StudentQuiz - Erreur:', error)
+      setError(error.response?.data?.error || 'Erreur chargement quiz')
     } finally {
       setLoading(false)
     }
@@ -90,13 +72,9 @@ export const StudentQuiz = () => {
 
   const fetchMyResults = async () => {
     try {
-      console.log('🔍 StudentQuiz - Appel API /api/my-results')
-      const res = await fetch('/api/my-results', { credentials: 'include' })
-      const data = await res.json()
-      console.log('🔍 StudentQuiz - Résultats reçus:', data)
-      if (res.ok) {
-        setMyResults(data.results || [])
-      }
+      console.log('🔍 StudentQuiz - Appel API /api/my-results via quizService')
+      const data = await quizService.getMyResults()
+      setMyResults(data.results || [])
     } catch (error) {
       console.error('Erreur fetchMyResults:', error)
     }
@@ -105,22 +83,17 @@ export const StudentQuiz = () => {
   const startQuiz = async (quizId: string) => {
     console.log('🔍 StudentQuiz - Démarrage du quiz:', quizId)
     try {
-      const res = await fetch(`/api/quizzes?id=${quizId}`, { credentials: 'include' })
-      const data = await res.json()
+      const data = await quizService.getById(quizId)
       console.log('🔍 StudentQuiz - Quiz chargé:', data)
-      if (res.ok) {
-        setSelectedQuiz(data)
-        setCurrentQuestionIndex(0)
-        setAnswers({})
-        setResult(null)
-        setTimeLeft(600)
-        setTimerActive(true)
-      } else {
-        toast.error(data.error || 'Erreur chargement quiz')
-      }
-    } catch (error) {
+      setSelectedQuiz(data)
+      setCurrentQuestionIndex(0)
+      setAnswers({})
+      setResult(null)
+      setTimeLeft(600)
+      setTimerActive(true)
+    } catch (error: any) {
       console.error('🔴 StudentQuiz - Erreur startQuiz:', error)
-      toast.error('Erreur réseau')
+      toast.error(error.response?.data?.error || 'Erreur chargement quiz')
     }
   }
 
@@ -143,30 +116,20 @@ export const StudentQuiz = () => {
     
     try {
       console.log('🔍 StudentQuiz - Soumission du quiz:', selectedQuiz.id)
-      const res = await fetch(`/api/quizzes/${selectedQuiz.id}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ answers })
-      })
-      const data = await res.json()
+      const data = await quizService.submit(selectedQuiz.id, answers)
       console.log('🔍 StudentQuiz - Réponse soumission:', data)
       
-      if (res.ok) {
-        setResult({ 
-          score: data.score, 
-          total: data.totalQuestions, 
-          percentage: data.percentage 
-        })
-        toast.success(`Score: ${data.score}/${data.totalQuestions}`)
-        await fetchQuizzes()
-        await fetchMyResults()
-      } else {
-        toast.error(data.error || 'Erreur soumission')
-      }
-    } catch (error) {
+      setResult({ 
+        score: data.score, 
+        total: data.totalQuestions, 
+        percentage: data.percentage 
+      })
+      toast.success(`Score: ${data.score}/${data.totalQuestions}`)
+      await fetchQuizzes()
+      await fetchMyResults()
+    } catch (error: any) {
       console.error('🔴 StudentQuiz - Erreur soumission:', error)
-      toast.error('Erreur réseau')
+      toast.error(error.response?.data?.error || 'Erreur soumission')
     } finally {
       setSubmitting(false)
     }
@@ -287,7 +250,6 @@ export const StudentQuiz = () => {
   // Liste des quiz disponibles
   const availableQuizzes = quizzes.filter(q => !q.completed)
   console.log('🔍 StudentQuiz - Quiz disponibles:', availableQuizzes.length)
-  console.log('🔍 StudentQuiz - Tous les quiz:', quizzes.map(q => ({ title: q.title, completed: q.completed })))
 
   return (
     <div className="space-y-6">
@@ -306,8 +268,6 @@ export const StudentQuiz = () => {
         availableQuizzes.length === 0 ? (
           <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-8 text-center text-white/40 text-sm">
             📭 Aucun quiz disponible pour le moment.
-            <br />
-            <span className="text-xs">(Niveau: voir les logs)</span>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

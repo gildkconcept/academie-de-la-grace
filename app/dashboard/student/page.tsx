@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ProgressChart } from '@/components/charts'
@@ -12,11 +11,16 @@ import { Attendance, Progress, Badge } from '@/types'
 import { StudentQuiz } from '@/components/StudentQuiz'
 import { ProfileSection } from '@/components/ProfileSection'
 import { NotificationBell } from '@/components/NotificationBell'
-import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
+import { ChatBubbleLeftRightIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import { ChatGroups } from '@/components/ChatGroups'
 import { ChatMessages } from '@/components/ChatMessages'
 import { DailyVerseCard } from '@/components/DailyVerseCard'
 import { LiveStatus } from '@/components/LiveStatus'
+import { sessionService } from '@/services/sessionService'
+import { quizService } from '@/services/quizService'
+import { studentService } from '@/services/studentService' 
+import { attendanceService } from '@/services/attendanceService'  
+import axiosInstance from '@/lib/axios'
 import { 
   UserCircleIcon, 
   Bars3Icon, 
@@ -27,7 +31,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 export default function StudentDashboard() {
-  const { user, loading, logout } = useAuth()
+  const { user, loading, logout, refreshUser } = useAuth()
   const [activeSessions, setActiveSessions] = useState<any[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false) 
   const router = useRouter()
@@ -39,53 +43,111 @@ export default function StudentDashboard() {
   const [code, setCode] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [userLevel, setUserLevel] = useState<number>(1)
   const [badges, setBadges] = useState<(Badge & { awarded_at?: string })[]>([])
   const [showChat, setShowChat] = useState(false)
   const [selectedChatGroup, setSelectedChatGroup] = useState<{ id: string; name: string } | null>(null)
 
- useEffect(() => {
-  if (!loading && !user) router.push('/login')
-  if (user?.role === 'service_manager') router.push('/dashboard/manager')
-  if (user?.role === 'superadmin') router.push('/dashboard/superadmin')
-  if (user?.id) { 
-    fetchUserLevel(); 
-    fetchData(); 
-    fetchBadges();
-    fetchActiveSessions();  
-  }
-}, [user, loading])
+  // ✅ Fonction pour rafraîchir toutes les données
+  const refreshAllData = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await Promise.all([
+        fetchUserLevel(),
+        fetchData(),
+        fetchBadges(),
+        fetchActiveSessions(),
+        refreshUser()
+      ])
+      toast.success('Données mises à jour')
+    } catch (error) {
+      console.error('Erreur rafraîchissement:', error)
+    } finally {
+      setRefreshing(false)
+    }
+  }, [user?.id])
 
+  useEffect(() => {
+    if (!loading && !user) router.push('/login')
+    if (user?.role === 'service_manager') router.push('/dashboard/manager')
+    if (user?.role === 'superadmin') router.push('/dashboard/superadmin')
+    if (user?.id) { 
+      fetchUserLevel(); 
+      fetchData(); 
+      fetchBadges();
+      fetchActiveSessions();  
+    }
+  }, [user, loading])
+
+  // ✅ CORRIGÉ - Utilise studentService au lieu de supabase
   const fetchUserLevel = async () => {
-    const { data } = await supabase.from('students').select('level').eq('id', user?.id).single()
-    if (data) setUserLevel(data.level || 1)
+    if (!user?.id) return
+    try {
+      const student = await studentService.getById(user.id)
+      if (student) {
+        const newLevel = student.level || 1
+        if (newLevel !== userLevel) {
+          toast.info(`📚 Votre niveau a été mis à jour : Niveau ${newLevel}`)
+        }
+        setUserLevel(newLevel)
+      }
+    } catch (error) {
+      console.error('Erreur récupération niveau:', error)
+    }
   }
 
+  // ✅ CORRIGÉ - Utilise attendanceService au lieu de supabase
   const fetchData = async () => {
     setLoadingData(true)
     try {
-      const { data: attendanceData } = await supabase.from('attendance').select('*, sessions(*)').eq('student_id', user?.id).order('date', { ascending: false }).limit(10)
-      if (attendanceData) setAttendance(attendanceData)
-      const { data: progressData } = await supabase.from('progress').select('*').eq('student_id', user?.id)
-      if (progressData) setProgress(progressData)
-    } catch (error) { toast.error('Erreur lors du chargement des données') }
-    finally { setLoadingData(false) }
+      // Récupérer l'historique des présences
+      const history = await attendanceService.getSessionHistory(10, 0)
+      
+      console.log('📊 DEBUG - history complet:', history)
+      
+      if (history?.sessions) {
+        const formattedAttendance = history.sessions.map((session: any) => ({
+          id: session.id,
+          student_id: user?.id,
+          session_id: session.id,
+          status: session.status || 'absent',
+          date: session.date,
+          sessions: {
+            code: session.code,
+            date: session.date,
+            created_at: session.created_at
+          }
+        }))
+        setAttendance(formattedAttendance)
+      }
+      
+      setProgress([])
+    } catch (error) { 
+      console.error('Erreur chargement données:', error)
+      toast.error('Erreur lors du chargement des données') 
+    } finally { 
+      setLoadingData(false) 
+    }
   }
 
+  // ✅ CORRIGÉ - Utilise fetch API au lieu de supabase
   const fetchBadges = async () => {
     if (!user?.id) return
-    const { data } = await supabase.from('student_badges').select('awarded_at, badge:badges(*)').eq('student_id', user.id).order('awarded_at', { ascending: false })
-    if (data) setBadges(data.map((item: any) => ({ ...item.badge, awarded_at: item.awarded_at })))
+    try {
+      const response = await axiosInstance.get(`/badges/student/${user.id}`)
+      setBadges(response.data || [])
+    } catch (error) {
+      console.error('Erreur récupération badges:', error)
+    }
   }
 
+  // ✅ CORRIGÉ : Utilise sessionService
   const fetchActiveSessions = async () => {
     setLoadingSessions(true)
     try {
-      const res = await fetch('/api/sessions/active', {
-        credentials: 'include'
-      })
-      const data = await res.json()
-      if (res.ok && data.success) {
+      const data = await sessionService.getActiveSessions()
+      if (data.success) {
         setActiveSessions(data.sessions || [])
       }
     } catch (error) {
@@ -95,16 +157,25 @@ export default function StudentDashboard() {
     }
   }
 
+  // ✅ CORRIGÉ : Utilise sessionService
   const verifyCode = async () => {
     if (code.length !== 6) { toast.error('Le code doit faire 6 chiffres'); return }
     setVerifying(true)
     try {
-      const res = await fetch('/api/code/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ code }) })
-      const data = await res.json()
-      if (res.ok) { toast.success('✅ Présence enregistrée !'); setShowCodeInput(false); setCode(''); fetchData(); fetchBadges() }
-      else { toast.error(data.error || 'Code invalide') }
-    } catch (error) { toast.error('Erreur lors de la vérification') }
-    finally { setVerifying(false) }
+      const data = await sessionService.verifyCode(code)
+      if (data.success) { 
+        toast.success('✅ Présence enregistrée !'); 
+        setShowCodeInput(false); 
+        setCode(''); 
+        refreshAllData(); // ✅ Rafraîchir toutes les données après scan
+      } else {
+        toast.error(data.error || 'Code invalide')
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Erreur lors de la vérification')
+    } finally {
+      setVerifying(false)
+    }
   }
 
   const calculateProgress = () => {
@@ -133,7 +204,7 @@ export default function StudentDashboard() {
       <div className="fixed w-[250px] h-[250px] rounded-full bg-blue-600/8 blur-[100px] bottom-[10%] -left-[50px] z-20 pointer-events-none" />
 
       <div className="relative z-30 pb-20 sm:pb-24">
-        {/* Navigation - Universelle */}
+        {/* Navigation */}
         <nav className="sticky top-0 z-40 bg-[rgba(5,15,70,0.6)] backdrop-blur-2xl border-b border-white/[0.08]">
           <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
             <div className="flex justify-between items-center h-12 sm:h-14 md:h-16">
@@ -151,10 +222,18 @@ export default function StudentDashboard() {
                 </h1>
               </div>
 
-              {/* Desktop - caché sur mobile/tablette */}
+              {/* Desktop */}
               <div className="hidden lg:flex items-center gap-2 xl:gap-3">
                 {user?.profileImageUrl ? (
-                  <img src={user.profileImageUrl} alt="Photo" className="w-8 h-8 xl:w-10 xl:h-10 rounded-full object-cover border-2 border-white/20" />
+                  <img 
+                    src={user.profileImageUrl} 
+                    alt="Photo" 
+                    className="w-8 h-8 xl:w-10 xl:h-10 rounded-full object-cover border-2 border-white/20"
+                    onError={(e) => {
+                      console.error('Erreur chargement photo:', user.profileImageUrl);
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
                 ) : (
                   <div className="w-8 h-8 xl:w-10 xl:h-10 rounded-full bg-white/10 flex items-center justify-center border-2 border-white/20">
                     <span className="text-xs xl:text-sm font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
@@ -174,6 +253,13 @@ export default function StudentDashboard() {
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 xl:gap-1.5 px-2 xl:px-3 py-1 xl:py-1.5 bg-white/10 text-white/80 rounded-lg text-[10px] xl:text-xs hover:bg-white/20 transition-colors">
                   <UserCircleIcon className="w-3.5 h-3.5 xl:w-4 xl:h-4" /> Profil
                 </button>
+                <button 
+                  onClick={refreshAllData} 
+                  disabled={refreshing}
+                  className="px-2 xl:px-3 py-1 xl:py-1.5 bg-blue-500/20 text-blue-300 rounded-lg text-[10px] xl:text-xs hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+                >
+                  <ArrowPathIcon className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                </button>
                 <button onClick={logout} className="px-2 xl:px-3 py-1 xl:py-1.5 bg-red-500/20 text-red-300 rounded-lg text-[10px] xl:text-xs hover:bg-red-500/30 transition-colors">
                   Déco
                 </button>
@@ -182,7 +268,14 @@ export default function StudentDashboard() {
               {/* Mobile/Tablette */}
               <div className="flex items-center gap-1 sm:gap-2 lg:hidden">
                 {user?.profileImageUrl ? (
-                  <img src={user.profileImageUrl} alt="Photo" className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover border border-white/20" />
+                  <img 
+                    src={user.profileImageUrl} 
+                    alt="Photo" 
+                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover border border-white/20"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
                 ) : (
                   <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
                     <span className="text-[10px] sm:text-xs font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
@@ -193,6 +286,13 @@ export default function StudentDashboard() {
                 </div>
                 <NotificationBell />
                 <LiveStatus />
+                <button 
+                  onClick={refreshAllData} 
+                  disabled={refreshing}
+                  className="p-1 sm:p-1.5 text-blue-400 hover:text-blue-300"
+                >
+                  <ArrowPathIcon className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                </button>
                 <button onClick={logout} className="p-1 sm:p-1.5 text-red-400 hover:text-red-300" aria-label="Déconnexion">
                   <ArrowLeftOnRectangleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
@@ -200,7 +300,7 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {/* Menu mobile déroulant */}
+          {/* Menu mobile déroulant (reste identique) */}
           {mobileMenuOpen && (
             <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.98)] backdrop-blur-2xl">
               <div className="px-3 py-2 space-y-1">
@@ -234,6 +334,14 @@ export default function StudentDashboard() {
                   <span>Mon profil</span>
                 </button>
                 
+                <button 
+                  onClick={() => { refreshAllData(); setMobileMenuOpen(false) }} 
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-blue-300/80 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
+                >
+                  <ArrowPathIcon className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  <span>Rafraîchir</span>
+                </button>
+                
                 {user?.maisonGrace && (
                   <div className="flex items-center gap-3 px-3 py-2 text-white/50 text-xs">
                     <span>🏠</span>
@@ -253,14 +361,16 @@ export default function StudentDashboard() {
           )}
         </nav>
 
+        {/* Le reste du JSX reste identique */}
         {showProfile ? (
-          <ProfileSection user={user} onClose={() => setShowProfile(false)} />
+          <ProfileSection user={user} onClose={() => {
+            setShowProfile(false);
+            refreshUser();
+          }} />
         ) : (
           <div className="max-w-7xl mx-auto py-2 sm:py-4 md:py-6 px-2 sm:px-4 lg:px-8">
-            {/* ✨ Verset du jour */}
             <DailyVerseCard />
             
-            {/* Statistiques - 3 colonnes responsives */}
             <div className="grid grid-cols-3 gap-1.5 sm:gap-3 md:gap-4 mb-3 sm:mb-4 md:mb-6">
               {[
                 { label: 'Présences', value: attendance.filter(a => a.status === 'present').length, color: 'text-green-300' },
@@ -274,13 +384,11 @@ export default function StudentDashboard() {
               ))}
             </div>
 
-            {/* Progression */}
             <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-lg sm:rounded-xl p-2 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6">
               <h3 className="text-sm sm:text-base md:text-lg font-normal text-white mb-2 sm:mb-3 md:mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Ma progression</h3>
               <ProgressChart data={progress.map(p => ({ name: p.module, progress: p.score }))} />
             </div>
 
-            {/* Quiz */}
             <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-lg sm:rounded-xl p-2 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6">
               <h3 className="text-sm sm:text-base md:text-lg font-normal text-white mb-2 sm:mb-3 md:mb-4 flex items-center gap-2" style={{ fontFamily: "'Playfair Display', serif" }}>
                 <span>📝</span> Quiz
@@ -288,7 +396,6 @@ export default function StudentDashboard() {
               <StudentQuiz />
             </div>
 
-            {/* Historique */}
             <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-lg sm:rounded-xl p-2 sm:p-4 md:p-6">
               <h3 className="text-sm sm:text-base md:text-lg font-normal text-white mb-2 sm:mb-3 md:mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Historique</h3>
               {attendance.length === 0 ? (

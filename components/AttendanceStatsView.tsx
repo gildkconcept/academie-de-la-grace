@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+// ⚠️ SUPPRIMER l'import de supabase
+// import { supabase } from '@/lib/supabase'
+import { serviceService } from '@/services/serviceService'  // ← AJOUTER
 import { toast } from 'sonner'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts'
 
@@ -24,9 +26,14 @@ export const AttendanceStatsView = () => {
 
   useEffect(() => { fetchServices(); fetchStats() }, [serviceId, method])
 
+  // ✅ CORRIGÉ - Remplacer l'appel Supabase par serviceService
   const fetchServices = async () => {
-    const { data } = await supabase.from('services').select('id, name')
-    if (data) setServices(data)
+    try {
+      const data = await serviceService.getAll()
+      setServices(data || [])
+    } catch (error) {
+      console.error('Erreur chargement services:', error)
+    }
   }
 
   const fetchStats = async () => {

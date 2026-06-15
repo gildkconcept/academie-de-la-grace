@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import axiosInstance from '@/lib/axios'
 
 interface Student {
   id: string
   full_name: string
+  name?: string
   branch: string
   level: number
   status?: 'present' | 'absent'
@@ -32,13 +34,31 @@ export const AssistedAttendance = ({ sessionId, sessionCode, onComplete }: Assis
   const fetchStudents = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/attendance/assisted?sessionId=${sessionId}`, { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok) {
-        setStudents(data.students || [])
+      console.log('🔍 [AssistedAttendance] Fetching students for session:', sessionId)
+      
+      const response = await axiosInstance.get(`/attendance/assisted?sessionId=${sessionId}`)
+      const data = response.data
+      
+      console.log('📊 [AssistedAttendance] Données reçues:', data)
+      
+      if (response.status === 200 && data.students) {
+        console.log(`📋 [AssistedAttendance] ${data.students.length} étudiants reçus`)
+        
+        // Afficher les noms pour debug
+        data.students.forEach((s: any, index: number) => {
+          console.log(`   ${index + 1}. ${s.full_name || s.name} (ID: ${s.id})`)
+        })
+        
+        setStudents(data.students.map((s: any) => ({
+          id: s.id,
+          full_name: s.full_name || s.name || 'Nom inconnu',
+          branch: s.branch || '-',
+          level: s.level || 1,
+          status: s.status || 'absent'
+        })))
       }
     } catch (error) {
-      console.error('Erreur:', error)
+      console.error('❌ Erreur fetchStudents:', error)
       toast.error('Erreur chargement étudiants')
     } finally {
       setLoading(false)
@@ -61,36 +81,48 @@ export const AssistedAttendance = ({ sessionId, sessionCode, onComplete }: Assis
     setSaving(true)
     try {
       const attendances = students.map(s => ({ studentId: s.id, status: s.status || 'absent' }))
-      const res = await fetch('/api/attendance/assisted', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ sessionId, attendances })
+      
+      console.log('💾 [AssistedAttendance] Sauvegarde des présences:', attendances)
+      
+      const response = await axiosInstance.post('/attendance/assisted', { 
+        sessionId, 
+        attendances 
       })
-      const data = await res.json()
-      if (res.ok) {
+      
+      if (response.status === 200) {
         toast.success('Présences enregistrées')
         if (onComplete) onComplete()
-      } else {
-        toast.error(data.error || 'Erreur')
       }
-    } catch (error) {
-      toast.error('Erreur lors de l\'enregistrement')
+    } catch (error: any) {
+      console.error('❌ Erreur saveAttendances:', error)
+      toast.error(error.response?.data?.error || 'Erreur lors de l\'enregistrement')
     } finally {
       setSaving(false)
     }
   }
 
+  // Filtrer par recherche
   const filteredStudents = students.filter(s =>
-    s.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+    (s.full_name || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const presentCount = students.filter(s => s.status === 'present').length
   const totalCount = students.length
   const attendanceRate = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0
 
+  console.log(`📊 [AssistedAttendance] Affichage: ${filteredStudents.length}/${students.length} étudiants`)
+
   if (loading) {
     return <div className="text-center py-8 text-white/60">Chargement des étudiants...</div>
+  }
+
+  if (students.length === 0) {
+    return (
+      <div className="text-center py-12 bg-white/[0.04] rounded-xl">
+        <p className="text-white/40 text-sm">Aucun étudiant sans téléphone trouvé pour cette session</p>
+        <p className="text-white/30 text-xs mt-2">Vérifiez que des étudiants ont has_phone = false dans la base</p>
+      </div>
+    )
   }
 
   return (
@@ -136,9 +168,9 @@ export const AssistedAttendance = ({ sessionId, sessionCode, onComplete }: Assis
       )}
 
       {/* Liste des étudiants */}
-      <div className="space-y-2 max-h-80 overflow-y-auto">
+      <div className="space-y-2 max-h-96 overflow-y-auto">
         {filteredStudents.length === 0 ? (
-          <div className="text-center py-8 text-white/40 text-sm">Aucun étudiant sans téléphone</div>
+          <div className="text-center py-8 text-white/40 text-sm">Aucun étudiant trouvé</div>
         ) : (
           filteredStudents.map(student => (
             <div

@@ -1,4 +1,3 @@
-// components/MonthlyReports.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -8,7 +7,7 @@ import {
   ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell
 } from 'recharts'
 import { DocumentArrowDownIcon, FunnelIcon, ArrowPathIcon, ChevronDownIcon, EyeIcon } from '@heroicons/react/24/outline'
-import { supabase } from '@/lib/supabase'
+import { attendanceService } from '@/services/attendanceService'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -130,36 +129,39 @@ export const MonthlyReports = () => {
   }, [selectedMonth, selectedYear, serviceFilter, levelFilter, branchFilter])
 
   const fetchServices = async () => {
-    const { data } = await supabase.from('services').select('id, name').order('name')
-    if (data) setServices(data)
+    try {
+      const { data } = await attendanceService.getServices?.() || []
+      setServices(data || [])
+    } catch (error) {
+      console.error('Erreur fetchServices:', error)
+    }
   }
 
   const fetchBranches = async () => {
-    const { data } = await supabase.from('students').select('branch').is('deleted_at', null)
-    if (data) {
-      const uniqueBranches = [...new Set(data.map(s => s.branch))].sort()
-      setBranches(uniqueBranches)
+    try {
+      const { data } = await attendanceService.getBranches?.() || []
+      setBranches(data || [])
+    } catch (error) {
+      console.error('Erreur fetchBranches:', error)
     }
   }
 
   const fetchReport = async () => {
     setLoading(true)
     try {
-      let url = `/api/reports/monthly?month=${selectedMonth}&year=${selectedYear}`
-      if (serviceFilter !== 'all') url += `&serviceId=${serviceFilter}`
-      if (levelFilter !== 'all') url += `&level=${levelFilter}`
-      if (branchFilter !== 'all') url += `&branch=${encodeURIComponent(branchFilter)}`
+      const params = new URLSearchParams({
+        month: selectedMonth.toString(),
+        year: selectedYear.toString()
+      })
+      if (serviceFilter !== 'all') params.append('serviceId', serviceFilter)
+      if (levelFilter !== 'all') params.append('level', levelFilter)
+      if (branchFilter !== 'all') params.append('branch', branchFilter)
       
-      const res = await fetch(url, { credentials: 'include' })
-      const result = await res.json()
-      if (res.ok) {
-        setData(result)
-      } else {
-        toast.error(result.error || 'Erreur lors du chargement du rapport')
-      }
+      const result = await attendanceService.getMonthlyReport?.(params) || {}
+      setData(result)
     } catch (error) {
-      console.error('Erreur:', error)
-      toast.error('Erreur réseau')
+      console.error('Erreur fetchReport:', error)
+      toast.error('Erreur lors du chargement du rapport')
     } finally {
       setLoading(false)
     }

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { serviceService } from '@/services/serviceService'  // ← Remplacer supabase
 
 interface Service {
   id: string
@@ -31,8 +31,12 @@ export default function ForgotCredentialsPage() {
   useEffect(() => { fetchServices() }, [])
 
   const fetchServices = async () => {
-    const { data } = await supabase.from('services').select('id, name').order('name')
-    if (data) setServices(data)
+    try {
+      const data = await serviceService.getAll()  // ← Remplacé
+      setServices(data || [])
+    } catch (error) {
+      console.error('Erreur chargement services:', error)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

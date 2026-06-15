@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
+import axiosInstance from '@/lib/axios'  
 
 export function useLiveStatus() {
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -29,20 +30,13 @@ export function useLiveStatus() {
       else if (pathname?.includes('/superadmin')) currentPage = 'Admin'
       else if (pathname?.includes('/manager')) currentPage = 'Manager'
       
-      const res = await fetch('/api/live/heartbeat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ currentPage })
-      })
+      // ✅ Remplacer fetch par axiosInstance
+      const response = await axiosInstance.post('/live/heartbeat', { currentPage })
       
-      if (res.ok) {
-        const data = await res.json()
-        if (data.data?.connected_at && !connectedSince) {
-          setConnectedSince(new Date(data.data.connected_at))
-        }
-        setIsOnline(true)
+      if (response.data?.data?.connected_at && !connectedSince) {
+        setConnectedSince(new Date(response.data.data.connected_at))
       }
+      setIsOnline(true)
     } catch (error) {
       console.error('Heartbeat error:', error)
     }
@@ -50,12 +44,12 @@ export function useLiveStatus() {
 
   useEffect(() => {
     sendHeartbeat()
-    // ✅ Heartbeat toutes les 5 minutes (300000 ms) au lieu de 30 secondes
-    const interval = setInterval(sendHeartbeat,  120000)
+    // Heartbeat toutes les 2 minutes
+    const interval = setInterval(sendHeartbeat, 120000)
     return () => clearInterval(interval)
   }, [sendHeartbeat])
 
-  // Gérer la fermeture de l'onglet
+  // Gérer la fermeture de l'onglet (fetch nu car sendBeacon ne supporte pas axios)
   useEffect(() => {
     const handleBeforeUnload = () => {
       navigator.sendBeacon('/api/live/heartbeat', JSON.stringify({ isOnline: false }))

@@ -2,11 +2,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { serviceService } from '@/services/serviceService'
+import { studentService } from '@/services/studentService'
 import { toast } from 'sonner'
-import { TrophyIcon, FunnelIcon, DocumentArrowDownIcon, XMarkIcon, ScaleIcon, ChartBarIcon } from '@heroicons/react/24/outline'
+import { TrophyIcon, FunnelIcon, DocumentArrowDownIcon, XMarkIcon, ScaleIcon, ChartBarIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import axiosInstance from '@/lib/axios'
 
 interface RankingStudent {
   id: string
@@ -34,6 +36,7 @@ interface RankingStudent {
 export const RankingList = ({ userRole, serviceId }: { userRole: string; serviceId?: string }) => {
   const [rankings, setRankings] = useState<RankingStudent[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [selectedLevel, setSelectedLevel] = useState('all')
   const [selectedPeriod, setSelectedPeriod] = useState('monthly')
   const [selectedService, setSelectedService] = useState('all')
@@ -59,21 +62,36 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
     fetchRankings()
   }, [selectedLevel, selectedPeriod, selectedService, selectedBranch, useFairRanking])
 
+  // Rafraîchissement automatique toutes les 30 secondes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchRankings(true)
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [selectedLevel, selectedPeriod, selectedService, selectedBranch, useFairRanking])
+
   const fetchServicesAndBranches = async () => {
-    const { data: servicesData } = await supabase.from('services').select('id, name')
-    if (servicesData) setServices(servicesData)
+    try {
+      const servicesData = await serviceService.getAll()
+      setServices(servicesData || [])
+    } catch (error) {
+      console.error('Erreur chargement services:', error)
+    }
     
-    const { data: studentsData } = await supabase.from('students').select('branch').is('deleted_at', null)
-    if (studentsData) {
-      const uniqueBranches = [...new Set(studentsData.map(s => s.branch))].sort()
-      setBranches(uniqueBranches)
+    try {
+      const branchesData = await studentService.getBranches()
+      setBranches(branchesData || [])
+    } catch (error) {
+      console.error('Erreur chargement branches:', error)
     }
   }
 
-  const fetchRankings = async () => {
-    setLoading(true)
+  const fetchRankings = async (silent = false) => {
+    if (!silent) setLoading(true)
+    else setRefreshing(true)
+    
     try {
-      let url = useFairRanking ? '/api/rankings/fair' : '/api/rankings'
+      let url = useFairRanking ? '/rankings/fair' : '/rankings'
       
       const params = new URLSearchParams()
       if (selectedLevel !== 'all') params.append('level', selectedLevel)
@@ -83,26 +101,33 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
       
       if (params.toString()) url += `?${params.toString()}`
       
-      const res = await fetch(url, { credentials: 'include' })
-      const data = await res.json()
+      const response = await axiosInstance.get(url)
+      const data = response.data
       
-      if (res.ok) {
-        setRankings(data.rankings || [])
-        setStats({
-          totalStudents: data.stats?.totalStudents || 0,
-          averageScore: data.stats?.averageScore || 0,
-          topStudent: data.rankings?.[0] || null,
-          totalStudentsWithMissedQuizzes: data.stats?.totalStudentsWithMissedQuizzes || 0,
-          totalStudentsWithMissedSessions: data.stats?.totalStudentsWithMissedSessions || 0
-        })
-      } else {
-        toast.error(data.error || 'Erreur chargement classement')
+      const rankingsData = Array.isArray(data) ? data : (data.rankings || [])
+      const statsData = data.stats || {}
+      
+      setRankings(rankingsData)
+      setStats({
+        totalStudents: statsData.totalStudents || rankingsData.length,
+        averageScore: statsData.averageScore || 0,
+        topStudent: rankingsData[0] || null,
+        totalStudentsWithMissedQuizzes: statsData.totalStudentsWithMissedQuizzes || 0,
+        totalStudentsWithMissedSessions: statsData.totalStudentsWithMissedSessions || 0
+      })
+      
+      if (!silent && rankingsData.length > 0) {
+        toast.success(`Classement mis à jour (${rankingsData.length} étudiants)`)
       }
-    } catch (error) {
-      console.error('Erreur:', error)
-      toast.error('Erreur chargement classement')
+    } catch (error: any) {
+      console.error('Erreur fetchRankings:', error)
+      if (!silent) {
+        const errorMsg = error.response?.data?.error || error.message || 'Erreur chargement classement'
+        toast.error(errorMsg)
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
+      else setRefreshing(false)
     }
   }
 
@@ -151,7 +176,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
     
     if (useFairRanking && stats.totalStudentsWithMissedQuizzes > 0) {
       doc.text(`Étudiants avec quiz manqués: ${stats.totalStudentsWithMissedQuizzes}`, 20, 66)
-      doc.text(`Étudiants avec séances manquées: ${stats.totalStudentsWithMissedSessions}`, 20, 73)
+      doc.text(`Étudiants avec codes manqués: ${stats.totalStudentsWithMissedSessions}`, 20, 73)
     }
 
     let dataToExport = rankings
@@ -174,11 +199,12 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
       `${Math.round(r.final_score)}%`,
       `${Math.round(r.attendance_score)}%`,
       `${Math.round(r.quiz_score)}%`,
-      useFairRanking ? `${r.missed_quizzes || 0}/${r.total_quizzes_expected || 0}` : '-'
+      useFairRanking ? `${r.missed_quizzes || 0}/${r.total_quizzes_expected || 0}` : '-',
+      useFairRanking ? `${r.missed_sessions || 0}/${r.total_sessions_expected || 0}` : '-'
     ])
 
     const headers = useFairRanking 
-      ? [['Rang', 'Étudiant', 'Niveau', 'Service', 'Branche', 'Score', 'Présence', 'Quiz', 'Manqués']]
+      ? [['Rang', 'Étudiant', 'Niveau', 'Service', 'Branche', 'Score', 'Présence', 'Quiz', 'Quiz manqués', 'Codes manqués']]
       : [['Rang', 'Étudiant', 'Niveau', 'Service', 'Branche', 'Score', 'Présence', 'Quiz']]
 
     autoTable(doc, {
@@ -196,7 +222,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
 
   const selectClass = "w-full px-4 py-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-indigo-400 [&>option]:bg-white [&>option]:text-gray-900"
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="w-10 h-10 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -206,97 +232,6 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
 
   const top3 = rankings.slice(0, 3)
   const rest = rankings.slice(3)
-
-  // Version mobile du podium
-  const MobilePodium = () => {
-    if (top3.length === 0) return null
-    return (
-      <div className="space-y-3 lg:hidden">
-        {top3[0] && (
-          <div key="first-place" className="bg-gradient-to-b from-yellow-500 to-amber-600 rounded-xl p-4 text-center">
-            <div className="text-5xl mb-2">🥇</div>
-            {top3[0].student.profile_image_url ? (
-              <img src={top3[0].student.profile_image_url} alt="" className="w-16 h-16 rounded-full mx-auto object-cover border-2 border-white/30" />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-white/20 mx-auto flex items-center justify-center">
-                <span className="text-2xl font-bold text-white/60">{top3[0].student.full_name?.charAt(0)}</span>
-              </div>
-            )}
-            <p className="text-white font-semibold text-base mt-2">{top3[0].student.full_name}</p>
-            <p className="text-white/80 text-sm">{Math.round(top3[0].final_score)}%</p>
-            {useFairRanking && top3[0]?.missed_quizzes && top3[0].missed_quizzes > 0 && (
-              <p className="text-white/50 text-[10px] mt-1">⚠️ {top3[0].missed_quizzes} quiz manqués</p>
-            )}
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          {top3[1] && (
-            <div key="second-place" className="bg-gradient-to-b from-gray-400 to-gray-500 rounded-xl p-3 text-center">
-              <div className="text-3xl mb-1">🥈</div>
-              <div className="w-12 h-12 rounded-full bg-white/20 mx-auto flex items-center justify-center">
-                <span className="text-lg font-bold text-white/60">{top3[1].student.full_name?.charAt(0)}</span>
-              </div>
-              <p className="text-white font-medium text-sm mt-1 truncate">{top3[1].student.full_name}</p>
-              <p className="text-white/80 text-xs">{Math.round(top3[1].final_score)}%</p>
-            </div>
-          )}
-          {top3[2] && (
-            <div key="third-place" className="bg-gradient-to-b from-amber-600 to-amber-700 rounded-xl p-3 text-center">
-              <div className="text-3xl mb-1">🥉</div>
-              <div className="w-12 h-12 rounded-full bg-white/20 mx-auto flex items-center justify-center">
-                <span className="text-lg font-bold text-white/60">{top3[2].student.full_name?.charAt(0)}</span>
-              </div>
-              <p className="text-white font-medium text-sm mt-1 truncate">{top3[2].student.full_name}</p>
-              <p className="text-white/80 text-xs">{Math.round(top3[2].final_score)}%</p>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Version mobile de la liste
-  const MobileRankingList = () => {
-    if (rest.length === 0) return null
-    return (
-      <div className="space-y-3 lg:hidden">
-        {rest.map((ranking) => (
-          <div key={ranking.id} className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-3">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                <span className="text-xs font-bold text-white/60">#{ranking.rank}</span>
-              </div>
-              {ranking.student.profile_image_url ? (
-                <img src={ranking.student.profile_image_url} alt="" className="w-10 h-10 rounded-full object-cover" />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                  <span className="text-sm font-bold text-white/60">{ranking.student.full_name?.charAt(0)}</span>
-                </div>
-              )}
-              <div className="flex-1">
-                <p className="text-white font-medium text-sm">{ranking.student.full_name}</p>
-                <p className="text-white/40 text-xs">Niv.{ranking.student.level} • {ranking.student.service_name || '-'}</p>
-                {useFairRanking && ranking.missed_quizzes && ranking.missed_quizzes > 0 && (
-                  <p className="text-white/30 text-[10px]">⚠️ {ranking.missed_quizzes} quiz manqués</p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-white font-bold">{Math.round(ranking.final_score)}%</p>
-                <div className="flex gap-1 mt-1">
-                  <div className="w-8 bg-white/10 rounded-full h-1">
-                    <div className="bg-green-400 h-1 rounded-full" style={{ width: `${ranking.attendance_score}%` }} />
-                  </div>
-                  <div className="w-8 bg-white/10 rounded-full h-1">
-                    <div className="bg-blue-400 h-1 rounded-full" style={{ width: `${ranking.quiz_score}%` }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -310,13 +245,12 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
             </h2>
             <p className="text-white/40 text-[10px] sm:text-xs hidden sm:block">
               {useFairRanking 
-                ? 'Prend en compte les quiz manqués et les séances manquées dès l\'inscription' 
+                ? 'Prend en compte les quiz manqués et les codes manqués' 
                 : 'Basé sur les présences (40%) et quiz (60%)'}
             </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          {/* Toggle entre les deux modes de classement */}
           <div className="flex gap-1 bg-white/10 rounded-lg p-0.5">
             <button
               onClick={() => setUseFairRanking(true)}
@@ -325,7 +259,6 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
                   ? 'bg-green-500/30 text-green-300' 
                   : 'text-white/50 hover:text-white/70'
               }`}
-              title="Classement équitable - prend en compte l'ancienneté"
             >
               <ScaleIcon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Équitable</span>
@@ -337,12 +270,20 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
                   ? 'bg-blue-500/30 text-blue-300' 
                   : 'text-white/50 hover:text-white/70'
               }`}
-              title="Classement simple - moyenne simple des scores"
             >
               <ChartBarIcon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Simple</span>
             </button>
           </div>
+          
+          <button
+            onClick={() => fetchRankings(false)}
+            disabled={refreshing}
+            className="px-3 py-2 bg-blue-500/20 text-blue-300 rounded-lg text-xs hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+          >
+            <ArrowPathIcon className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Mise à jour...' : 'Rafraîchir'}
+          </button>
           
           <button
             onClick={exportRankingsPDF}
@@ -430,7 +371,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
             </div>
             <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.08] rounded-xl p-3 sm:p-4 text-center">
               <div className="text-xl sm:text-2xl font-bold text-red-300">{stats.totalStudentsWithMissedSessions}</div>
-              <div className="text-[10px] sm:text-xs text-white/40">Séances manquées</div>
+              <div className="text-[10px] sm:text-xs text-white/40">Codes manqués</div>
             </div>
           </>
         )}
@@ -443,7 +384,7 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
             const rank = student.rank
             const isSecond = rank === 2
             return (
-              <div key={student.id} className={`text-center ${isSecond ? 'order-first' : ''}`}>
+              <div key={student.student.id} className={`text-center ${isSecond ? 'order-first' : ''}`}>
                 <div className={`relative bg-gradient-to-b ${getMedalColor(rank)} rounded-xl p-3 sm:p-4 backdrop-blur-2xl`}>
                   <div className="text-3xl sm:text-4xl mb-1">{getMedalIcon(rank)}</div>
                   {student.student.profile_image_url ? (
@@ -456,8 +397,12 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
                   <p className="text-white font-medium text-xs sm:text-sm mt-2 truncate">{student.student.full_name}</p>
                   <p className="text-white/60 text-[10px] sm:text-xs">Niveau {student.student.level}</p>
                   <p className="text-white font-bold text-sm sm:text-base mt-1">{Math.round(student.final_score)}%</p>
-                  {useFairRanking && student.missed_quizzes && student.missed_quizzes > 0 && (
-                    <p className="text-white/40 text-[8px] mt-1">⚠️ {student.missed_quizzes} quiz manqués</p>
+                  {useFairRanking && (student.missed_quizzes > 0 || student.missed_sessions > 0) && (
+                    <p className="text-white/40 text-[8px] mt-1">
+                      {student.missed_quizzes > 0 && `⚠️ ${student.missed_quizzes} quiz`}
+                      {student.missed_quizzes > 0 && student.missed_sessions > 0 && ' • '}
+                      {student.missed_sessions > 0 && `📱 ${student.missed_sessions} code`}
+                    </p>
                   )}
                 </div>
               </div>
@@ -467,7 +412,51 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
       )}
 
       {/* Podium Mobile */}
-      <MobilePodium />
+      <div className="space-y-3 lg:hidden">
+        {top3[0] && (
+          <div key="first-place" className="bg-gradient-to-b from-yellow-500 to-amber-600 rounded-xl p-4 text-center">
+            <div className="text-5xl mb-2">🥇</div>
+            {top3[0].student.profile_image_url ? (
+              <img src={top3[0].student.profile_image_url} alt="" className="w-16 h-16 rounded-full mx-auto object-cover border-2 border-white/30" />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-white/20 mx-auto flex items-center justify-center">
+                <span className="text-2xl font-bold text-white/60">{top3[0].student.full_name?.charAt(0)}</span>
+              </div>
+            )}
+            <p className="text-white font-semibold text-base mt-2">{top3[0].student.full_name}</p>
+            <p className="text-white/80 text-sm">{Math.round(top3[0].final_score)}%</p>
+            {useFairRanking && (top3[0]?.missed_quizzes > 0 || top3[0]?.missed_sessions > 0) && (
+              <p className="text-white/50 text-[10px] mt-1">
+                {top3[0].missed_quizzes > 0 && `⚠️ ${top3[0].missed_quizzes} quiz`}
+                {top3[0].missed_quizzes > 0 && top3[0].missed_sessions > 0 && ' • '}
+                {top3[0].missed_sessions > 0 && `📱 ${top3[0].missed_sessions} code`}
+              </p>
+            )}
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          {top3[1] && (
+            <div key="second-place" className="bg-gradient-to-b from-gray-400 to-gray-500 rounded-xl p-3 text-center">
+              <div className="text-3xl mb-1">🥈</div>
+              <div className="w-12 h-12 rounded-full bg-white/20 mx-auto flex items-center justify-center">
+                <span className="text-lg font-bold text-white/60">{top3[1].student.full_name?.charAt(0)}</span>
+              </div>
+              <p className="text-white font-medium text-sm mt-1 truncate">{top3[1].student.full_name}</p>
+              <p className="text-white/80 text-xs">{Math.round(top3[1].final_score)}%</p>
+            </div>
+          )}
+          {top3[2] && (
+            <div key="third-place" className="bg-gradient-to-b from-amber-600 to-amber-700 rounded-xl p-3 text-center">
+              <div className="text-3xl mb-1">🥉</div>
+              <div className="w-12 h-12 rounded-full bg-white/20 mx-auto flex items-center justify-center">
+                <span className="text-lg font-bold text-white/60">{top3[2].student.full_name?.charAt(0)}</span>
+              </div>
+              <p className="text-white font-medium text-sm mt-1 truncate">{top3[2].student.full_name}</p>
+              <p className="text-white/80 text-xs">{Math.round(top3[2].final_score)}%</p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Liste Desktop */}
       <div className="hidden lg:block bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl overflow-hidden">
@@ -484,13 +473,16 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
                 <th className="px-4 py-3 text-center text-xs text-white/40">Présence</th>
                 <th className="px-4 py-3 text-center text-xs text-white/40">Quiz</th>
                 {useFairRanking && (
-                  <th className="px-4 py-3 text-center text-xs text-white/40">Manqués</th>
+                  <>
+                    <th className="px-4 py-3 text-center text-xs text-white/40">Quiz manqués</th>
+                    <th className="px-4 py-3 text-center text-xs text-white/40">Codes manqués</th>
+                  </>
                 )}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {rest.map((ranking) => (
-                <tr key={ranking.id} className="hover:bg-white/[0.04] transition-colors">
+                <tr key={ranking.student.id} className="hover:bg-white/[0.04] transition-colors">
                   <td className="px-4 py-3">
                     <span className="text-sm text-white/40">#{ranking.rank}</span>
                   </td>
@@ -529,11 +521,18 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
                     </div>
                   </td>
                   {useFairRanking && (
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-xs text-orange-300">
-                        {ranking.missed_quizzes || 0}/{ranking.total_quizzes_expected || 0}
-                      </span>
-                    </td>
+                    <>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-xs text-orange-300">
+                          {ranking.missed_quizzes || 0}/{ranking.total_quizzes_expected || 0}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-xs text-red-300">
+                          {ranking.missed_sessions || 0}/{ranking.total_sessions_expected || 0}
+                        </span>
+                      </td>
+                    </>
                   )}
                 </tr>
               ))}
@@ -543,7 +542,49 @@ export const RankingList = ({ userRole, serviceId }: { userRole: string; service
       </div>
 
       {/* Liste Mobile */}
-      <MobileRankingList />
+      <div className="space-y-3 lg:hidden">
+        {rest.map((ranking) => (
+          <div key={ranking.student.id} className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                <span className="text-xs font-bold text-white/60">#{ranking.rank}</span>
+              </div>
+              {ranking.student.profile_image_url ? (
+                <img src={ranking.student.profile_image_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                  <span className="text-sm font-bold text-white/60">{ranking.student.full_name?.charAt(0)}</span>
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="text-white font-medium text-sm">{ranking.student.full_name}</p>
+                <p className="text-white/40 text-xs">Niv.{ranking.student.level} • {ranking.student.service_name || '-'}</p>
+                {useFairRanking && (ranking.missed_quizzes > 0 || ranking.missed_sessions > 0) && (
+                  <div className="flex gap-2 mt-1">
+                    {ranking.missed_quizzes > 0 && (
+                      <span className="text-orange-300 text-[10px]">⚠️ {ranking.missed_quizzes} quiz</span>
+                    )}
+                    {ranking.missed_sessions > 0 && (
+                      <span className="text-red-300 text-[10px]">📱 {ranking.missed_sessions} code</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-white font-bold">{Math.round(ranking.final_score)}%</p>
+                <div className="flex gap-1 mt-1">
+                  <div className="w-8 bg-white/10 rounded-full h-1">
+                    <div className="bg-green-400 h-1 rounded-full" style={{ width: `${ranking.attendance_score}%` }} />
+                  </div>
+                  <div className="w-8 bg-white/10 rounded-full h-1">
+                    <div className="bg-blue-400 h-1 rounded-full" style={{ width: `${ranking.quiz_score}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {rankings.length === 0 && (
         <div className="text-center py-8 text-white/40 text-sm">Aucun classement disponible</div>

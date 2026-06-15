@@ -2,11 +2,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { serviceService } from '@/services/serviceService'
+import { studentService } from '@/services/studentService'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { UserGroupIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import axiosInstance from '@/lib/axios'
 
 interface Student {
   id: string
@@ -39,47 +41,44 @@ export const PromotionManager = () => {
   }, [selectedLevel, selectedService, selectedBranch])
 
   const fetchServices = async () => {
-    const { data } = await supabase.from('services').select('id, name')
-    if (data) setServices(data)
+    try {
+      const data = await serviceService.getAll()
+      setServices(data || [])
+    } catch (error) {
+      console.error('Erreur chargement services:', error)
+    }
   }
 
   const fetchBranches = async () => {
-    const { data } = await supabase.from('students').select('branch').is('deleted_at', null)
-    if (data) {
-      const unique = [...new Set(data.map(s => s.branch))].sort()
-      setBranches(unique)
+    try {
+      const data = await studentService.getBranches()
+      setBranches(data || [])
+    } catch (error) {
+      console.error('Erreur chargement branches:', error)
     }
   }
 
   const fetchStudents = async () => {
     setLoading(true)
     try {
-      let query = supabase
-        .from('students')
-        .select('*, services(name)')
-        .is('deleted_at', null)
-        .order('full_name')
-
-      if (selectedLevel !== 'all') {
-        query = query.eq('level', parseInt(selectedLevel))
-      }
-      if (selectedService !== 'all') {
-        query = query.eq('service_id', selectedService)
-      }
-      if (selectedBranch !== 'all') {
-        query = query.eq('branch', selectedBranch)
-      }
-
-      const { data } = await query
+      const filters: { level?: string; serviceId?: string; branch?: string } = {}
+      
+      if (selectedLevel !== 'all') filters.level = selectedLevel
+      if (selectedService !== 'all') filters.serviceId = selectedService
+      if (selectedBranch !== 'all') filters.branch = selectedBranch
+      
+      const data = await studentService.getAll(filters)
+      
       if (data) {
-        const studentsWithService = data.map(s => ({
+        const servicesMap = new Map(services.map(s => [s.id, s.name]))
+        const studentsWithService = data.map((s: any) => ({
           ...s,
-          service_name: (s.services as any)?.name
+          service_name: servicesMap.get(s.service_id) || '-'
         }))
         setStudents(studentsWithService)
       }
     } catch (error) {
-      console.error('Erreur:', error)
+      console.error('Erreur fetchStudents:', error)
       toast.error('Erreur chargement étudiants')
     } finally {
       setLoading(false)
@@ -117,27 +116,19 @@ export const PromotionManager = () => {
 
     setPromoting(true)
     try {
-      const res = await fetch('/api/students/bulk-promote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          studentIds: Array.from(selectedStudents),
-          targetLevel,
-          reason: `Promotion en masse via l'interface d'administration`
-        })
+      // ✅ Utiliser axiosInstance au lieu de fetch
+      const response = await axiosInstance.post('/students/bulk-promote', {
+        studentIds: Array.from(selectedStudents),
+        targetLevel,
+        reason: `Promotion en masse vers le niveau ${targetLevel}`
       })
 
-      const data = await res.json()
-      if (res.ok) {
-        toast.success(data.message)
-        setSelectedStudents(new Set())
-        fetchStudents()
-      } else {
-        toast.error(data.error || 'Erreur lors de la promotion')
-      }
-    } catch (error) {
-      toast.error('Erreur réseau')
+      toast.success(response.data.message || `${selectedStudents.size} étudiant(s) promu(s) avec succès`)
+      setSelectedStudents(new Set())
+      fetchStudents()
+    } catch (error: any) {
+      console.error('Erreur promotion:', error)
+      toast.error(error.response?.data?.error || 'Erreur lors de la promotion')
     } finally {
       setPromoting(false)
     }
@@ -154,22 +145,14 @@ export const PromotionManager = () => {
     if (!confirm) return
 
     try {
-      const res = await fetch(`/api/students/${studentId}/level`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ level: newLevel })
-      })
+      // ✅ Utiliser axiosInstance au lieu de fetch
+      const response = await axiosInstance.put(`/students/${studentId}/level`, { level: newLevel })
 
-      const data = await res.json()
-      if (res.ok) {
-        toast.success(data.message)
-        fetchStudents()
-      } else {
-        toast.error(data.error || 'Erreur')
-      }
-    } catch (error) {
-      toast.error('Erreur réseau')
+      toast.success(response.data.message || 'Niveau mis à jour')
+      fetchStudents()
+    } catch (error: any) {
+      console.error('Erreur promotion individuelle:', error)
+      toast.error(error.response?.data?.error || 'Erreur lors de la promotion')
     }
   }
 

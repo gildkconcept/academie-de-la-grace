@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { EyeIcon, MagnifyingGlassIcon, FunnelIcon, XMarkIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline'
+import { quizService } from '@/services/quizService'
+import { serviceService } from '@/services/serviceService'
 
 export const AdminQuizHistory = () => {
   const [results, setResults] = useState<any[]>([])
@@ -25,39 +27,42 @@ export const AdminQuizHistory = () => {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      params.append('limit', limit.toString())
-      params.append('offset', (page * limit).toString())
-      if (selectedLevel !== 'all') params.append('level', selectedLevel)
-      if (selectedService !== 'all') params.append('serviceId', selectedService)
-      if (selectedBranch !== 'all') params.append('branch', selectedBranch)
-      if (searchTerm) params.append('search', searchTerm)
-
-      const res = await fetch(`/api/quiz/history?${params}`, { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok) {
-        setResults(data.results || [])
-        setTotal(data.total || 0)
-        setStats(data.stats || {})
-      }
-    } catch (error) { console.error('Erreur:', error) }
-    finally { setLoading(false) }
+      const data = await quizService.getHistory({
+        limit,
+        offset: page * limit,
+        level: selectedLevel,
+        serviceId: selectedService,
+        branch: selectedBranch,
+        search: searchTerm
+      })
+      setResults(data.results || [])
+      setTotal(data.total || 0)
+      setStats(data.stats || {})
+    } catch (error) { 
+      console.error('Erreur fetchData:', error) 
+    } finally { 
+      setLoading(false) 
+    }
   }
 
   const fetchServices = async () => {
-    const res = await fetch('/api/services', { credentials: 'include' })
-    const data = await res.json()
-    if (Array.isArray(data)) {
+    try {
+      const data = await serviceService.getAll()
       setServices(data)
       const uniqueBranches = [...new Set(data.flatMap((s: any) => s.branch || []))].sort()
       setBranches(uniqueBranches as string[])
+    } catch (error) {
+      console.error('Erreur fetchServices:', error)
     }
   }
 
   const viewDetail = async (resultId: string) => {
-    const res = await fetch(`/api/quiz/detail?resultId=${resultId}`, { credentials: 'include' })
-    const data = await res.json()
-    if (res.ok) setShowDetail(data)
+    try {
+      const data = await quizService.getDetail(resultId)
+      setShowDetail(data)
+    } catch (error) {
+      console.error('Erreur viewDetail:', error)
+    }
   }
 
   const totalPages = Math.ceil(total / limit)
@@ -95,10 +100,9 @@ export const AdminQuizHistory = () => {
         </div>
       )}
 
-      {/* Historique - Version responsive */}
+      {/* Historique */}
       {activeTab === 'history' && (
         <>
-          {/* Barre de recherche et filtres */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -118,7 +122,6 @@ export const AdminQuizHistory = () => {
             </button>
           </div>
 
-          {/* Filtres déroulants */}
           {showFilters && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className={selectClass}>
@@ -138,7 +141,7 @@ export const AdminQuizHistory = () => {
             </div>
           )}
 
-          {/* Version mobile : Cartes */}
+          {/* Version mobile */}
           <div className="lg:hidden space-y-3">
             {loading ? (
               <div className="text-center py-8 text-white/50">Chargement...</div>
@@ -153,10 +156,7 @@ export const AdminQuizHistory = () => {
                       <p className="text-white/40 text-xs">{r.quiz?.title}</p>
                       <p className="text-white/40 text-xs">Niveau {r.quiz?.level}</p>
                     </div>
-                    <button
-                      onClick={() => viewDetail(r.id)}
-                      className="p-2 text-blue-300 hover:text-blue-200 bg-blue-500/10 rounded-lg"
-                    >
+                    <button onClick={() => viewDetail(r.id)} className="p-2 text-blue-300 hover:text-blue-200 bg-blue-500/10 rounded-lg">
                       <EyeIcon className="w-5 h-5" />
                     </button>
                   </div>
@@ -175,7 +175,7 @@ export const AdminQuizHistory = () => {
             )}
           </div>
 
-          {/* Version desktop : Tableau */}
+          {/* Version desktop */}
           <div className="hidden lg:block bg-white/[0.04] border border-white/[0.08] rounded-xl overflow-hidden">
             <table className="min-w-full">
               <thead>
@@ -215,27 +215,15 @@ export const AdminQuizHistory = () => {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex justify-center gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs disabled:opacity-30"
-              >
-                ← Précédent
-              </button>
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs disabled:opacity-30">← Précédent</button>
               <span className="px-3 py-1.5 text-white/50 text-xs">Page {page + 1}/{totalPages}</span>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
-                className="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs disabled:opacity-30"
-              >
-                Suivant →
-              </button>
+              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs disabled:opacity-30">Suivant →</button>
             </div>
           )}
         </>
       )}
 
-      {/* Modal détail - Version responsive */}
+      {/* Modal détail */}
       {showDetail && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-[rgba(8,20,90,0.97)] backdrop-blur-2xl border border-white/[0.15] rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-auto">

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { XMarkIcon, MegaphoneIcon } from '@heroicons/react/24/outline'
+import axiosInstance from '@/lib/axios'
 
 interface SendAnnouncementProps {
   onClose: () => void
@@ -16,45 +17,77 @@ export const SendAnnouncement = ({ onClose }: SendAnnouncementProps) => {
   const [selectedLevel, setSelectedLevel] = useState<string>('1')
   const [loadingServices, setLoadingServices] = useState(false)
 
+  useEffect(() => {
+    fetchServices()
+  }, [])
+
   const fetchServices = async () => {
     setLoadingServices(true)
     try {
-      const res = await fetch('/api/services', { credentials: 'include' })
-      const data = await res.json()
+      const response = await axiosInstance.get('/services')
+      const data = response.data
       if (Array.isArray(data)) setServices(data)
-    } catch (error) { console.error('Erreur chargement services:', error) }
-    finally { setLoadingServices(false) }
+    } catch (error) { 
+      console.error('Erreur chargement services:', error)
+      toast.error('Erreur lors du chargement des services')
+    } finally { 
+      setLoadingServices(false) 
+    }
   }
 
   const handleSend = async () => {
-    if (!formData.title || !formData.message) { toast.error('Le titre et le message sont requis'); return }
+    if (!formData.title || !formData.message) { 
+      toast.error('Le titre et le message sont requis')
+      return 
+    }
+    
     setLoading(true)
     try {
       let userIds: string[] = []
       let targetLabel = ''
+      
       if (formData.target === 'all') {
-        const res = await fetch('/api/students/all-ids', { credentials: 'include' })
-        const data = await res.json(); userIds = data.studentIds || []; targetLabel = 'tous les étudiants'
+        const response = await axiosInstance.get('/students/all-ids')
+        userIds = response.data.studentIds || []
+        targetLabel = 'tous les étudiants'
       } else if (formData.target === 'service') {
-        if (!selectedService) { toast.error('Veuillez sélectionner un service'); setLoading(false); return }
-        const res = await fetch(`/api/students/by-service?serviceId=${selectedService}`, { credentials: 'include' })
-        const data = await res.json(); userIds = data.studentIds || []
+        if (!selectedService) { 
+          toast.error('Veuillez sélectionner un service')
+          setLoading(false)
+          return 
+        }
+        const response = await axiosInstance.get(`/students/by-service?serviceId=${selectedService}`)
+        userIds = response.data.studentIds || []
         targetLabel = `le service ${services.find(s => s.id === selectedService)?.name || ''}`
       } else if (formData.target === 'level') {
-        const res = await fetch(`/api/students/by-level?level=${selectedLevel}`, { credentials: 'include' })
-        const data = await res.json(); userIds = data.studentIds || []; targetLabel = `les étudiants de niveau ${selectedLevel}`
+        const response = await axiosInstance.get(`/students/by-level?level=${selectedLevel}`)
+        userIds = response.data.studentIds || []
+        targetLabel = `les étudiants du niveau ${selectedLevel}`
       }
-      if (userIds.length === 0) { toast.error('Aucun étudiant trouvé'); setLoading(false); return }
+      
+      if (userIds.length === 0) { 
+        toast.error('Aucun étudiant trouvé')
+        setLoading(false)
+        return 
+      }
 
-      const res = await fetch('/api/notifications', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ userIds, title: `📢 ${formData.title}`, message: formData.message, type: 'announcement', link: '/dashboard/student' })
+      const response = await axiosInstance.post('/notifications', {
+        userIds,
+        title: `📢 ${formData.title}`,
+        message: formData.message,
+        type: 'announcement',
+        link: '/dashboard/student'
       })
-      const data = await res.json()
-      if (res.ok) { toast.success(`Annonce envoyée à ${userIds.length} étudiant(s) de ${targetLabel} !`); onClose() }
-      else toast.error(data.error || 'Erreur lors de l\'envoi')
-    } catch (error) { toast.error('Erreur réseau') }
-    finally { setLoading(false) }
+      
+      toast.success(`Annonce envoyée à ${userIds.length} étudiant(s) de ${targetLabel} !`)
+      onClose()
+    } catch (error: any) {
+      console.error('Erreur:', error)
+      const errorMsg = error.response?.data?.error || error.message || 'Erreur lors de l\'envoi'
+      toast.error(errorMsg)
+    } finally { 
+      setLoading(false) 
+    }
   }
 
   const inputClass = "w-full p-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-400"
@@ -89,7 +122,7 @@ export const SendAnnouncement = ({ onClose }: SendAnnouncementProps) => {
             </div>
             <div>
               <label className="block text-sm text-white/70 mb-1">Destinataires</label>
-              <select value={formData.target} onChange={(e) => { setFormData({ ...formData, target: e.target.value }); if (e.target.value === 'service') fetchServices() }}
+              <select value={formData.target} onChange={(e) => setFormData({ ...formData, target: e.target.value })}
                 className={selectClass}>
                 <option value="all">Tous les étudiants</option>
                 <option value="service">Un service spécifique</option>
@@ -104,7 +137,9 @@ export const SendAnnouncement = ({ onClose }: SendAnnouncementProps) => {
             )}
             {formData.target === 'level' && (
               <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className={selectClass}>
-                <option value="1">Niveau 1</option><option value="2">Niveau 2</option><option value="3">Niveau 3</option>
+                <option value="1">Niveau 1</option>
+                <option value="2">Niveau 2</option>
+                <option value="3">Niveau 3</option>
               </select>
             )}
             <div className="flex justify-end gap-3 pt-4 border-t border-white/[0.08]">

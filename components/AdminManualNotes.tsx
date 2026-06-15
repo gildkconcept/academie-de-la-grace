@@ -2,9 +2,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { PhoneXMarkIcon, PencilIcon, TrashIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import axiosInstance from '@/lib/axios'
 
 interface Student {
   id: string
@@ -59,17 +59,18 @@ export const AdminManualNotes = () => {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/quiz-manual?${selectedStudent ? `studentId=${selectedStudent}` : ''}`, {
-        credentials: 'include'
-      })
-      const data = await res.json()
-      if (res.ok) {
+      const url = `/admin/quiz-manual${selectedStudent ? `?studentId=${selectedStudent}` : ''}`
+      const response = await axiosInstance.get(url)
+      const data = response.data
+      
+      if (response.status === 200) {
         setStudents(data.students || [])
         setQuizzes(data.quizzes || [])
         setManualNotes(data.manualNotes || [])
       }
-    } catch (error) {
-      toast.error('Erreur de chargement')
+    } catch (error: any) {
+      console.error('Erreur fetchData:', error)
+      toast.error(error.response?.data?.error || 'Erreur de chargement')
     } finally {
       setLoading(false)
     }
@@ -92,32 +93,25 @@ export const AdminManualNotes = () => {
     const percentage = (score / totalQuestions) * 100
 
     try {
-      const res = await fetch('/api/admin/quiz-manual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          studentId: selectedStudent,
-          quizId: formData.quizId,
-          score,
-          totalQuestions,
-          percentage,
-          action: editingNote ? 'update' : 'create'
-        })
+      const response = await axiosInstance.post('/admin/quiz-manual', {
+        studentId: selectedStudent,
+        quizId: formData.quizId,
+        score,
+        totalQuestions,
+        percentage,
+        action: editingNote ? 'update' : 'create'
       })
 
-      const data = await res.json()
-      if (res.ok) {
+      if (response.status === 200 || response.status === 201) {
         toast.success(editingNote ? 'Note modifiée' : 'Note ajoutée')
         setShowModal(false)
         setEditingNote(null)
         setFormData({ quizId: '', score: '', totalQuestions: '', percentage: '' })
         fetchData()
-      } else {
-        toast.error(data.error || 'Erreur')
       }
-    } catch (error) {
-      toast.error('Erreur réseau')
+    } catch (error: any) {
+      console.error('Erreur handleSubmit:', error)
+      toast.error(error.response?.data?.error || 'Erreur lors de l\'enregistrement')
     }
   }
 
@@ -125,25 +119,19 @@ export const AdminManualNotes = () => {
     if (!confirm(`Supprimer la note pour ${note.quiz?.title} ?`)) return
 
     try {
-      const res = await fetch('/api/admin/quiz-manual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          studentId: note.student_id,
-          quizId: note.quiz_id,
-          action: 'delete'
-        })
+      const response = await axiosInstance.post('/admin/quiz-manual', {
+        studentId: note.student_id,
+        quizId: note.quiz_id,
+        action: 'delete'
       })
 
-      if (res.ok) {
+      if (response.status === 200) {
         toast.success('Note supprimée')
         fetchData()
-      } else {
-        toast.error('Erreur lors de la suppression')
       }
-    } catch (error) {
-      toast.error('Erreur réseau')
+    } catch (error: any) {
+      console.error('Erreur handleDelete:', error)
+      toast.error(error.response?.data?.error || 'Erreur lors de la suppression')
     }
   }
 

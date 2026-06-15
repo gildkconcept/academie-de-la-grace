@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { Quiz, QuizResult } from '@/types'
+import { quizService } from '@/services/quizService'
 
 export const AdminQuiz = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
@@ -25,23 +26,24 @@ export const AdminQuiz = () => {
 
   const fetchQuizzes = async () => {
     try {
-      const res = await fetch('/api/quizzes', { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok) setQuizzes(data)
-    } catch (error) { console.error('Erreur:', error) }
+      const data = await quizService.getAll()
+      setQuizzes(data)
+    } catch (error) { 
+      console.error('Erreur fetchQuizzes:', error) 
+    }
   }
 
   const fetchResults = async () => {
     setLoading(true)
     try {
-      let url = '/api/quiz-results?'
-      if (selectedQuiz !== 'all') url += `quizId=${selectedQuiz}&`
-      if (selectedLevel !== 'all') url += `level=${selectedLevel}&`
-      const res = await fetch(url, { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok) { setResults(data.results || []); setStats(data.stats) }
-    } catch (error) { console.error('Erreur:', error) }
-    finally { setLoading(false) }
+      const data = await quizService.getAllResults(selectedQuiz, selectedLevel)
+      setResults(data.results || [])
+      setStats(data.stats || { totalSubmissions: 0, totalStudents: 0, averageScore: 0, perfectScores: 0 })
+    } catch (error) { 
+      console.error('Erreur fetchResults:', error) 
+    } finally { 
+      setLoading(false) 
+    }
   }
 
   const addQuestion = () => setNewQuiz(prev => ({ ...prev, questions: [...prev.questions, { question: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: 'A' }] }))
@@ -53,8 +55,15 @@ export const AdminQuiz = () => {
     const invalid = newQuiz.questions.some(q => !q.question || !q.option_a || !q.option_b || !q.option_c || !q.option_d)
     if (invalid) { toast.error('Remplissez toutes les questions'); return }
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/quizzes', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(newQuiz)
+        method: 'POST', 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }, 
+        credentials: 'include', 
+        body: JSON.stringify(newQuiz)
       })
       const data = await res.json()
       if (res.ok) {

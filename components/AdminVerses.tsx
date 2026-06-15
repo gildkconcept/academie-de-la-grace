@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { CalendarIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline'
+import { verseService } from '@/services/verseService'
 
 interface Verse {
   id: number
@@ -32,9 +33,8 @@ export const AdminVerses = () => {
   const fetchVerses = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/verses', { credentials: 'include' })
-      const data = await res.json()
-      if (res.ok) setVerses(data)
+      const data = await verseService.getAll()
+      setVerses(data)
     } catch (error) {
       toast.error('Erreur de chargement')
     } finally {
@@ -49,30 +49,22 @@ export const AdminVerses = () => {
     }
 
     try {
-      const method = editingVerse ? 'PUT' : 'POST'
-      const body = editingVerse 
-        ? { ...formData, id: editingVerse.id, is_active: true }
-        : formData
-
-      const res = await fetch('/api/admin/verses', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body)
-      })
-
-      if (res.ok) {
-        toast.success(editingVerse ? 'Verset modifié' : 'Verset ajouté')
-        setShowForm(false)
-        setEditingVerse(null)
-        setFormData({ verse: '', reference: '', displayed_date: new Date().toISOString().split('T')[0] })
-        fetchVerses()
+      if (editingVerse) {
+        await verseService.update(editingVerse.id.toString(), {
+          ...formData,
+          is_active: true
+        })
+        toast.success('Verset modifié')
       } else {
-        const error = await res.json()
-        toast.error(error.error || 'Erreur')
+        await verseService.create(formData)
+        toast.success('Verset ajouté')
       }
-    } catch (error) {
-      toast.error('Erreur lors de l\'enregistrement')
+      setShowForm(false)
+      setEditingVerse(null)
+      setFormData({ verse: '', reference: '', displayed_date: new Date().toISOString().split('T')[0] })
+      fetchVerses()
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Erreur')
     }
   }
 
@@ -80,19 +72,11 @@ export const AdminVerses = () => {
     if (!confirm('Supprimer ce verset ?')) return
     
     try {
-      const res = await fetch(`/api/admin/verses?id=${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      })
-      
-      if (res.ok) {
-        toast.success('Verset supprimé')
-        fetchVerses()
-      } else {
-        toast.error('Erreur lors de la suppression')
-      }
+      await verseService.delete(id.toString())
+      toast.success('Verset supprimé')
+      fetchVerses()
     } catch (error) {
-      toast.error('Erreur réseau')
+      toast.error('Erreur lors de la suppression')
     }
   }
 
