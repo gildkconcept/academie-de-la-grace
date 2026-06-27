@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -24,7 +24,7 @@ import { AnnouncementSection } from './AnnouncementSection'
 // Importer le composant Sidebar
 import { Sidebar } from '@/components/layout/Sidebar'
 
-// Icônes (garder uniquement celles utilisées)
+// Icônes
 import { 
   HomeIcon, 
   ChartBarIcon, 
@@ -51,7 +51,7 @@ interface Student {
   created_at: string
 }
 
-// Configuration des sections (uniquement celles conservées)
+// Configuration des sections
 const sections = [
   { id: 'overview', label: "Vue d'ensemble", icon: HomeIcon, component: GlobalStatsSection },
   { id: 'history', label: 'Historique', icon: ChartBarIcon, component: SessionsHistorySection },
@@ -107,8 +107,10 @@ export default function SuperAdminDashboard() {
     }
   }, [user, loading, router])
 
+  // ✅ useEffect avec TOUTES les dépendances pour appliquer les filtres
   useEffect(() => {
     applyFilters()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedService, selectedBranch, selectedLevel, selectedBaptism, studentSearchTerm, students])
 
   const handleNavigate = (sectionId: string) => {
@@ -149,31 +151,52 @@ export default function SuperAdminDashboard() {
     }
   }
 
-  const applyFilters = () => {
+  // ✅ Fonction applyFilters AMÉLIORÉE avec recherche robuste
+  const applyFilters = useCallback(() => {
+    if (!students || students.length === 0) {
+      setFilteredStudents([])
+      return
+    }
+
     let filtered = [...students]
     
+    // Filtre par service
     if (selectedService !== 'all') {
       filtered = filtered.filter(s => s.service_id === selectedService)
     }
+    
+    // Filtre par branche
     if (selectedBranch !== 'all') {
       filtered = filtered.filter(s => s.branch === selectedBranch)
     }
+    
+    // Filtre par niveau
     if (selectedLevel !== 'all') {
       filtered = filtered.filter(s => s.level === parseInt(selectedLevel))
     }
+    
+    // Filtre par baptême
     if (selectedBaptism !== 'all') {
       const isBaptized = selectedBaptism === 'yes'
       filtered = filtered.filter(s => s.baptized === isBaptized)
     }
-    if (studentSearchTerm) {
-      filtered = filtered.filter(s => 
-        s.full_name.toLowerCase().includes(studentSearchTerm.toLowerCase()) ||
-        s.username.toLowerCase().includes(studentSearchTerm.toLowerCase())
-      )
+    
+    // ✅ FILTRE RECHERCHE - Version robuste avec gestion des valeurs nulles
+    if (studentSearchTerm && studentSearchTerm.trim() !== '') {
+      const search = studentSearchTerm.toLowerCase().trim()
+      filtered = filtered.filter(s => {
+        const fullName = (s.full_name || '').toLowerCase()
+        const username = (s.username || '').toLowerCase()
+        const branch = (s.branch || '').toLowerCase()
+        
+        return fullName.includes(search) || 
+               username.includes(search) || 
+               branch.includes(search)
+      })
     }
     
     setFilteredStudents(filtered)
-  }
+  }, [students, selectedService, selectedBranch, selectedLevel, selectedBaptism, studentSearchTerm])
 
   const resetFilters = () => {
     setSelectedService('all')
@@ -187,7 +210,7 @@ export default function SuperAdminDashboard() {
     setStudentBaptismFilter('all')
     setStudentMaisonGraceFilter('all')
     setStudentMaisonGraceSearch('')
-    applyFilters()
+    // applyFilters sera déclenché par le useEffect
   }
 
   const handleDeleteStudent = async (studentId: string) => {
