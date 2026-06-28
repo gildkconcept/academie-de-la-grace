@@ -58,14 +58,21 @@ export const CodeHistoryList = () => {
     fetchSessions()
   }, [page, selectedLevel, selectedDate])
 
+  // ✅ MODIFIÉ - Utilisation de getAdminSessionHistory avec filtres
   const fetchSessions = async () => {
     setLoading(true)
     try {
       const offset = page * limit
-      const response = await sessionService.getSessionHistory(limit, offset)
+      const response = await sessionService.getAdminSessionHistory(limit, offset, {
+        level: selectedLevel,
+        date: selectedDate
+      })
+      
+      // La réponse contient { sessions, total }
+      const sessionsData = response.sessions || []
       
       // Enrichir avec les stats
-      const enriched = await Promise.all((response.sessions || []).map(async (session: any) => {
+      const enriched = await Promise.all(sessionsData.map(async (session: any) => {
         const stats = await getSessionStats(session.id)
         return {
           ...session,
@@ -109,7 +116,7 @@ export const CodeHistoryList = () => {
     
     setDeleting(sessionId)
     try {
-      await axiosInstance.delete(`/sessions/${sessionId}`)
+      await axiosInstance.delete(`/attendance/sessions/${sessionId}`)
       toast.success('Session supprimée avec succès')
       fetchSessions()
     } catch (error: any) {
@@ -167,12 +174,9 @@ export const CodeHistoryList = () => {
     }
   }
 
-  const filteredSessions = sessions.filter(session => {
-    if (searchTerm && !session.code.includes(searchTerm)) return false
-    if (selectedLevel !== 'all' && session.level !== parseInt(selectedLevel)) return false
-    if (selectedDate && session.date !== selectedDate) return false
-    return true
-  })
+  // ✅ FILTRES DÉPLACÉS VERS LE BACKEND - Plus besoin de filtrer côté frontend
+  // Les filtres sont maintenant appliqués directement dans la requête API
+  const filteredSessions = sessions
 
   const totalPages = Math.ceil(total / limit)
 
@@ -210,7 +214,10 @@ export const CodeHistoryList = () => {
               <label className="block text-xs text-white/50 mb-1">Niveau</label>
               <select
                 value={selectedLevel}
-                onChange={(e) => setSelectedLevel(e.target.value)}
+                onChange={(e) => {
+                  setSelectedLevel(e.target.value)
+                  setPage(0)
+                }}
                 className={selectClass}
               >
                 <option value="all">Tous</option>
@@ -224,13 +231,16 @@ export const CodeHistoryList = () => {
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value)
+                  setPage(0)
+                }}
                 className={inputClass}
               />
             </div>
           </div>
           <button
-            onClick={() => { setSearchTerm(''); setSelectedLevel('all'); setSelectedDate('') }}
+            onClick={() => { setSearchTerm(''); setSelectedLevel('all'); setSelectedDate(''); setPage(0) }}
             className="mt-3 text-xs text-blue-300/80 hover:text-blue-200"
           >
             Réinitialiser les filtres
