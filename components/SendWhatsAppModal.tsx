@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { XMarkIcon, PaperAirplaneIcon, UserGroupIcon, PhoneIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, PaperAirplaneIcon, PhoneIcon, ClipboardIcon, CheckIcon } from '@heroicons/react/24/outline'
 import { whatsappService } from '@/services/whatsappService'
 import { serviceService } from '@/services/serviceService'
 
@@ -20,9 +20,15 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
   const [selectedStudents, setSelectedStudents] = useState<string[]>([])
   const [selectAll, setSelectAll] = useState(false)
   
+  // ✅ NOUVEAU - États pour les liens
+  const [allLinks, setAllLinks] = useState<string[]>([])
+  const [currentLinkIndex, setCurrentLinkIndex] = useState(0)
+  const [showLinks, setShowLinks] = useState(false)
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+  
   const [formData, setFormData] = useState({
     message: '',
-    target: 'all', // 'all' | 'service' | 'level' | 'selected'
+    target: 'all',
     serviceId: 'all',
     level: 'all',
     branch: 'all'
@@ -32,13 +38,16 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
     total: number
     withPhone: number
     withoutPhone: number
-    sampleLinks: string[]
   } | null>(null)
 
   useEffect(() => {
     if (isOpen) {
       fetchServices()
       fetchStudents()
+      // Réinitialiser les liens quand on ferme/ouvre
+      setAllLinks([])
+      setShowLinks(false)
+      setCurrentLinkIndex(0)
     }
   }, [isOpen])
 
@@ -74,14 +83,12 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
       const data = await whatsappService.getStudentPhones(filters)
       setStudents(data.students || [])
       
-      // Mettre à jour le preview
       const total = data.students?.length || 0
       const withPhone = data.students?.filter((s: any) => s.phone).length || 0
       setPreview({
         total,
         withPhone,
-        withoutPhone: total - withPhone,
-        sampleLinks: []
+        withoutPhone: total - withPhone
       })
     } catch (error) {
       console.error('Erreur chargement étudiants:', error)
@@ -104,7 +111,6 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
 
     setLoading(true)
     try {
-      // Déterminer les destinataires
       let recipients: string[] = []
       let includeAll = false
       let serviceId = undefined
@@ -134,17 +140,16 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
         setPreview({
           total: data.stats.totalStudents,
           withPhone: data.stats.withPhone,
-          withoutPhone: data.stats.withoutPhone,
-          sampleLinks: data.links.slice(0, 3)
+          withoutPhone: data.stats.withoutPhone
         })
 
-        // Ouvrir les liens WhatsApp dans de nouveaux onglets
-        if (data.links.length > 0) {
-          // Pour les envois groupés, on ouvre le premier lien
-          // L'utilisateur peut ensuite utiliser le partage WhatsApp
-          const link = data.links[0]
-          window.open(link, '_blank')
-          toast.success(`Message préparé pour ${data.stats.withPhone} étudiant(s) sur ${data.stats.totalStudents}`)
+        // ✅ STOCKER TOUS LES LIENS
+        setAllLinks(data.links || [])
+        setCurrentLinkIndex(0)
+        setShowLinks(true)
+
+        if (data.stats.withPhone > 0) {
+          toast.success(`${data.stats.withPhone} lien(s) WhatsApp générés !`)
         }
 
         if (data.stats.withoutPhone > 0) {
@@ -157,6 +162,46 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
     } finally {
       setLoading(false)
     }
+  }
+
+  // ✅ Ouvrir le lien actuel
+  const openCurrentLink = () => {
+    if (allLinks.length > 0 && currentLinkIndex < allLinks.length) {
+      window.open(allLinks[currentLinkIndex], '_blank')
+    }
+  }
+
+  // ✅ Passer au lien suivant
+  const nextLink = () => {
+    if (currentLinkIndex < allLinks.length - 1) {
+      setCurrentLinkIndex(currentLinkIndex + 1)
+    } else {
+      toast.success('✅ Tous les liens ont été parcourus !')
+    }
+  }
+
+  // ✅ Passer au lien précédent
+  const prevLink = () => {
+    if (currentLinkIndex > 0) {
+      setCurrentLinkIndex(currentLinkIndex - 1)
+    }
+  }
+
+  // ✅ Copier le lien
+  const copyLink = async (link: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopiedIndex(index)
+      setTimeout(() => setCopiedIndex(null), 2000)
+      toast.success('Lien copié !')
+    } catch (error) {
+      toast.error('Erreur lors de la copie')
+    }
+  }
+
+  // ✅ Ouvrir un lien spécifique
+  const openSpecificLink = (link: string) => {
+    window.open(link, '_blank')
   }
 
   const toggleSelectAll = () => {
@@ -178,20 +223,143 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
     })
   }
 
+  // ✅ Fermer et réinitialiser
+  const handleClose = () => {
+    setAllLinks([])
+    setShowLinks(false)
+    setCurrentLinkIndex(0)
+    onClose()
+  }
+
   if (!isOpen) return null
 
   const inputClass = "w-full px-4 py-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-400"
   const selectClass = "w-full px-4 py-2.5 bg-white/90 border border-white/30 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-indigo-400 [&>option]:bg-white [&>option]:text-gray-900"
 
+  // ✅ Si on affiche les liens
+  if (showLinks && allLinks.length > 0) {
+    const total = allLinks.length
+    const current = currentLinkIndex + 1
+    const progress = Math.round((current / total) * 100)
+
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
+        <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto relative rounded-2xl" style={{ fontFamily: "'Crimson Text', Georgia, serif" }}>
+          <div className="absolute inset-0 bg-cover bg-center rounded-2xl" style={{ backgroundImage: "url('/ok.png')" }} />
+          <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(135deg, rgba(8,20,90,0.97) 0%, rgba(15,45,130,0.95) 40%, rgba(10,30,100,0.96) 70%, rgba(4,12,65,0.98) 100%)' }} />
+          
+          <div className="relative z-10 p-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-xl font-normal text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  📱 Envoi WhatsApp
+                </h2>
+                <p className="text-white/50 text-sm">{current} / {total} étudiants</p>
+              </div>
+              <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                <XMarkIcon className="w-5 h-5 text-white/60" />
+              </button>
+            </div>
+
+            {/* Barre de progression */}
+            <div className="w-full bg-white/10 rounded-full h-2 mb-4">
+              <div 
+                className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+
+            {/* Lien actuel */}
+            <div className="bg-white/[0.06] border border-white/[0.1] rounded-xl p-4 mb-4">
+              <p className="text-white/60 text-xs mb-1">Étudiant {current}</p>
+              <p className="text-white/80 text-sm truncate">{allLinks[currentLinkIndex]}</p>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={openCurrentLink}
+                  className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold transition-colors"
+                >
+                  📤 Ouvrir WhatsApp
+                </button>
+                <button
+                  onClick={() => copyLink(allLinks[currentLinkIndex], currentLinkIndex)}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white/80 rounded-lg text-sm transition-colors"
+                >
+                  {copiedIndex === currentLinkIndex ? (
+                    <CheckIcon className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <ClipboardIcon className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex gap-3">
+              <button
+                onClick={prevLink}
+                disabled={currentLinkIndex === 0}
+                className="flex-1 py-2 bg-white/10 text-white/70 rounded-lg text-sm hover:bg-white/20 transition-colors disabled:opacity-30"
+              >
+                ← Précédent
+              </button>
+              <button
+                onClick={nextLink}
+                className="flex-1 py-2 bg-white text-[#1a3a8f] rounded-lg text-sm font-bold hover:shadow-lg transition-all"
+              >
+                {currentLinkIndex < allLinks.length - 1 ? 'Suivant →' : '✅ Terminé'}
+              </button>
+            </div>
+
+            {/* Liste de tous les liens (scrollable) */}
+            <div className="mt-4 max-h-40 overflow-y-auto bg-white/[0.04] rounded-lg p-3">
+              <p className="text-white/40 text-xs mb-2">Tous les liens ({allLinks.length}) :</p>
+              {allLinks.map((link, index) => (
+                <div 
+                  key={index} 
+                  className={`flex items-center gap-2 py-1 px-2 rounded cursor-pointer hover:bg-white/10 transition-colors ${
+                    index === currentLinkIndex ? 'bg-green-500/20 border-l-2 border-green-400' : ''
+                  }`}
+                  onClick={() => openSpecificLink(link)}
+                >
+                  <span className={`text-xs ${index === currentLinkIndex ? 'text-white' : 'text-white/40'}`}>
+                    {index + 1}.
+                  </span>
+                  <span className={`text-xs truncate flex-1 ${index === currentLinkIndex ? 'text-white/80' : 'text-white/40'}`}>
+                    {link}
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); copyLink(link, index); }}
+                    className="text-white/30 hover:text-white/70"
+                  >
+                    {copiedIndex === index ? (
+                      <CheckIcon className="w-3 h-3 text-green-400" />
+                    ) : (
+                      <ClipboardIcon className="w-3 h-3" />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Stats */}
+            <div className="mt-4 text-center text-white/40 text-xs">
+              💡 Cliquez sur "Ouvrir WhatsApp" puis envoyez le message. 
+              Revenez ensuite pour passer à l'étudiant suivant.
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ✅ Formulaire de sélection des étudiants
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto relative rounded-2xl" style={{ fontFamily: "'Crimson Text', Georgia, serif" }}>
-        {/* Fond glass */}
         <div className="absolute inset-0 bg-cover bg-center rounded-2xl" style={{ backgroundImage: "url('/ok.png')" }} />
         <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(135deg, rgba(8,20,90,0.97) 0%, rgba(15,45,130,0.95) 40%, rgba(10,30,100,0.96) 70%, rgba(4,12,65,0.98) 100%)' }} />
         
         <div className="relative z-10 p-6">
-          {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
@@ -201,12 +369,11 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
                 Envoyer un message WhatsApp
               </h2>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+            <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
               <XMarkIcon className="w-5 h-5 text-white/60" />
             </button>
           </div>
 
-          {/* Stats */}
           {preview && (
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="bg-white/[0.04] rounded-lg p-3 text-center">
@@ -224,9 +391,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
             </div>
           )}
 
-          {/* Formulaire */}
           <div className="space-y-4">
-            {/* Destinataires */}
             <div>
               <label className="block text-sm text-white/70 mb-1">Destinataires</label>
               <select
@@ -241,7 +406,6 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
               </select>
             </div>
 
-            {/* Filtres */}
             {(formData.target === 'service' || formData.target === 'all') && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -271,7 +435,6 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
               </div>
             )}
 
-            {/* Sélection manuelle */}
             {formData.target === 'selected' && (
               <div className="bg-white/[0.04] rounded-lg p-3 max-h-48 overflow-y-auto">
                 <div className="flex items-center gap-2 mb-2">
@@ -301,7 +464,6 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
               </div>
             )}
 
-            {/* Message */}
             <div>
               <label className="block text-sm text-white/70 mb-1">Message</label>
               <textarea
@@ -317,10 +479,9 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
               </div>
             </div>
 
-            {/* Boutons */}
             <div className="flex gap-3 pt-4 border-t border-white/[0.08]">
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex-1 py-2.5 bg-white/10 text-white/70 rounded-lg text-sm hover:bg-white/20 transition-colors"
               >
                 Annuler
@@ -335,17 +496,16 @@ export const SendWhatsAppModal = ({ isOpen, onClose }: SendWhatsAppModalProps) =
                 ) : (
                   <>
                     <PaperAirplaneIcon className="w-4 h-4" />
-                    Envoyer via WhatsApp
+                    Générer les liens WhatsApp
                   </>
                 )}
               </button>
             </div>
 
-            {/* Avertissement */}
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
               <p className="text-amber-300/70 text-xs flex items-start gap-2">
-                <span className="text-amber-400">⚠️</span>
-                <span>Chaque étudiant recevra un lien WhatsApp individuel. Ouvrez le premier lien pour envoyer le message, puis passez au suivant en fermant l'onglet.</span>
+                <span className="text-amber-400">ℹ️</span>
+                <span>Les liens seront générés pour chaque étudiant. Vous pourrez ensuite les ouvrir un par un pour envoyer les messages.</span>
               </p>
             </div>
           </div>
