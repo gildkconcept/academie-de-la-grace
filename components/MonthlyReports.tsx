@@ -175,7 +175,7 @@ export const MonthlyReports = () => {
     }
   }
 
-  // ✅ FONCTION POUR RÉCUPÉRER LES CODES
+  // ✅ FONCTION POUR RÉCUPÉRER LES CODES - CORRIGÉE
   const fetchCodeSessions = async () => {
     setLoadingCodes(true)
     try {
@@ -183,7 +183,8 @@ export const MonthlyReports = () => {
       if (selectedCodeLevel !== 'all') params.append('level', selectedCodeLevel)
       if (selectedCodeDate) params.append('date', selectedCodeDate)
       
-      const response = await axiosInstance.get(`/sessions/history?${params.toString()}`)
+      // ✅ Utilisation de la route admin-history
+      const response = await axiosInstance.get(`/sessions/admin-history?${params.toString()}`)
       const sessions = response.data.sessions || []
       
       // Enrichir avec les stats
