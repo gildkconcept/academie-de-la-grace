@@ -204,97 +204,114 @@ export default function StudentDashboard() {
       <div className="fixed w-[250px] h-[250px] rounded-full bg-blue-600/8 blur-[100px] bottom-[10%] -left-[50px] z-20 pointer-events-none" />
 
       <div className="relative z-30 pb-20 sm:pb-24">
-        {/* Navigation */}
+        {/* ========== NAVIGATION AMÉLIORÉE ========== */}
         <nav className="sticky top-0 z-40 bg-[rgba(5,15,70,0.6)] backdrop-blur-2xl border-b border-white/[0.08]">
-          <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
-            <div className="flex justify-between items-center h-12 sm:h-14 md:h-16">
-              {/* Logo et titre */}
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+            <div className="flex justify-between items-center h-14 sm:h-16 md:h-18">
+              
+              {/* Menu + Titre */}
               <div className="flex items-center flex-1 min-w-0">
                 <button 
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
-                  className="lg:hidden p-1.5 sm:p-2 text-white/70 hover:text-white rounded-lg transition-colors"
+                  className="lg:hidden p-2 sm:p-2.5 text-white/70 hover:text-white rounded-xl hover:bg-white/10 transition-all"
                   aria-label="Menu"
                 >
-                  {mobileMenuOpen ? <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <Bars3Icon className="w-4 h-4 sm:w-5 sm:h-5" />}
+                  {mobileMenuOpen ? (
+                    <XMarkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                  ) : (
+                    <Bars3Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                  )}
                 </button>
-                <h1 className="text-xs sm:text-sm md:text-base lg:text-lg font-normal text-white ml-1 sm:ml-2 lg:ml-0 truncate" style={{ fontFamily: "'Playfair Display', serif" }}>
+                <h1 className="text-sm sm:text-base md:text-lg lg:text-xl font-normal text-white ml-2 sm:ml-3 lg:ml-0 truncate" style={{ fontFamily: "'Playfair Display', serif" }}>
                   {showProfile ? 'Mon profil' : 'Mon Espace'}
                 </h1>
               </div>
 
-              {/* Desktop */}
-              <div className="hidden lg:flex items-center gap-2 xl:gap-3">
+              {/* BOUTONS DESKTOP (plus grands) */}
+              <div className="hidden lg:flex items-center gap-3 xl:gap-4">
                 {user?.profileImageUrl ? (
                   <img 
                     src={user.profileImageUrl} 
                     alt="Photo" 
-                    className="w-8 h-8 xl:w-10 xl:h-10 rounded-full object-cover border-2 border-white/20"
+                    className="w-9 h-9 xl:w-11 xl:h-11 rounded-full object-cover border-2 border-white/20"
                     onError={(e) => {
                       console.error('Erreur chargement photo:', user.profileImageUrl);
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
                 ) : (
-                  <div className="w-8 h-8 xl:w-10 xl:h-10 rounded-full bg-white/10 flex items-center justify-center border-2 border-white/20">
-                    <span className="text-xs xl:text-sm font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                  <div className="w-9 h-9 xl:w-11 xl:h-11 rounded-full bg-white/10 flex items-center justify-center border-2 border-white/20">
+                    <span className="text-sm xl:text-base font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-1 xl:gap-1.5 px-2 xl:px-2.5 py-0.5 xl:py-1 bg-white/10 text-white/80 rounded-full text-[10px] xl:text-xs">
-                  <AcademicCapIcon className="w-3 h-3 xl:w-3.5 xl:h-3.5" /> Niv.{currentLevel}
+                
+                <div className="flex items-center gap-1.5 xl:gap-2 px-3 xl:px-3.5 py-1 xl:py-1.5 bg-white/10 text-white/80 rounded-full text-xs xl:text-sm">
+                  <AcademicCapIcon className="w-3.5 h-3.5 xl:w-4 xl:h-4" /> 
+                  Niv.{currentLevel}
                 </div>
+                
                 {user?.maisonGrace && (
-                  <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 bg-white/10 text-white/80 rounded-full text-xs">🏠 {user.maisonGrace}</div>
+                  <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-white/80 rounded-full text-sm">🏠 {user.maisonGrace}</div>
                 )}
+                
                 <NotificationBell />
                 <LiveStatus />
-                <button onClick={() => setShowChat(true)} className="flex items-center gap-1 xl:gap-1.5 px-2 xl:px-3 py-1 xl:py-1.5 bg-white/10 text-white/80 rounded-lg text-[10px] xl:text-xs hover:bg-white/20 transition-colors">
-                  <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 xl:w-4 xl:h-4" /> Chat
+                
+                <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 xl:gap-2 px-3 xl:px-4 py-2 xl:py-2.5 bg-white/10 text-white/80 rounded-xl text-sm xl:text-base hover:bg-white/20 transition-colors">
+                  <ChatBubbleLeftRightIcon className="w-4 h-4 xl:w-5 xl:h-5" /> Chat
                 </button>
-                <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 xl:gap-1.5 px-2 xl:px-3 py-1 xl:py-1.5 bg-white/10 text-white/80 rounded-lg text-[10px] xl:text-xs hover:bg-white/20 transition-colors">
-                  <UserCircleIcon className="w-3.5 h-3.5 xl:w-4 xl:h-4" /> Profil
+                
+                <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1.5 xl:gap-2 px-3 xl:px-4 py-2 xl:py-2.5 bg-white/10 text-white/80 rounded-xl text-sm xl:text-base hover:bg-white/20 transition-colors">
+                  <UserCircleIcon className="w-4 h-4 xl:w-5 xl:h-5" /> Profil
                 </button>
+                
                 <button 
                   onClick={refreshAllData} 
                   disabled={refreshing}
-                  className="px-2 xl:px-3 py-1 xl:py-1.5 bg-blue-500/20 text-blue-300 rounded-lg text-[10px] xl:text-xs hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+                  className="px-3 xl:px-4 py-2 xl:py-2.5 bg-blue-500/20 text-blue-300 rounded-xl text-sm xl:text-base hover:bg-blue-500/30 transition-colors disabled:opacity-50"
                 >
-                  <ArrowPathIcon className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                  <ArrowPathIcon className={`w-4 h-4 xl:w-5 xl:h-5 ${refreshing ? 'animate-spin' : ''}`} />
                 </button>
-                <button onClick={logout} className="px-2 xl:px-3 py-1 xl:py-1.5 bg-red-500/20 text-red-300 rounded-lg text-[10px] xl:text-xs hover:bg-red-500/30 transition-colors">
+                
+                <button onClick={logout} className="px-3 xl:px-4 py-2 xl:py-2.5 bg-red-500/20 text-red-300 rounded-xl text-sm xl:text-base hover:bg-red-500/30 transition-colors">
                   Déco
                 </button>
               </div>
 
-              {/* Mobile/Tablette */}
-              <div className="flex items-center gap-1 sm:gap-2 lg:hidden">
+              {/* BOUTONS MOBILE/TABLETTE (plus grands) */}
+              <div className="flex items-center gap-2 sm:gap-3 lg:hidden">
                 {user?.profileImageUrl ? (
                   <img 
                     src={user.profileImageUrl} 
                     alt="Photo" 
-                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover border border-white/20"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-white/20"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
                 ) : (
-                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-                    <span className="text-[10px] sm:text-xs font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                    <span className="text-sm sm:text-base font-bold text-white/60">{user?.name?.charAt(0)?.toUpperCase()}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/10 text-white/80 rounded-full text-[9px] sm:text-[10px]">
-                  <AcademicCapIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> {currentLevel}
+                
+                <div className="flex items-center gap-1 px-2 py-1 bg-white/10 text-white/80 rounded-full text-xs sm:text-sm">
+                  <AcademicCapIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> {currentLevel}
                 </div>
+                
                 <NotificationBell />
                 <LiveStatus />
+                
                 <button 
                   onClick={refreshAllData} 
                   disabled={refreshing}
-                  className="p-1 sm:p-1.5 text-blue-400 hover:text-blue-300"
+                  className="p-2 sm:p-2.5 text-blue-400 hover:text-blue-300"
                 >
-                  <ArrowPathIcon className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  <ArrowPathIcon className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
                 </button>
-                <button onClick={logout} className="p-1 sm:p-1.5 text-red-400 hover:text-red-300" aria-label="Déconnexion">
-                  <ArrowLeftOnRectangleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                
+                <button onClick={logout} className="p-2 sm:p-2.5 text-red-400 hover:text-red-300" aria-label="Déconnexion">
+                  <ArrowLeftOnRectangleIcon className="w-5 h-5 sm:w-5 sm:h-5" />
                 </button>
               </div>
             </div>
@@ -361,7 +378,7 @@ export default function StudentDashboard() {
           )}
         </nav>
 
-        {/* Le reste du JSX reste identique */}
+        {/* ========== LE RESTE RESTE IDENTIQUE ========== */}
         {showProfile ? (
           <ProfileSection user={user} onClose={() => {
             setShowProfile(false);
