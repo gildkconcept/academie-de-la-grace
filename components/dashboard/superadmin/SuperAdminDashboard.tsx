@@ -31,7 +31,9 @@ import {
   QrCodeIcon,
   UsersIcon,
   BookOpenIcon,
-  MegaphoneIcon
+  MegaphoneIcon,
+  PlusIcon,  // ✅ AJOUTÉ
+  FolderIcon // ✅ AJOUTÉ
 } from '@heroicons/react/24/outline'
 
 // Types
@@ -57,6 +59,7 @@ const sections = [
   { id: 'history', label: 'Historique', icon: ChartBarIcon, component: SessionsHistorySection },
   { id: 'codegen', label: 'Générer code', icon: QrCodeIcon, component: CodeGenerationSection },
   { id: 'students', label: 'Étudiants', icon: UsersIcon, component: StudentsListSection },
+  { id: 'documents', label: '📚 Documents', icon: FolderIcon, component: null }, // ✅ NOUVEAU
   { id: 'quiz', label: 'Quiz bibliques', icon: BookOpenIcon, component: QuizSection },
   { id: 'announcements', label: 'Annonces', icon: MegaphoneIcon, component: AnnouncementSection },
 ]
@@ -346,6 +349,41 @@ export default function SuperAdminDashboard() {
           showQuizSection={showQuizSection}
           setShowQuizSection={setShowQuizSection}
         />
+      )
+    }
+
+    // ✅ NOUVEAU - SECTION DOCUMENTS
+    if (activeSectionId === 'documents') {
+      return (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-normal text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
+              📚 Bibliothèque de documents
+            </h2>
+            <button
+              onClick={() => router.push('/dashboard/superadmin/documents')}
+              className="px-4 py-2 bg-white text-[#1a3a8f] rounded-lg text-sm font-bold hover:shadow-lg transition-all flex items-center gap-2"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Gérer les documents
+            </button>
+          </div>
+          
+          {/* Aperçu rapide des documents */}
+          <div className="bg-white/[0.06] backdrop-blur-2xl border border-white/[0.1] rounded-xl p-8 text-center">
+            <div className="text-6xl mb-4">📄</div>
+            <h3 className="text-white font-medium text-lg">Bibliothèque de documents</h3>
+            <p className="text-white/50 text-sm mt-2">
+              Gérez tous les documents PDF mis à disposition des étudiants
+            </p>
+            <button
+              onClick={() => router.push('/dashboard/superadmin/documents')}
+              className="mt-4 px-6 py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/20 transition-colors"
+            >
+              Accéder à la bibliothèque →
+            </button>
+          </div>
+        </div>
       )
     }
     

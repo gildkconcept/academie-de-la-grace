@@ -27,8 +27,10 @@ import {
   XMarkIcon,
   ArrowLeftOnRectangleIcon,
   QrCodeIcon,
-  AcademicCapIcon
+  AcademicCapIcon,
+  FolderIcon  // ✅ AJOUTÉ POUR DOCUMENTS
 } from '@heroicons/react/24/outline'
+import Link from 'next/link'  // ✅ AJOUTÉ POUR Link
 
 export default function StudentDashboard() {
   const { user, loading, logout, refreshUser } = useAuth()
@@ -317,7 +319,7 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {/* Menu mobile déroulant (reste identique) */}
+          {/* Menu mobile déroulant - AVEC LE LIEN VERS DOCUMENTS */}
           {mobileMenuOpen && (
             <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.98)] backdrop-blur-2xl">
               <div className="px-3 py-2 space-y-1">
@@ -334,6 +336,16 @@ export default function StudentDashboard() {
                     <p className="text-xs text-white/40">Niveau {currentLevel}</p>
                   </div>
                 </div>
+                
+                {/* ✅ NOUVEAU - Lien vers Documents */}
+                <Link 
+                  href="/dashboard/student/documents" 
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <FolderIcon className="w-4 h-4" />
+                  <span>📚 Documents</span>
+                </Link>
                 
                 <button 
                   onClick={() => { setShowChat(true); setMobileMenuOpen(false) }} 

@@ -20,7 +20,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   Bars3Icon,
-  PhoneIcon  // ✅ AJOUTÉ
+  PhoneIcon,
+  FolderIcon  // ✅ AJOUTÉ POUR DOCUMENTS
 } from '@heroicons/react/24/outline'
 import { SparklesIcon } from '@heroicons/react/24/solid'
 
@@ -32,13 +33,14 @@ interface SidebarProps {
   userRole: string
 }
 
-// ✅ Navigation principale
+// ✅ Navigation principale - AJOUT DE DOCUMENTS
 const navItems = [
   { id: 'overview', label: "Vue d'ensemble", icon: HomeIcon },
   { id: 'history', label: 'Historique', icon: ChartBarIcon },
   { id: 'codegen', label: 'Générer code', icon: QrCodeIcon },
   { id: 'students', label: 'Étudiants', icon: UsersIcon },
   { id: 'quiz', label: 'Quiz bibliques', icon: BookOpenIcon },
+  { id: 'documents', label: '📚 Documents', icon: FolderIcon }, // ✅ NOUVEAU
   { id: 'announcements', label: 'Annonces', icon: MegaphoneIcon },
 ]
 
@@ -50,10 +52,9 @@ const quickAccessItems = [
   { id: 'promotions', label: 'Promotions', icon: AcademicCapIcon, color: 'text-emerald-400', route: '/dashboard/superadmin/promotions' },
 ]
 
-// ✅ AJOUT DE WHATSAPP DANS ACTION ITEMS
 const actionItems = [
   { id: 'chat', label: 'Chat', icon: ChatBubbleLeftRightIcon, color: 'text-cyan-400', route: '/dashboard/superadmin/chat' },
-  { id: 'whatsapp', label: 'WhatsApp 📱', icon: PhoneIcon, color: 'text-green-400', route: '/dashboard/superadmin/whatsapp' }, // ✅ NOUVEAU
+  { id: 'whatsapp', label: 'WhatsApp 📱', icon: PhoneIcon, color: 'text-green-400', route: '/dashboard/superadmin/whatsapp' },
   { id: 'no-phone', label: 'Sans téléphone', icon: DevicePhoneMobileIcon, color: 'text-purple-400', route: '/dashboard/superadmin/no-phone' },
   { id: 'assisted', label: 'Présence assistée', icon: UserPlusIcon, color: 'text-indigo-400', route: '/dashboard/superadmin/assisted-attendance' },
 ]
