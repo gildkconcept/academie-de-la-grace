@@ -55,18 +55,14 @@ export const documentService = {
     },
 
     // Créer un document (superadmin)
-    async create(data: FormData) {
-        const response = await axiosInstance.post('/documents', data, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+    async create(data: any) {
+        const response = await axiosInstance.post('/documents', data);
         return response.data;
     },
 
     // Mettre à jour un document (superadmin)
-    async update(id: string, data: FormData) {
-        const response = await axiosInstance.put(`/documents/${id}`, data, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+    async update(id: string, data: any) {
+        const response = await axiosInstance.put(`/documents/${id}`, data);
         return response.data;
     },
 
@@ -90,8 +86,19 @@ export const documentService = {
 
     // Upload d'un fichier (superadmin)
     async uploadFile(file: File) {
+        // ✅ Vérifier le type du fichier
+        console.log('📄 [uploadFile] Fichier:', file.name, 'Type:', file.type, 'Taille:', file.size);
+        
+        // ✅ Vérifier si c'est un PDF
+        const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        if (!isPDF) {
+            console.error('❌ [uploadFile] Le fichier n\'est pas un PDF:', file.type);
+            throw new Error('Le fichier doit être un PDF');
+        }
+
         const formData = new FormData();
         formData.append('file', file);
+        
         const response = await axiosInstance.post('/documents/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
