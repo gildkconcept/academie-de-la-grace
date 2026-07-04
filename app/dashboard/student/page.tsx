@@ -28,9 +28,9 @@ import {
   ArrowLeftOnRectangleIcon,
   QrCodeIcon,
   AcademicCapIcon,
-  FolderIcon  // ✅ AJOUTÉ POUR DOCUMENTS
+  FolderIcon
 } from '@heroicons/react/24/outline'
-import Link from 'next/link'  // ✅ AJOUTÉ POUR Link
+import Link from 'next/link'
 
 export default function StudentDashboard() {
   const { user, loading, logout, refreshUser } = useAuth()
@@ -229,7 +229,7 @@ export default function StudentDashboard() {
                 </h1>
               </div>
 
-              {/* BOUTONS DESKTOP (plus grands) */}
+              {/* BOUTONS DESKTOP (plus grands) - AVEC LE BOUTON DOCUMENTS */}
               <div className="hidden lg:flex items-center gap-3 xl:gap-4">
                 {user?.profileImageUrl ? (
                   <img 
@@ -262,6 +262,15 @@ export default function StudentDashboard() {
                 <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 xl:gap-2 px-3 xl:px-4 py-2 xl:py-2.5 bg-white/10 text-white/80 rounded-xl text-sm xl:text-base hover:bg-white/20 transition-colors">
                   <ChatBubbleLeftRightIcon className="w-4 h-4 xl:w-5 xl:h-5" /> Chat
                 </button>
+                
+                {/* ✅ BOUTON DOCUMENTS POUR DESKTOP */}
+                <Link 
+                  href="/dashboard/student/documents" 
+                  className="flex items-center gap-1.5 xl:gap-2 px-3 xl:px-4 py-2 xl:py-2.5 bg-white/10 text-white/80 rounded-xl text-sm xl:text-base hover:bg-white/20 transition-colors"
+                >
+                  <FolderIcon className="w-4 h-4 xl:w-5 xl:h-5" />
+                  <span>Documents</span>
+                </Link>
                 
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1.5 xl:gap-2 px-3 xl:px-4 py-2 xl:py-2.5 bg-white/10 text-white/80 rounded-xl text-sm xl:text-base hover:bg-white/20 transition-colors">
                   <UserCircleIcon className="w-4 h-4 xl:w-5 xl:h-5" /> Profil
@@ -319,7 +328,7 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {/* Menu mobile déroulant - AVEC LE LIEN VERS DOCUMENTS */}
+          {/* Menu mobile déroulant */}
           {mobileMenuOpen && (
             <div className="lg:hidden border-t border-white/[0.08] bg-[rgba(5,15,70,0.98)] backdrop-blur-2xl">
               <div className="px-3 py-2 space-y-1">
@@ -337,7 +346,6 @@ export default function StudentDashboard() {
                   </div>
                 </div>
                 
-                {/* ✅ NOUVEAU - Lien vers Documents */}
                 <Link 
                   href="/dashboard/student/documents" 
                   className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
