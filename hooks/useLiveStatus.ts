@@ -3,7 +3,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
-import axiosInstance from '@/lib/axios'  
+import axiosInstance from '@/lib/axios'
+
+// 🔧 FIX : navigator.sendBeacon a besoin d'une URL ABSOLUE vers le backend.
+// Une URL relative comme '/api/live/heartbeat' part vers ton frontend
+// Vercel (qui n'a pas cette route) et échoue silencieusement, jamais
+// vers ton VPS. On réutilise la même base URL que ton axiosInstance.
+// ⚠️ Adapte le nom de la variable d'env si elle diffère dans ton projet
+// (vérifie ce que tu utilises déjà dans lib/axios.ts).
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
 export function useLiveStatus() {
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -19,40 +27,50 @@ export function useLiveStatus() {
     return () => clearInterval(interval)
   }, [])
 
-  // Heartbeat toutes les 5 minutes (300 secondes)
+  // Heartbeat toutes les 2 minutes (120 secondes)
   const sendHeartbeat = useCallback(async () => {
     try {
-      // Déterminer la page actuelle
       let currentPage = 'Dashboard'
       if (pathname?.includes('/quiz')) currentPage = 'Quiz'
       else if (pathname?.includes('/chat')) currentPage = 'Chat'
       else if (pathname?.includes('/profile')) currentPage = 'Profil'
       else if (pathname?.includes('/superadmin')) currentPage = 'Admin'
       else if (pathname?.includes('/manager')) currentPage = 'Manager'
-      
-      // ✅ Remplacer fetch par axiosInstance
+
       const response = await axiosInstance.post('/live/heartbeat', { currentPage })
-      
+
       if (response.data?.data?.connected_at && !connectedSince) {
         setConnectedSince(new Date(response.data.data.connected_at))
       }
       setIsOnline(true)
-    } catch (error) {
+    } catch (error: any) {
+      // 🔧 FIX : si le backend renvoie 429 (rate limit heartbeat), ce n'est
+      // pas une vraie erreur de connexion — on ne casse pas le statut "en ligne"
+      // pour un heartbeat en trop qui a été throttled côté serveur.
+      if (error?.response?.status === 429) {
+        console.warn('Heartbeat throttled (429), ignoré côté UI')
+        return
+      }
       console.error('Heartbeat error:', error)
+      setIsOnline(false)
     }
   }, [pathname, connectedSince])
 
   useEffect(() => {
     sendHeartbeat()
-    // Heartbeat toutes les 2 minutes
     const interval = setInterval(sendHeartbeat, 120000)
     return () => clearInterval(interval)
   }, [sendHeartbeat])
 
-  // Gérer la fermeture de l'onglet (fetch nu car sendBeacon ne supporte pas axios)
+  // Gérer la fermeture de l'onglet
   useEffect(() => {
     const handleBeforeUnload = () => {
-      navigator.sendBeacon('/api/live/heartbeat', JSON.stringify({ isOnline: false }))
+      if (!API_BASE_URL) return
+      // 🔧 FIX : URL absolue vers le backend, plus vers le frontend Next.js
+      navigator.sendBeacon(
+        `${API_BASE_URL}/live/heartbeat`,
+        new Blob([JSON.stringify({ isOnline: false })], { type: 'application/json' })
+      )
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
@@ -71,7 +89,7 @@ export function useLiveStatus() {
     const diff = Date.now() - connectedSince.getTime()
     const hours = Math.floor(diff / (1000 * 60 * 60))
     const minutes = Math.floor((diff % (3600000)) / 60000)
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}min`
     }
