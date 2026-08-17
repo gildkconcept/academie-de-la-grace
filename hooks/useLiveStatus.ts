@@ -8,10 +8,12 @@ import axiosInstance from '@/lib/axios'
 // 🔧 FIX : navigator.sendBeacon a besoin d'une URL ABSOLUE vers le backend.
 // Une URL relative comme '/api/live/heartbeat' part vers ton frontend
 // Vercel (qui n'a pas cette route) et échoue silencieusement, jamais
-// vers ton VPS. On réutilise la même base URL que ton axiosInstance.
-// ⚠️ Adapte le nom de la variable d'env si elle diffère dans ton projet
-// (vérifie ce que tu utilises déjà dans lib/axios.ts).
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''
+// vers ton VPS. On reproduit EXACTEMENT la même construction d'URL que
+// lib/axios.ts (baseURL = `${API_URL}/api`), fallback IP:port inclus,
+// pour être certain que sendBeacon tape sur la même route que le reste
+// de l'app.
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://85.31.238.112:3001'
+const API_BASE_URL = `${API_URL}/api`
 
 export function useLiveStatus() {
   const [currentTime, setCurrentTime] = useState(new Date())
