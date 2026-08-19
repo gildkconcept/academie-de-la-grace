@@ -127,6 +127,7 @@ export const CodeHistoryList = () => {
     }
   }
 
+  // ✅✅✅ EXPORT PDF AVEC TRI ALPHABÉTIQUE ✅✅✅
   const exportPDF = async (session: CodeSession) => {
     try {
       const doc = new jsPDF()
@@ -149,7 +150,12 @@ export const CodeHistoryList = () => {
       const response = await axiosInstance.get(`/attendance/session/${session.id}/students`)
       const students = response.data || []
 
-      const tableData = students.map((s: any) => [
+      // ✅✅✅ TRI ALPHABÉTIQUE PAR NOM ✅✅✅
+      const sortedStudents = [...students].sort((a: any, b: any) => 
+        (a.student_name || a.full_name || '').localeCompare(b.student_name || b.full_name || '', 'fr', { sensitivity: 'base' })
+      )
+
+      const tableData = sortedStudents.map((s: any) => [
         s.student_name || s.full_name || 'N/A',
         s.branch || '-',
         `Niv. ${s.level || 1}`,
@@ -446,7 +452,10 @@ export const CodeHistoryList = () => {
                 {detailStudents.length === 0 ? (
                   <div className="text-center py-8 text-white/40 text-sm">Aucun étudiant</div>
                 ) : (
-                  detailStudents.map((s: any) => (
+                  // ✅✅✅ TRI ALPHABÉTIQUE DANS LA MODALE AUSSI ✅✅✅
+                  [...detailStudents].sort((a: any, b: any) => 
+                    (a.student_name || a.full_name || '').localeCompare(b.student_name || b.full_name || '', 'fr', { sensitivity: 'base' })
+                  ).map((s: any) => (
                     <div key={s.id} className="flex justify-between items-center p-2 bg-white/[0.04] border border-white/[0.06] rounded-lg">
                       <span className="text-sm text-white/80">{s.student_name || s.full_name || 'N/A'}</span>
                       <div className="flex items-center gap-3">
