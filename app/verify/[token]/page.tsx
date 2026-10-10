@@ -32,7 +32,12 @@ export default function VerifyCardPage() {
   const [photoFailed, setPhotoFailed] = useState(false)
 
   const verify = useCallback(async () => {
-    if (!token) return
+    if (!token) {
+      // Lien sans jeton : on l'indique au lieu de tourner indéfiniment
+      setResult({ valid: false, status: 'unknown' })
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setPhotoFailed(false)
     setResult(await cardService.verify(token))

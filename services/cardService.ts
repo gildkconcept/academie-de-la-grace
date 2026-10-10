@@ -44,13 +44,21 @@ export interface VerifyResult {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://85.31.238.112:3001'
 
 // Adresse de la page de vérification qui sera encodée dans le QR code.
-// Pour des cartes imprimées, définissez NEXT_PUBLIC_SITE_URL (adresse de production du site)
-// afin que le QR ne contienne jamais l'adresse d'un aperçu Vercel.
+// Pour des cartes imprimées, définissez NEXT_PUBLIC_SITE_URL (adresse de production du site).
+// La valeur est nettoyée : "https://" est ajouté s'il manque, et tout chemin ou "/" final est retiré
+// (sinon un QR sans "https://" s'ouvre mal sur les téléphones). Si la valeur est inutilisable,
+// on retombe sur l'adresse du site actuellement ouvert.
 export function getVerifyUrl(token: string): string {
-  const base = (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : '')
-  ).replace(/\/+$/, '')
+  const raw = (process.env.NEXT_PUBLIC_SITE_URL || '').trim()
+  let base = ''
+  if (raw) {
+    try {
+      base = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).origin
+    } catch {
+      base = ''
+    }
+  }
+  if (!base && typeof window !== 'undefined') base = window.location.origin
   return `${base}/verify/${token}`
 }
 
