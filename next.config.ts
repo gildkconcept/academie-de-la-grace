@@ -1,14 +1,11 @@
 /** @type {import('next').NextConfig} */
 
 // Adresse du backend utilisée par le proxy /api de Next.js.
-// - Si BACKEND_URL est définie sur Vercel (recommandé : l'adresse HTTPS de votre API,
-//   sans "/api" à la fin), elle est utilisée.
-// - Sinon on garde EXACTEMENT le comportement actuel (rien ne casse).
-const BACKEND_URL = (
-  process.env.BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  'http://85.31.238.112:3001'
-).replace(/\/+$/, '')
+// IMPORTANT : on lit UNIQUEMENT la variable BACKEND_URL (jamais NEXT_PUBLIC_API_URL).
+// NEXT_PUBLIC_API_URL est l'adresse que le NAVIGATEUR appelle : elle peut être l'adresse du
+// site lui-même, et l'utiliser ici ferait boucler le proxy sur lui-même (erreur 508).
+// Sans BACKEND_URL, on garde EXACTEMENT le comportement d'origine (IP du VPS).
+const BACKEND_URL = (process.env.BACKEND_URL || 'http://85.31.238.112:3001').replace(/\/+$/, '')
 
 const nextConfig = {
   eslint: {
