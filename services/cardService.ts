@@ -1,94 +1,117 @@
-// services/cardService.ts
-// Carte d'identité numérique de l'étudiant.
+// services/cardScanService.ts
+// Pointage des présences par scan de carte (superadmin).
 import axiosInstance from '@/lib/axios'
 
-export type CardStatus = 'active' | 'revoked'
-
-export interface MyCard {
-  card: {
-    cardNumber: string
-    status: CardStatus
-    issuedAt: string
-    verifyToken: string
-  }
-  student: {
-    fullName: string
-    firstName: string | null
-    lastName: string | null
-    branch: string | null
-    level: number | null
-    serviceName: string | null
-    profileImageUrl: string | null
-  }
+export interface AttendanceCounts {
+  present: number
+  late: number
+  absent: number
+  byMethod: Record<string, number>
 }
 
-export type VerifyStatus =
-  | 'valid'
+export interface ScanSession {
+  id: string
+  code: string
+  date: string
+  level: number | null
+  createdAt: string
+  expiresAt: string
+  codeOpen: boolean
+  counts: AttendanceCounts
+}
+
+export type ScanOutcome =
+  | 'recorded'
+  | 'upgraded'
+  | 'already_present'
+  | 'not_eligible'
+  | 'invalid_card'
   | 'revoked'
-  | 'invalid'
-  | 'unknown'
-  | 'unavailable'
+  | 'session_closed'
+  | 'session_not_found'
+  | 'technical'
   | 'rate_limited'
-  | 'error'
+  | 'network_error'
 
-export interface VerifyResult {
-  valid: boolean
-  status: VerifyStatus
-  cardNumber?: string
-  issuedAt?: string
-  revokedAt?: string | null
-  student?: { fullName: string; photoUrl: string | null }
+export interface ScanStudent {
+  fullName: string
+  photoUrl: string | null
+  branch: string | null
+  serviceName: string | null
+  level: number | null
+  cardNumber: string
 }
 
-// Même adresse que lib/axios.ts
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://85.31.238.112:3001'
-
-// Adresse de la page de vérification qui sera encodée dans le QR code.
-// Pour des cartes imprimées, définissez NEXT_PUBLIC_SITE_URL (adresse de production du site).
-// La valeur est nettoyée : "https://" est ajouté s'il manque, et tout chemin ou "/" final est retiré
-// (sinon un QR sans "https://" s'ouvre mal sur les téléphones). Si la valeur est inutilisable,
-// on retombe sur l'adresse du site actuellement ouvert.
-export function getVerifyUrl(token: string): string {
-  const raw = (process.env.NEXT_PUBLIC_SITE_URL || '').trim()
-  let base = ''
-  if (raw) {
-    try {
-      base = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).origin
-    } catch {
-      base = ''
-    }
-  }
-  if (!base && typeof window !== 'undefined') base = window.location.origin
-  return `${base}/verify/${token}`
+export interface ScanResult {
+  ok: boolean
+  outcome: ScanOutcome
+  message: string
+  student?: ScanStudent
+  card?: { cardNumber: string }
+  previous?: { status: string; method: string | null; at: string | null }
+  scannedAt?: string
+  reason?: string
 }
 
-export const cardService = {
-  // Carte de l'étudiant connecté (authentifié)
-  async getMyCard(): Promise<MyCard> {
-    const { data } = await axiosInstance.get('/cards/me')
+export interface AttendanceItem {
+  studentId: string | null
+  fullName: string
+  photoUrl: string | null
+  branch: string | null
+  serviceName: string | null
+  level: number | null
+  status: string
+  method: string | null
+  scannedAt: string
+}
+
+export interface SessionAttendance {
+  session: { id: string; code: string; date: string; level: number | null; expiresAt: string }
+  counts: AttendanceCounts
+  items: AttendanceItem[]
+}
+
+export const cardScanService = {
+  async listSessions(): Promise<ScanSession[]> {
+    const { data } = await axiosInstance.get('/card-scan/sessions')
+    return data.sessions || []
+  },
+
+  async getAttendance(sessionId: string): Promise<SessionAttendance> {
+    const { data } = await axiosInstance.get(`/card-scan/sessions/${sessionId}/attendance`)
     return data
   },
 
-  // Vérification PUBLIQUE (aucune connexion requise).
-  // On utilise fetch et non axiosInstance : l'intercepteur d'axios redirigerait un visiteur
-  // non connecté vers /login en cas de 401, ce qui est exactement ce qu'il ne faut pas ici.
-  async verify(token: string): Promise<VerifyResult> {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 15000)
+  // Ne lève jamais d'erreur : renvoie toujours un résultat affichable
+  async scan(sessionId: string, token: string): Promise<ScanResult> {
     try {
-      const res = await fetch(`${API_URL}/api/cards/verify/${encodeURIComponent(token)}`, {
-        method: 'GET',
-        cache: 'no-store',
-        referrerPolicy: 'no-referrer',
-        signal: controller.signal,
-      })
-      const data = await res.json().catch(() => null)
-      if (data && typeof data.status === 'string') return data as VerifyResult
-      return { valid: false, status: 'error' }
-    } catch {
-      return { valid: false, status: 'error' }
-    } finally {
-      clearTimeout(timer)
+      const { data } = await axiosInstance.post('/card-scan/scan', { sessionId, token })
+      return data as ScanResult
+    } catch (error: any) {
+      const data = error?.response?.data
+      if (data && typeof data.outcome === 'string') return data as ScanResult
+      if (error?.response) {
+        return {
+          ok: false,
+          outcome: 'technical',
+          message: data?.message || data?.error || "Impossible d'enregistrer la présence, veuillez réessayer",
+        }
+      }
+      return {
+        ok: false,
+        outcome: 'network_error',
+        message: "Connexion perdue : la présence n'a PAS été enregistrée. Réessayez.",
+      }
     }
+  },
+
+  async getMissingCards(): Promise<{ totalActive: number; missing: number }> {
+    const { data } = await axiosInstance.get('/card-scan/missing-cards')
+    return data
+  },
+
+  async generateMissingCards(): Promise<{ created: number; totalActive: number; alreadyHadCard: number }> {
+    const { data } = await axiosInstance.post('/card-scan/generate-missing-cards')
+    return data
   },
 }

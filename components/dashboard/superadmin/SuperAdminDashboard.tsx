@@ -32,8 +32,8 @@ import {
   UsersIcon,
   BookOpenIcon,
   MegaphoneIcon,
-  PlusIcon,  // ✅ AJOUTÉ
-  FolderIcon // ✅ AJOUTÉ
+  PlusIcon,
+  FolderIcon
 } from '@heroicons/react/24/outline'
 
 // Types
@@ -59,7 +59,7 @@ const sections = [
   { id: 'history', label: 'Historique', icon: ChartBarIcon, component: SessionsHistorySection },
   { id: 'codegen', label: 'Générer code', icon: QrCodeIcon, component: CodeGenerationSection },
   { id: 'students', label: 'Étudiants', icon: UsersIcon, component: StudentsListSection },
-  { id: 'documents', label: '📚 Documents', icon: FolderIcon, component: null }, // ✅ NOUVEAU
+  { id: 'documents', label: '📚 Documents', icon: FolderIcon, component: null },
   { id: 'quiz', label: 'Quiz bibliques', icon: BookOpenIcon, component: QuizSection },
   { id: 'announcements', label: 'Annonces', icon: MegaphoneIcon, component: AnnouncementSection },
 ]
@@ -110,7 +110,7 @@ export default function SuperAdminDashboard() {
     }
   }, [user, loading, router])
 
-  // ✅ useEffect avec TOUTES les dépendances pour appliquer les filtres
+  // useEffect avec TOUTES les dépendances pour appliquer les filtres
   useEffect(() => {
     applyFilters()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,7 +154,7 @@ export default function SuperAdminDashboard() {
     }
   }
 
-  // ✅ Fonction applyFilters AMÉLIORÉE avec recherche robuste
+  // Fonction applyFilters améliorée avec recherche robuste
   const applyFilters = useCallback(() => {
     if (!students || students.length === 0) {
       setFilteredStudents([])
@@ -184,7 +184,7 @@ export default function SuperAdminDashboard() {
       filtered = filtered.filter(s => s.baptized === isBaptized)
     }
     
-    // ✅ FILTRE RECHERCHE - Version robuste avec gestion des valeurs nulles
+    // FILTRE RECHERCHE - Version robuste avec gestion des valeurs nulles
     if (studentSearchTerm && studentSearchTerm.trim() !== '') {
       const search = studentSearchTerm.toLowerCase().trim()
       filtered = filtered.filter(s => {
@@ -228,27 +228,49 @@ export default function SuperAdminDashboard() {
     }
   }
 
+  // =====================================================
+  // ✅ FONCTION PDF CORRIGÉE AVEC TRI ALPHABÉTIQUE
+  // =====================================================
   const generateStudentsPDF = async () => {
     if (filteredStudents.length === 0) {
       toast.error('Aucun étudiant à exporter')
       return
     }
 
+    // ✅ TRI ALPHABÉTIQUE PAR NOM
+    const sortedStudents = [...filteredStudents].sort((a, b) => 
+      a.full_name.localeCompare(b.full_name)
+    )
+
     const doc = new jsPDF({ orientation: 'landscape' })
     
     doc.setFontSize(20)
     doc.text('Académie de la Grâce', 148, 15, { align: 'center' })
     doc.setFontSize(16)
-    doc.text('Liste des étudiants', 148, 25, { align: 'center' })
+    doc.text('Liste des étudiants (tri alphabétique)', 148, 25, { align: 'center' })
     
     const now = new Date()
     doc.setFontSize(10)
     doc.text(`Généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}`, 148, 33, { align: 'center' })
     
+    // Afficher les filtres appliqués
+    let filtersText = ''
+    if (selectedService !== 'all') {
+      const service = services.find(s => s.id === selectedService)
+      filtersText += `Service: ${service?.name || selectedService} | `
+    }
+    if (selectedLevel !== 'all') filtersText += `Niveau ${selectedLevel} | `
+    if (selectedBranch !== 'all') filtersText += `Branche: ${selectedBranch}`
+    if (filtersText) {
+      doc.setFontSize(9)
+      doc.text(`Filtres: ${filtersText}`, 20, 42)
+    }
+    
     doc.setFontSize(12)
-    doc.text(`Total: ${filteredStudents.length} étudiants`, 20, 45)
+    doc.text(`Total: ${sortedStudents.length} étudiants`, 20, filtersText ? 50 : 45)
 
-    const tableData = filteredStudents.map(student => {
+    // Utiliser les étudiants triés pour le tableau
+    const tableData = sortedStudents.map(student => {
       const studentService = services.find(s => s.id === student.service_id)
       return [
         student.full_name || 'N/A',
@@ -265,15 +287,28 @@ export default function SuperAdminDashboard() {
     autoTable(doc, {
       head: [['Nom', 'Username', 'Service', 'Niveau', 'Branche', 'Baptême', 'Maison grâce', 'Téléphone']],
       body: tableData,
-      startY: 52,
-      styles: { fontSize: 8 },
+      startY: filtersText ? 57 : 52,
+      styles: { fontSize: 7 },
       headStyles: { fillColor: [79, 70, 229] },
-      alternateRowStyles: { fillColor: [240, 240, 240] }
+      alternateRowStyles: { fillColor: [240, 240, 240] },
+      columnStyles: {
+        0: { cellWidth: 35 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 15 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 15 },
+        6: { cellWidth: 25 },
+        7: { cellWidth: 25 }
+      }
     })
 
-    doc.save(`etudiants_${now.toISOString().split('T')[0]}.pdf`)
+    doc.save(`etudiants_tries_${now.toISOString().split('T')[0]}.pdf`)
     toast.success('PDF généré avec succès')
   }
+  // =====================================================
+  // FIN DE LA FONCTION CORRIGÉE
+  // =====================================================
 
   if (loading) {
     return <LoadingSpinner />
@@ -352,7 +387,7 @@ export default function SuperAdminDashboard() {
       )
     }
 
-    // ✅ NOUVEAU - SECTION DOCUMENTS
+    // SECTION DOCUMENTS
     if (activeSectionId === 'documents') {
       return (
         <div className="space-y-6">

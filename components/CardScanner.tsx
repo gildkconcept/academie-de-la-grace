@@ -6,7 +6,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { cameraErrorMessage, decodeFrame, preloadQrDecoder } from '../lib/Qrdecode'
+import { cameraErrorMessage, decodeFrame, preloadQrDecoder } from '@/lib/qrDecode'
 
 interface CardScannerProps {
   active: boolean
