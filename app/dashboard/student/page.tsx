@@ -15,7 +15,6 @@ import { ChatBubbleLeftRightIcon, ArrowPathIcon } from '@heroicons/react/24/outl
 import { ChatGroups } from '@/components/ChatGroups'
 import { ChatMessages } from '@/components/ChatMessages'
 import { DailyVerseCard } from '@/components/DailyVerseCard'
-import { StudentCardPreview } from '@/components/StudentCardPreview'
 import { LiveStatus } from '@/components/LiveStatus'
 import { sessionService } from '@/services/sessionService'
 import { quizService } from '@/services/quizService'
@@ -408,7 +407,6 @@ export default function StudentDashboard() {
         ) : (
           <div className="max-w-7xl mx-auto py-2 sm:py-4 md:py-6 px-2 sm:px-4 lg:px-8">
             <DailyVerseCard />
-            <StudentCardPreview />
             
             <div className="grid grid-cols-3 gap-1.5 sm:gap-3 md:gap-4 mb-3 sm:mb-4 md:mb-6">
               {[
