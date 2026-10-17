@@ -7,27 +7,34 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { IdentificationIcon } from '@heroicons/react/24/outline'
-import { cardService, MyCard } from '@/services/cardService'
+import { cardService, MyCard } from '../../academie-de-la-grace/services/cardService'
 
 export function StudentCardPreview() {
   const [data, setData] = useState<MyCard | null>(null)
   const [loading, setLoading] = useState(true)
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState(false)€
   const [photoFailed, setPhotoFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    cardService
-      .getMyCard()
-      .then((res) => {
-        if (!cancelled) setData(res)
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+    try {
+      cardService
+        .getMyCard()
+        .then((res) => {
+          if (!cancelled) setData(res)
+        })
+        .catch(() => {
+          if (!cancelled) setFailed(true)
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    } catch {
+      // Erreur immédiate (par exemple service indisponible) : on masque l'aperçu
+      // au lieu de faire planter tout le tableau de bord.
+      setFailed(true)
+      setLoading(false)
+    }
     return () => {
       cancelled = true
     }
